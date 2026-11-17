@@ -24,7 +24,7 @@ namespace ZenQOffice.UI
         {
             _releaseInfo = initialInfo;
 
-            Text = "Cập nhật ứng dụng ZENQ OFFICE";
+            Text = AppL10n.T("Cập nhật ứng dụng ZENQ OFFICE", "ZENQ OFFICE Updater");
             Size = new Size(500, 290);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -75,7 +75,7 @@ namespace ZenQOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "Cập nhật Phần mềm ZENQ OFFICE",
+                Text = AppL10n.T("Cập nhật Phần mềm ZENQ OFFICE", "ZENQ OFFICE Software Update"),
                 Font = new Font("Segoe UI", 11.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(66, 12),
@@ -86,7 +86,7 @@ namespace ZenQOffice.UI
 
             Label lblSubTitle = new Label
             {
-                Text = "Hệ thống kiểm tra và tải bản cập nhật tự động",
+                Text = AppL10n.T("Hệ thống kiểm tra và tải bản cập nhật tự động", "Automatic update checker & installer"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(68, 36),
@@ -116,7 +116,7 @@ namespace ZenQOffice.UI
 
             Label lblCurTitle = new Label
             {
-                Text = "Phiên bản hiện tại:",
+                Text = AppL10n.T("Phiên bản hiện tại:", "Current Version:"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(16, 12),
@@ -146,7 +146,7 @@ namespace ZenQOffice.UI
 
             Label lblNewTitle = new Label
             {
-                Text = "Phiên bản mới nhất:",
+                Text = AppL10n.T("Phiên bản mới nhất:", "Latest Version:"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(210, 12),
@@ -156,7 +156,7 @@ namespace ZenQOffice.UI
 
             _lblNewVersion = new Label
             {
-                Text = "Đang kiểm tra...",
+                Text = AppL10n.T("Đang kiểm tra...", "Checking..."),
                 Font = new Font("Segoe UI", 12f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(2, 132, 199),
                 Location = new Point(210, 34),
@@ -169,7 +169,7 @@ namespace ZenQOffice.UI
             // 3. Status Label
             _lblStatus = new Label
             {
-                Text = "Đang kết nối đến máy chủ cập nhật...",
+                Text = AppL10n.T("Đang kết nối đến máy chủ cập nhật...", "Connecting to update server..."),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Location = new Point(20, 158),
@@ -217,7 +217,7 @@ namespace ZenQOffice.UI
 
             _btnCheckAgain = new Button
             {
-                Text = "Kiểm tra lại",
+                Text = AppL10n.T("Kiểm tra lại", "Check Again"),
                 Size = new Size(115, 32),
                 Location = new Point(20, 10),
                 BackColor = Color.White,
@@ -235,7 +235,7 @@ namespace ZenQOffice.UI
 
             _btnUpdate = new Button
             {
-                Text = "Cập nhật ngay",
+                Text = AppL10n.T("Cập nhật ngay", "Update Now"),
                 Size = new Size(135, 32),
                 Location = new Point(235, 10),
                 BackColor = Color.FromArgb(210, 71, 38),
@@ -256,7 +256,7 @@ namespace ZenQOffice.UI
 
             _btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 Size = new Size(95, 32),
                 Location = new Point(379, 10),
                 BackColor = Color.White,
@@ -300,11 +300,11 @@ namespace ZenQOffice.UI
             _progressBar.Visible = false;
             _lblProgress.Visible = false;
             _lblStatus.Visible = true;
-            _lblStatus.Text = "ℹ️ Đã dừng tải bản cập nhật.";
+            _lblStatus.Text = AppL10n.T("ℹ️ Đã dừng tải bản cập nhật.", "ℹ️ Update download canceled.");
             _lblStatus.ForeColor = Color.FromArgb(100, 116, 139);
             _btnUpdate.Enabled = true;
             _btnCheckAgain.Enabled = true;
-            _btnClose.Text = "Đóng";
+            _btnClose.Text = AppL10n.T("Đóng", "Close");
             _btnClose.Enabled = true;
         }
 
@@ -313,9 +313,9 @@ namespace ZenQOffice.UI
             _btnCheckAgain.Enabled = false;
             _btnUpdate.Enabled = false;
             _lblStatus.Visible = true;
-            _lblStatus.Text = "Đang kiểm tra phiên bản mới...";
+            _lblStatus.Text = AppL10n.T("Đang kiểm tra phiên bản mới...", "Checking for updates...");
             _lblStatus.ForeColor = Color.FromArgb(71, 85, 105);
-            _lblNewVersion.Text = "Đang kiểm tra...";
+            _lblNewVersion.Text = AppL10n.T("Đang kiểm tra...", "Checking...");
             _lblNewVersion.ForeColor = Color.FromArgb(2, 132, 199);
             _progressBar.Visible = false;
             _lblProgress.Visible = false;
@@ -343,13 +343,13 @@ namespace ZenQOffice.UI
 
             if (info.HasUpdate)
             {
-                string newVer = string.IsNullOrEmpty(info.TagName) ? "Bản mới" : info.TagName;
+                string newVer = string.IsNullOrEmpty(info.TagName) ? AppL10n.T("Bản mới", "New Build") : info.TagName;
                 _lblNewVersion.Text = newVer;
                 _lblNewVersion.ForeColor = Color.FromArgb(16, 185, 129); // Emerald green
-                _lblStatus.Text = "✨ Đã có bản cập nhật mới (" + newVer + ") sẵn sàng tải xuống!";
+                _lblStatus.Text = AppL10n.T($"✨ Đã có bản cập nhật mới ({newVer}) sẵn sàng tải xuống!", $"✨ New update ({newVer}) is ready to download!");
                 _lblStatus.ForeColor = Color.FromArgb(16, 185, 129);
                 _btnUpdate.Enabled = true;
-                _btnUpdate.Text = "Cập nhật ngay";
+                _btnUpdate.Text = AppL10n.T("Cập nhật ngay", "Update Now");
                 _btnUpdate.BackColor = Color.FromArgb(210, 71, 38);
             }
             else if (!string.IsNullOrEmpty(info.ErrorMessage))
@@ -359,17 +359,17 @@ namespace ZenQOffice.UI
                 _lblStatus.Text = "ℹ️ " + info.ErrorMessage;
                 _lblStatus.ForeColor = Color.FromArgb(100, 116, 139);
                 _btnUpdate.Enabled = false;
-                _btnUpdate.Text = "Đã mới nhất";
+                _btnUpdate.Text = AppL10n.T("Đã mới nhất", "Up to Date");
                 _btnUpdate.BackColor = Color.FromArgb(148, 163, 184);
             }
             else
             {
                 _lblNewVersion.Text = string.IsNullOrEmpty(info.TagName) ? UpdateManager.CURRENT_VERSION_TAG : info.TagName;
                 _lblNewVersion.ForeColor = Color.FromArgb(16, 185, 129);
-                _lblStatus.Text = "✅ Ứng dụng của bạn đang ở phiên bản mới nhất (" + _lblNewVersion.Text + ").";
+                _lblStatus.Text = AppL10n.T($"✅ Ứng dụng của bạn đang ở phiên bản mới nhất ({_lblNewVersion.Text}).", $"✅ You are up to date ({_lblNewVersion.Text}).");
                 _lblStatus.ForeColor = Color.FromArgb(16, 185, 129);
                 _btnUpdate.Enabled = false;
-                _btnUpdate.Text = "Đã mới nhất";
+                _btnUpdate.Text = AppL10n.T("Đã mới nhất", "Up to Date");
                 _btnUpdate.BackColor = Color.FromArgb(148, 163, 184);
             }
         }
@@ -382,12 +382,12 @@ namespace ZenQOffice.UI
             _btnUpdate.Enabled = false;
             _btnCheckAgain.Enabled = false;
             _btnClose.Enabled = true;
-            _btnClose.Text = "Hủy";
+            _btnClose.Text = AppL10n.T("Hủy", "Cancel");
             _lblStatus.Visible = false;
             _progressBar.Visible = true;
             _progressBar.Value = 0;
             _lblProgress.Visible = true;
-            _lblProgress.Text = "Đang bắt đầu tải xuống...";
+            _lblProgress.Text = AppL10n.T("Đang bắt đầu tải xuống...", "Starting download...");
 
             UpdateManager.DownloadAndApplyUpdate(_releaseInfo,
                 (percent, currentBytes, totalBytes) =>
@@ -414,7 +414,7 @@ namespace ZenQOffice.UI
                         BeginInvoke((MethodInvoker)delegate
                         {
                             if (IsDisposed) return;
-                            _lblProgress.Text = "🎉 Tải xong! Đang cài đặt bản cập nhật...";
+                            _lblProgress.Text = AppL10n.T("🎉 Tải xong! Đang cài đặt bản cập nhật...", "🎉 Download complete! Installing update...");
                             _lblProgress.ForeColor = Color.FromArgb(16, 185, 129);
                         });
                     }
@@ -432,13 +432,13 @@ namespace ZenQOffice.UI
                             _btnUpdate.Enabled = true;
                             _btnCheckAgain.Enabled = true;
                             _btnClose.Enabled = true;
-                            _btnClose.Text = "Đóng";
+                            _btnClose.Text = AppL10n.T("Đóng", "Close");
                             _progressBar.Visible = false;
                             _lblProgress.Visible = false;
                             _lblStatus.Visible = true;
                             _lblStatus.Text = "❌ " + errorMsg;
                             _lblStatus.ForeColor = Color.FromArgb(239, 68, 68);
-                            ZenQOffice.UI.FluentMessageBox.Show(this, errorMsg, "Lỗi cập nhật", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(this, errorMsg, AppL10n.T("Lỗi cập nhật", "Update Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                         });
                     }
                     catch { }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -58,7 +59,7 @@ namespace ZenQOffice.UI
 
             Label lblHeader = new Label
             {
-                Text = "Hiệu ứng đối tượng (Theme Effects)",
+                Text = AppL10n.Tr("Hiệu ứng đối tượng (Theme Effects)"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(10, 8),
@@ -115,14 +116,14 @@ namespace ZenQOffice.UI
                     using (Font nf = new Font("Segoe UI", 8.5f, isSel ? FontStyle.Bold : FontStyle.Regular))
                     using (SolidBrush nb = new SolidBrush(isSel ? Color.FromArgb(29, 78, 216) : Color.FromArgb(30, 41, 59)))
                     {
-                        g.DrawString(eff.Name, nf, nb, 38, 4);
+                        g.DrawString(AppL10n.Tr(eff.Name), nf, nb, 38, 4);
                     }
 
                     // Description
                     using (Font df = new Font("Segoe UI", 7.0f, FontStyle.Regular))
                     using (SolidBrush db = new SolidBrush(Color.FromArgb(100, 116, 139)))
                     {
-                        g.DrawString(eff.Description, df, db, 38, 20);
+                        g.DrawString(AppL10n.Tr(eff.Description), df, db, 38, 20);
                     }
                 };
 

@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -566,7 +567,7 @@ namespace ZenQOffice.UI
                 using (Font txtFont = new Font("Segoe UI", 9.2f, FontStyle.Regular))
                 using (SolidBrush tb = new SolidBrush(Color.FromArgb(30, 41, 59)))
                 {
-                    g.DrawString("Kh\u00f4ng c\u00f3 m\u00e0u (No Color)", txtFont, tb, swatchX + 28, curY + 4);
+                    g.DrawString(AppL10n.Tr("Kh\u00f4ng c\u00f3 m\u00e0u (No Color)"), txtFont, tb, swatchX + 28, curY + 4);
                 }
             }
 
@@ -808,7 +809,7 @@ namespace ZenQOffice.UI
             using (Font itemFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
             using (SolidBrush tb = new SolidBrush(Color.FromArgb(32, 31, 30)))
             {
-                g.DrawString("Không có màu", itemFont, tb, 40, noColY + 4);
+                g.DrawString(AppL10n.Tr("Không có màu"), itemFont, tb, 40, noColY + 4);
             }
 
             // 2. Nút "Dừng tô màu" (Stop Highlighting)
@@ -826,7 +827,7 @@ namespace ZenQOffice.UI
             using (Font itemFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
             using (SolidBrush tb = new SolidBrush(Color.FromArgb(32, 31, 30)))
             {
-                g.DrawString("Dừng tô màu", itemFont, tb, 14, stopY + 4);
+                g.DrawString(AppL10n.Tr("Dừng tô màu"), itemFont, tb, 14, stopY + 4);
             }
         }
 

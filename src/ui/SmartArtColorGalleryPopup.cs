@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -295,7 +296,7 @@ namespace ZenQOffice.UI
             {
                 foreach (var grp in groups)
                 {
-                    g.DrawString(grp.Title, groupFont, groupBrush, 10, grp.Items[0].Bounds.Y - 18);
+                    g.DrawString(AppL10n.Tr(grp.Title), groupFont, groupBrush, 10, grp.Items[0].Bounds.Y - 18);
 
                     foreach (var it in grp.Items)
                     {

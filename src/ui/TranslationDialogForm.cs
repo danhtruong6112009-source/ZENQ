@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -60,7 +61,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Dịch thuật Đa ngôn ngữ (Translator - Office 365)";
+            this.Text = AppL10n.T("Dịch thuật Đa ngôn ngữ (Translator - Office 365)", "Translator");
             this.Size = new Size(520, 520);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -81,15 +82,15 @@ namespace ZenQOffice.UI
                 using (Font hf = new Font("Segoe UI", 11.5f, FontStyle.Bold))
                 using (Font sub = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("Dịch thuật Trí tuệ Nhân tạo (Office 365 AI Translator)", hf, Brushes.White, 46, 8);
-                    e.Graphics.DrawString("Chuyển ngữ đa chiều toàn vẹn ngữ cảnh văn bản cho Writer, Calc và Slides", sub, Brushes.WhiteSmoke, 46, 32);
+                    e.Graphics.DrawString(AppL10n.T("Dịch thuật Trí tuệ Nhân tạo (Office 365 AI Translator)", "AI Document Translator"), hf, Brushes.White, 46, 8);
+                    e.Graphics.DrawString(AppL10n.T("Chuyển ngữ đa chiều toàn vẹn ngữ cảnh văn bản cho Writer, Calc và Slides", "Context-aware neural translation for Writer, Calc, and Slides"), sub, Brushes.WhiteSmoke, 46, 32);
                 }
             };
             this.Controls.Add(topPanel);
 
             // Source Text Label
             Label lblSource = new Label();
-            lblSource.Text = "Văn bản gốc (Tự động nhận diện ngôn ngữ nguồn):";
+            lblSource.Text = AppL10n.T("Văn bản gốc (Tự động nhận diện ngôn ngữ nguồn):", "Source text (auto-detect language):");
             lblSource.Location = new Point(14, 66);
             lblSource.AutoSize = true;
             lblSource.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
@@ -106,7 +107,7 @@ namespace ZenQOffice.UI
 
             // Target Language selector Bar
             Label lblTarget = new Label();
-            lblTarget.Text = "Dịch sang:";
+            lblTarget.Text = AppL10n.T("Dịch sang:", "Translate to:");
             lblTarget.Location = new Point(14, 200);
             lblTarget.AutoSize = true;
             lblTarget.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
@@ -134,7 +135,7 @@ namespace ZenQOffice.UI
 
             // Swap button
             btnSwap = new Button();
-            btnSwap.Text = "Hoán đổi";
+            btnSwap.Text = AppL10n.T("Hoán đổi", "Swap");
             btnSwap.Image = FluentIconRenderer.GetGlyphBitmap('\uE8AB', 14, 14, Color.FromArgb(50, 49, 48));
             btnSwap.ImageAlign = ContentAlignment.MiddleLeft;
             btnSwap.TextAlign = ContentAlignment.MiddleCenter;
@@ -149,7 +150,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(btnSwap);
 
             btnTranslate = new Button();
-            btnTranslate.Text = "Dịch ngay";
+            btnTranslate.Text = AppL10n.T("Dịch ngay", "Translate");
             btnTranslate.Image = FluentIconRenderer.GetGlyphBitmap('\uE774', 14, 14, Color.White);
             btnTranslate.ImageAlign = ContentAlignment.MiddleLeft;
             btnTranslate.TextAlign = ContentAlignment.MiddleCenter;
@@ -166,7 +167,7 @@ namespace ZenQOffice.UI
 
             // Target Text Label
             Label lblResult = new Label();
-            lblResult.Text = "Bản dịch kết quả (Neural AI Translation):";
+            lblResult.Text = AppL10n.T("Bản dịch kết quả (Neural AI Translation):", "Translated text:");
             lblResult.Location = new Point(14, 234);
             lblResult.AutoSize = true;
             lblResult.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
@@ -183,7 +184,7 @@ namespace ZenQOffice.UI
 
             // Status label
             lblStatus = new Label();
-            lblStatus.Text = "Sẵn sàng dịch thuật.";
+            lblStatus.Text = AppL10n.T("Sẵn sàng dịch thuật.", "Ready to translate.");
             lblStatus.Location = new Point(14, 384);
             lblStatus.Size = new Size(476, 22);
             lblStatus.ForeColor = Color.FromArgb(100, 100, 100);
@@ -192,7 +193,7 @@ namespace ZenQOffice.UI
 
             // Buttons
             btnInsert = new Button();
-            btnInsert.Text = "Chèn vào tài liệu";
+            btnInsert.Text = AppL10n.T("Chèn vào tài liệu", "Insert into document");
             btnInsert.Image = FluentIconRenderer.GetGlyphBitmap('\uE73E', 15, 15, Color.White);
             btnInsert.ImageAlign = ContentAlignment.MiddleLeft;
             btnInsert.TextAlign = ContentAlignment.MiddleCenter;
@@ -215,7 +216,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(btnInsert);
 
             btnClose = new Button();
-            btnClose.Text = "Đóng";
+            btnClose.Text = AppL10n.T("Đóng", "Close");
             btnClose.Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 13, 13, Color.FromArgb(50, 49, 48));
             btnClose.ImageAlign = ContentAlignment.MiddleLeft;
             btnClose.TextAlign = ContentAlignment.MiddleCenter;
@@ -247,7 +248,7 @@ namespace ZenQOffice.UI
             if (string.IsNullOrWhiteSpace(src))
             {
                 txtTarget.Text = "";
-                lblStatus.Text = "Vui lòng nhập văn bản cần dịch.";
+                lblStatus.Text = AppL10n.T("Vui lòng nhập văn bản cần dịch.", "Please enter text to translate.");
                 lblStatus.ForeColor = Color.Gray;
                 return;
             }
@@ -256,7 +257,7 @@ namespace ZenQOffice.UI
             if (targetIdx < 0 || targetIdx >= _langCodes.Length) targetIdx = 1;
             string targetLangCode = _langCodes[targetIdx];
 
-            lblStatus.Text = "Đang kết nối máy chủ dịch thuật AI trực tuyến...";
+            lblStatus.Text = AppL10n.T("Đang kết nối máy chủ dịch thuật AI trực tuyến...", "Connecting to online translation service...");
             lblStatus.ForeColor = Color.Navy;
             btnTranslate.Enabled = false;
 
@@ -267,8 +268,8 @@ namespace ZenQOffice.UI
                 {
                     txtTarget.Text = result;
                     lblStatus.Text = string.Equals(provider, "MyMemory", StringComparison.OrdinalIgnoreCase)
-                        ? "Đã dịch thành công qua MyMemory Neural Translation."
-                        : "Đã dịch thành công qua Google Neural Machine Translation.";
+                        ? AppL10n.T("Đã dịch thành công qua MyMemory Neural Translation.", "Translated via MyMemory Neural Translation.")
+                        : AppL10n.T("Đã dịch thành công qua Google Neural Machine Translation.", "Translated via Google Neural Translation.");
                     lblStatus.ForeColor = Color.DarkGreen;
                     return;
                 }
@@ -288,11 +289,11 @@ namespace ZenQOffice.UI
 
             if (!isConnected)
             {
-                lblStatus.Text = "Không có kết nối internet, đang sử dụng từ điển dịch nhanh cục bộ.";
+                lblStatus.Text = AppL10n.T("Không có kết nối internet, đang sử dụng từ điển dịch nhanh cục bộ.", "Offline: using built-in local dictionary.");
             }
             else
             {
-                lblStatus.Text = "Máy chủ dịch thuật phản hồi chậm, đang sử dụng từ điển dịch nhanh cục bộ.";
+                lblStatus.Text = AppL10n.T("Máy chủ dịch thuật phản hồi chậm, đang sử dụng từ điển dịch nhanh cục bộ.", "Service timed out: using built-in local dictionary.");
             }
             lblStatus.ForeColor = Color.DarkGoldenrod;
             txtTarget.Text = TranslateStringOffline(src, targetIdx);

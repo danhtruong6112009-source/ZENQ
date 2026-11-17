@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 using ZenQOffice.Format;
 
 namespace ZenQOffice.UI
@@ -33,7 +34,7 @@ namespace ZenQOffice.UI
             this.totalItems = Math.Max(1, totalItems);
             this.currentItemIndex = Math.Max(0, Math.Min(this.totalItems - 1, currentItemIndex));
 
-            this.Text = customTitle ?? (isSlide ? "Tùy chọn Xuất Ảnh Slide - Export Slides" : "Tùy chọn Xuất Ảnh Trang - Export Pages");
+            this.Text = customTitle ?? (isSlide ? AppL10n.T("Tùy chọn Xuất Ảnh Slide - Export Slides", "Export Slides as Images") : AppL10n.T("Tùy chọn Xuất Ảnh Trang - Export Pages", "Export Pages as Images"));
             this.Size = new Size(500, 360);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -70,10 +71,10 @@ namespace ZenQOffice.UI
                 using (Font titleF = new Font("Segoe UI", 12f, FontStyle.Bold))
                 using (Font subF = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    string titleText = isSlide ? "Tùy chọn Xuất Ảnh Slide" : "Tùy chọn Xuất Ảnh Trang";
+                    string titleText = isSlide ? AppL10n.T("Tùy chọn Xuất Ảnh Slide", "Export Slides as Images") : AppL10n.T("Tùy chọn Xuất Ảnh Trang", "Export Pages as Images");
                     string subText = isSlide
-                        ? $"Bản trình chiếu có {totalItems} slide. Chọn các slide bạn muốn xuất thành tệp ảnh."
-                        : $"Tài liệu hiện tại có {totalItems} trang. Chọn các trang bạn muốn xuất thành tệp ảnh.";
+                        ? string.Format(AppL10n.T("Bản trình chiếu có {0} slide. Chọn các slide bạn muốn xuất thành tệp ảnh.", "Presentation has {0} slide(s). Select slides to export as images."), totalItems)
+                        : string.Format(AppL10n.T("Tài liệu hiện tại có {0} trang. Chọn các trang bạn muốn xuất thành tệp ảnh.", "Document has {0} page(s). Select pages to export as images."), totalItems);
 
                     e.Graphics.DrawString(titleText, titleF, Brushes.White, 44, 12);
                     e.Graphics.DrawString(subText, subF, Brushes.WhiteSmoke, 44, 38);
@@ -91,7 +92,7 @@ namespace ZenQOffice.UI
 
             GroupBox grpRange = new GroupBox
             {
-                Text = isSlide ? "Phạm vi Slide cần xuất" : "Phạm vi Trang cần xuất",
+                Text = isSlide ? AppL10n.T("Phạm vi Slide cần xuất", "Slide Range") : AppL10n.T("Phạm vi Trang cần xuất", "Page Range"),
                 Location = new Point(4, 4),
                 Size = new Size(444, 180),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -101,7 +102,7 @@ namespace ZenQOffice.UI
             // Option 1: All
             rdoAll = new RadioButton
             {
-                Text = isSlide ? $"Tất cả các slide ({totalItems} slide)" : $"Tất cả các trang ({totalItems} trang)",
+                Text = isSlide ? string.Format(AppL10n.T("Tất cả các slide ({0} slide)", "All slides ({0})"), totalItems) : string.Format(AppL10n.T("Tất cả các trang ({0} trang)", "All pages ({0})"), totalItems),
                 Location = new Point(18, 28),
                 AutoSize = true,
                 Checked = true,
@@ -112,7 +113,7 @@ namespace ZenQOffice.UI
             // Option 2: Current
             rdoCurrent = new RadioButton
             {
-                Text = isSlide ? $"Chỉ slide hiện tại (Slide {currentItemIndex + 1})" : $"Chỉ trang hiện tại (Trang {currentItemIndex + 1})",
+                Text = isSlide ? string.Format(AppL10n.T("Chỉ slide hiện tại (Slide {0})", "Current slide only (Slide {0})"), currentItemIndex + 1) : string.Format(AppL10n.T("Chỉ trang hiện tại (Trang {0})", "Current page only (Page {0})"), currentItemIndex + 1),
                 Location = new Point(18, 62),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Regular)
@@ -122,7 +123,7 @@ namespace ZenQOffice.UI
             // Option 3: Custom Range
             rdoCustom = new RadioButton
             {
-                Text = isSlide ? "Phạm vi slide cụ thể:" : "Phạm vi trang cụ thể:",
+                Text = isSlide ? AppL10n.T("Phạm vi slide cụ thể:", "Custom slides:") : AppL10n.T("Phạm vi trang cụ thể:", "Custom pages:"),
                 Location = new Point(18, 98),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Regular)
@@ -141,7 +142,7 @@ namespace ZenQOffice.UI
 
             lblRangeHint = new Label
             {
-                Text = "Ví dụ: 1-3, 5, 8-10",
+                Text = AppL10n.T("Ví dụ: 1-3, 5, 8-10", "e.g. 1-3, 5, 8-10"),
                 Location = new Point(332, 99),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(100, 116, 139),
@@ -152,8 +153,8 @@ namespace ZenQOffice.UI
             Label lblNote = new Label
             {
                 Text = isSlide
-                    ? "• Nếu chọn 1 slide, ảnh sẽ lưu đúng tên tệp đã chỉ định.\n• Nếu chọn nhiều slide, các ảnh sẽ được đánh số theo từng slide (ví dụ: TenTep_Slide_1.png)."
-                    : "• Nếu chọn 1 trang, ảnh sẽ lưu đúng tên tệp đã chỉ định.\n• Nếu chọn nhiều trang, các ảnh sẽ được đánh số theo từng trang (ví dụ: TenTep_Trang_1.png).",
+                    ? AppL10n.T("• Nếu chọn 1 slide, ảnh sẽ lưu đúng tên tệp đã chỉ định.\n• Nếu chọn nhiều slide, các ảnh sẽ được đánh số theo từng slide (ví dụ: TenTep_Slide_1.png).", "• Single slide saves directly with the chosen filename.\n• Multiple slides are numbered automatically (e.g. FileName_Slide_1.png).")
+                    : AppL10n.T("• Nếu chọn 1 trang, ảnh sẽ lưu đúng tên tệp đã chỉ định.\n• Nếu chọn nhiều trang, các ảnh sẽ được đánh số theo từng trang (ví dụ: TenTep_Trang_1.png).", "• Single page saves directly with the chosen filename.\n• Multiple pages are numbered automatically (e.g. FileName_Page_1.png)."),
                 Location = new Point(18, 130),
                 Size = new Size(410, 42),
                 ForeColor = Color.FromArgb(71, 85, 105),
@@ -182,7 +183,7 @@ namespace ZenQOffice.UI
 
             btnExport = new Button
             {
-                Text = "Xuất ảnh",
+                Text = AppL10n.T("Xuất ảnh", "Export"),
                 Size = new Size(110, 34),
                 Location = new Point(245, 9),
                 BackColor = isSlide ? Color.FromArgb(216, 59, 1) : Color.FromArgb(16, 185, 129),
@@ -201,7 +202,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Size = new Size(95, 34),
                 Location = new Point(365, 9),
                 BackColor = Color.White,
@@ -238,7 +239,7 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrWhiteSpace(txtRange.Text))
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, isSlide ? "Vui lòng nhập phạm vi slide cần xuất!" : "Vui lòng nhập phạm vi trang cần xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, isSlide ? AppL10n.T("Vui lòng nhập phạm vi slide cần xuất!", "Please enter the slide range!") : AppL10n.T("Vui lòng nhập phạm vi trang cần xuất!", "Please enter the page range!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtRange.Focus();
                     return;
                 }
@@ -246,7 +247,7 @@ namespace ZenQOffice.UI
                 SelectedIndices = PdfHandler.ParsePageRange(txtRange.Text, totalItems);
                 if (SelectedIndices == null || SelectedIndices.Count == 0)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, isSlide ? "Phạm vi slide không hợp lệ hoặc nằm ngoài số lượng slide trong bản trình chiếu!" : "Phạm vi trang không hợp lệ hoặc nằm ngoài số lượng trang trong tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, isSlide ? AppL10n.T("Phạm vi slide không hợp lệ hoặc nằm ngoài số lượng slide trong bản trình chiếu!", "Invalid slide range or out of bounds!") : AppL10n.T("Phạm vi trang không hợp lệ hoặc nằm ngoài số lượng trang trong tài liệu!", "Invalid page range or out of bounds!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtRange.Focus();
                     return;
                 }
@@ -254,7 +255,7 @@ namespace ZenQOffice.UI
 
             if (SelectedIndices.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show(this, "Không có mục nào được chọn để xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Không có mục nào được chọn để xuất!", "No items selected to export!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

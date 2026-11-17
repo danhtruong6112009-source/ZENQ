@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -34,7 +35,7 @@ namespace ZenQOffice.UI
 
             lblTitle = new Label
             {
-                Text = "Chèn Bảng (Insert Table)",
+                Text = AppL10n.Tr("Chèn Bảng (Insert Table)"),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(210, 71, 38),
                 Location = new Point(10, 8),
@@ -55,7 +56,7 @@ namespace ZenQOffice.UI
             {
                 hoverCols = 0;
                 hoverRows = 0;
-                lblTitle.Text = "Chèn Bảng (Insert Table)";
+                lblTitle.Text = AppL10n.Tr("Chèn Bảng (Insert Table)");
                 pnlGrid.Invalidate();
                 if (OnTableHoverLeave != null) OnTableHoverLeave();
             };
@@ -69,7 +70,7 @@ namespace ZenQOffice.UI
             // 1. Insert Table... option
             Button btnCustom = new Button
             {
-                Text = "   ▦  Chèn Bảng (Insert Table)...",
+                Text = AppL10n.Tr("   ▦  Chèn Bảng (Insert Table)..."),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 FlatStyle = FlatStyle.Flat,
@@ -91,7 +92,7 @@ namespace ZenQOffice.UI
             // 2. Draw Table option
             Button btnDraw = new Button
             {
-                Text = "   ✏️  Vẽ Bảng (Draw Table)",
+                Text = AppL10n.Tr("   ✏️  Vẽ Bảng (Draw Table)"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 FlatStyle = FlatStyle.Flat,
@@ -114,7 +115,7 @@ namespace ZenQOffice.UI
             // 3. Excel Spreadsheet option
             Button btnExcel = new Button
             {
-                Text = "   📊  Bảng tính Excel (Spreadsheet)",
+                Text = AppL10n.Tr("   📊  Bảng tính Excel (Spreadsheet)"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(21, 128, 61),
                 FlatStyle = FlatStyle.Flat,

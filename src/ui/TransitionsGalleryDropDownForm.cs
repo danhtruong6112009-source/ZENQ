@@ -144,7 +144,7 @@ namespace ZenQOffice.UI
         {
             Label lblHeader = new Label
             {
-                Text = title,
+                Text = AppL10n.Tr(title),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(14, curY),
@@ -234,7 +234,8 @@ namespace ZenQOffice.UI
                             Trimming = StringTrimming.EllipsisCharacter,
                             FormatFlags = StringFormatFlags.LineLimit
                         };
-                        g.DrawString(tName.Split(new[] { " (" }, StringSplitOptions.None)[0].Replace(" ⭐", ""), f, txtBrush, new RectangleF(2, 38, itemW - 4, 27), sf);
+                        string dispTName = AppL10n.IsEn ? AppL10n.Tr(tName) : tName.Split(new[] { " (" }, StringSplitOptions.None)[0].Replace(" ⭐", "");
+                        g.DrawString(dispTName, f, txtBrush, new RectangleF(2, 38, itemW - 4, 27), sf);
                     }
                 };
 

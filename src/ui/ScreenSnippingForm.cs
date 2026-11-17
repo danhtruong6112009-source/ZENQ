@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -76,7 +77,7 @@ namespace ZenQOffice.UI
             using (Font hintFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
             using (SolidBrush hintBg = new SolidBrush(Color.FromArgb(200, 30, 30, 30)))
             {
-                string hint = "Kéo chuột để chọn vùng cần chụp màn hình | Nhấn ESC để hủy";
+                string hint = AppL10n.T("Kéo chuột để chọn vùng cần chụp màn hình | Nhấn ESC để hủy", "Drag mouse to select capture region | Press ESC to cancel");
                 SizeF hSz = g.MeasureString(hint, hintFont);
                 int hX = (ClientSize.Width - (int)hSz.Width) / 2;
                 g.FillRectangle(hintBg, hX - 10, 20, hSz.Width + 20, hSz.Height + 10);

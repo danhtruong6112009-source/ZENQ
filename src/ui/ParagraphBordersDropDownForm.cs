@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -163,7 +164,7 @@ namespace ZenQOffice.UI
                 // Draw Text
                 using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(30, 30, 30)))
                 {
-                    g.DrawString(item.Text, itemFont, textBrush, 32, curY + 3);
+                    g.DrawString(AppL10n.Tr(item.Text), itemFont, textBrush, 32, curY + 3);
                 }
 
                 curY += 25;

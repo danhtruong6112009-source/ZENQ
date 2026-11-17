@@ -87,24 +87,48 @@ namespace ZenQOffice.Format
                 sb.AppendLine(@"\viewkind4\uc1\margl1440\margr1440\margt1440\margb1440");
 
                 // 3. Process Paragraphs
-                string[] rawParas = (textContent ?? "").Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
-                int charOffset = 0;
+                var paraSlices = DocxHandler.SplitParagraphSlices(textContent);
 
-                for (int pIdx = 0; pIdx < rawParas.Length; pIdx++)
+                for (int pIdx = 0; pIdx < paraSlices.Count; pIdx++)
                 {
-                    string para = rawParas[pIdx];
+                    int charOffset = paraSlices[pIdx].StartOffset;
+                    string para = paraSlices[pIdx].Text;
 
-                    // 3.1 Page Break
-                    if (para.Trim() == "[--- PAGE BREAK ---]" || para.Contains("TRANG TRẮNG MỚI"))
+                    // 3.1 Page / Column / Section Breaks
+                    string pTrimR = para.Trim();
+                    if (pTrimR == "[--- PAGE BREAK ---]" || para.Contains("TRANG TRẮNG MỚI"))
                     {
                         sb.AppendLine(@"\page");
-                        charOffset += para.Length + 1;
+                        continue;
+                    }
+                    if (pTrimR == "[--- COLUMN BREAK ---]")
+                    {
+                        sb.AppendLine(@"\column");
+                        continue;
+                    }
+                    if (pTrimR == "[--- SECTION BREAK (CONTINUOUS) ---]")
+                    {
+                        sb.AppendLine(@"\sect\sbknone");
+                        continue;
+                    }
+                    if (pTrimR == "[--- SECTION BREAK (EVEN PAGE) ---]")
+                    {
+                        sb.AppendLine(@"\sect\sbkeven");
+                        continue;
+                    }
+                    if (pTrimR == "[--- SECTION BREAK (ODD PAGE) ---]")
+                    {
+                        sb.AppendLine(@"\sect\sbkodd");
+                        continue;
+                    }
+                    if (pTrimR.StartsWith("[--- SECTION BREAK ("))
+                    {
+                        sb.AppendLine(@"\sect\sbkpage");
                         continue;
                     }
 
                     if (para.Trim() == "[--- COVER PAGE START ---]" || para.Trim() == "[--- COVER PAGE END ---]")
                     {
-                        charOffset += para.Length + 1;
                         continue;
                     }
 
@@ -112,17 +136,14 @@ namespace ZenQOffice.Format
                     if (!string.IsNullOrWhiteSpace(para) && para.Trim().StartsWith("|"))
                     {
                         List<string> tableLines = new List<string>();
-                        int tblLen = 0;
-                        while (pIdx < rawParas.Length && !string.IsNullOrWhiteSpace(rawParas[pIdx]) && rawParas[pIdx].Trim().StartsWith("|"))
+                        while (pIdx < paraSlices.Count && !string.IsNullOrWhiteSpace(paraSlices[pIdx].Text) && paraSlices[pIdx].Text.Trim().StartsWith("|"))
                         {
-                            tableLines.Add(rawParas[pIdx]);
-                            tblLen += rawParas[pIdx].Length + 1;
+                            tableLines.Add(paraSlices[pIdx].Text);
                             pIdx++;
                         }
                         pIdx--; // Step back for loop increment
 
                         WriteRtfTable(sb, tableLines, fontTable, colorTable);
-                        charOffset += tblLen;
                         continue;
                     }
 
@@ -203,8 +224,6 @@ namespace ZenQOffice.Format
                         }
                         sb.AppendLine(@"\par");
                     }
-
-                    charOffset += para.Length + 1;
                 }
 
                 // 4. Close RTF document

@@ -488,7 +488,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            Text = "Chèn Hàm (Insert Function - fx)";
+            Text = AppL10n.T("Chèn Hàm (Insert Function - fx)", "Insert Function (fx)");
             Size = new Size(520, 520);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -502,7 +502,7 @@ namespace ZenQOffice.UI
 
             Label lblSearchPrompt = new Label
             {
-                Text = "Tìm kiếm hàm (Gõ từ khóa để tìm):",
+                Text = AppL10n.T("Tìm kiếm hàm (Gõ từ khóa để tìm):", "Search for a function (type keyword):"),
                 Location = new Point(16, 12),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9f, FontStyle.Regular),
@@ -517,7 +517,7 @@ namespace ZenQOffice.UI
 
             Button btnGo = new Button
             {
-                Text = "Tìm",
+                Text = AppL10n.T("Tìm", "Go"),
                 Location = new Point(404, 33),
                 Size = new Size(80, 26),
                 BackColor = Color.FromArgb(240, 240, 240),
@@ -527,7 +527,7 @@ namespace ZenQOffice.UI
 
             Label lblCat = new Label
             {
-                Text = "Hoặc chọn một danh mục hàm:",
+                Text = AppL10n.T("Hoặc chọn một danh mục hàm:", "Or select a category:"),
                 Location = new Point(16, 68),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -539,22 +539,22 @@ namespace ZenQOffice.UI
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cboCategory.Items.AddRange(new object[] {
-                "Tất cả (All)",
-                "Toán học (Math & Trig)",
-                "Thống kê (Statistical)",
-                "Tài chính (Financial)",
-                "Logic (Logical)",
-                "Văn bản (Text)",
-                "Tra cứu & Tham chiếu (Lookup & Reference)",
-                "Ngày & Giờ (Date & Time)",
-                "Thông tin (Information)"
+                AppL10n.T("Tất cả (All)", "All"),
+                AppL10n.T("Toán học (Math & Trig)", "Math & Trig"),
+                AppL10n.T("Thống kê (Statistical)", "Statistical"),
+                AppL10n.T("Tài chính (Financial)", "Financial"),
+                AppL10n.T("Logic (Logical)", "Logical"),
+                AppL10n.T("Văn bản (Text)", "Text"),
+                AppL10n.T("Tra cứu & Tham chiếu (Lookup & Reference)", "Lookup & Reference"),
+                AppL10n.T("Ngày & Giờ (Date & Time)", "Date & Time"),
+                AppL10n.T("Thông tin (Information)", "Information")
             });
             cboCategory.SelectedIndex = 0;
             cboCategory.SelectedIndexChanged += (s, e) => FilterFunctions();
 
             Label lblList = new Label
             {
-                Text = "Chọn một hàm từ danh sách:",
+                Text = AppL10n.T("Chọn một hàm từ danh sách:", "Select a function:"),
                 Location = new Point(16, 124),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -588,7 +588,7 @@ namespace ZenQOffice.UI
 
             btnNextArgs = new Button
             {
-                Text = "Trợ giúp đối số >>",
+                Text = AppL10n.T("Trợ giúp đối số >>", "Next >>"),
                 Location = new Point(270, 420),
                 Size = new Size(130, 30),
                 BackColor = Color.FromArgb(16, 124, 65),
@@ -603,7 +603,7 @@ namespace ZenQOffice.UI
 
             Button btnCancelSelect = new Button
             {
-                Text = "Hủy (Cancel)",
+                Text = AppL10n.T("Hủy (Cancel)", "Cancel"),
                 Location = new Point(408, 420),
                 Size = new Size(80, 30),
                 BackColor = Color.FromArgb(226, 232, 240),
@@ -661,7 +661,7 @@ namespace ZenQOffice.UI
 
             btnBack = new Button
             {
-                Text = "<< Chọn hàm khác",
+                Text = AppL10n.T("<< Chọn hàm khác", "<< Back"),
                 Location = new Point(16, 420),
                 Size = new Size(130, 30),
                 BackColor = Color.FromArgb(226, 232, 240),
@@ -672,7 +672,7 @@ namespace ZenQOffice.UI
 
             btnOk = new Button
             {
-                Text = "OK (Áp dụng)",
+                Text = AppL10n.T("OK (Áp dụng)", "OK"),
                 Location = new Point(290, 420),
                 Size = new Size(104, 30),
                 BackColor = Color.FromArgb(16, 124, 65),
@@ -685,7 +685,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy (Cancel)",
+                Text = AppL10n.T("Hủy (Cancel)", "Cancel"),
                 Location = new Point(402, 420),
                 Size = new Size(84, 30),
                 BackColor = Color.FromArgb(226, 232, 240),
@@ -727,7 +727,7 @@ namespace ZenQOffice.UI
                 if (!matchCat) return false;
 
                 if (string.IsNullOrEmpty(q)) return true;
-                return f.Name.ToUpper().Contains(q) || f.Description.ToUpper().Contains(q) || f.Category.ToUpper().Contains(q);
+                return f.Name.ToUpper().Contains(q) || f.Description.ToUpper().Contains(q) || AppL10n.Tr(f.Description).ToUpper().Contains(q) || f.Category.ToUpper().Contains(q) || AppL10n.Tr(f.Category).ToUpper().Contains(q);
             });
 
             lstFunctions.Items.Clear();
@@ -744,7 +744,7 @@ namespace ZenQOffice.UI
             {
                 _selectedFunc = null;
                 lblSyntax.Text = "";
-                lblDescription.Text = "(Không tìm thấy hàm phù hợp)";
+                lblDescription.Text = AppL10n.T("(Không tìm thấy hàm phù hợp)", "(No matching functions found)");
             }
         }
 
@@ -754,7 +754,7 @@ namespace ZenQOffice.UI
             {
                 _selectedFunc = _filteredFunctions[lstFunctions.SelectedIndex];
                 lblSyntax.Text = _selectedFunc.Syntax;
-                lblDescription.Text = _selectedFunc.Description;
+                lblDescription.Text = AppL10n.Tr(_selectedFunc.Description);
             }
         }
 
@@ -786,7 +786,7 @@ namespace ZenQOffice.UI
 
                 Label lblArg = new Label
                 {
-                    Text = arg.Name + (arg.IsOptional ? " [tùy chọn]:" : " (bắt buộc):"),
+                    Text = arg.Name + (arg.IsOptional ? AppL10n.T(" [tùy chọn]:", " [optional]:") : AppL10n.T(" (bắt buộc):", " (required):")),
                     Location = new Point(10, curY + 3),
                     Size = new Size(130, 20),
                     Font = new Font("Segoe UI", 8.5f, arg.IsOptional ? FontStyle.Regular : FontStyle.Bold),
@@ -802,7 +802,7 @@ namespace ZenQOffice.UI
                 int argIndex = i;
                 txtVal.Enter += (s, e) =>
                 {
-                    lblArgDesc.Text = string.Format("【{0}】: {1}", arg.Name, arg.Description);
+                    lblArgDesc.Text = string.Format("【{0}】: {1}", arg.Name, AppL10n.Tr(arg.Description));
                 };
                 txtVal.TextChanged += (s, e) => UpdateFormulaResultPreview();
 
@@ -817,17 +817,17 @@ namespace ZenQOffice.UI
             {
                 Label lblNoArgs = new Label
                 {
-                    Text = "Hàm này không yêu cầu đối số.",
+                    Text = AppL10n.T("Hàm này không yêu cầu đối số.", "This function takes no arguments."),
                     Location = new Point(15, 20),
                     AutoSize = true,
                     ForeColor = Color.FromArgb(71, 85, 105)
                 };
                 pnlArgsInputs.Controls.Add(lblNoArgs);
-                lblArgDesc.Text = func.Description;
+                lblArgDesc.Text = AppL10n.Tr(func.Description);
             }
             else
             {
-                lblArgDesc.Text = string.Format("【{0}】: {1}", func.Arguments[0].Name, func.Arguments[0].Description);
+                lblArgDesc.Text = string.Format("【{0}】: {1}", func.Arguments[0].Name, AppL10n.Tr(func.Arguments[0].Description));
             }
 
             UpdateFormulaResultPreview();
@@ -857,16 +857,16 @@ namespace ZenQOffice.UI
                 {
                     CellData evalRes = FormulaEngine.EvaluateFormula(formulaStr, _calcView.CurrentSheet);
                     string resDisplay = !string.IsNullOrEmpty(evalRes.EvaluatedStr) ? evalRes.EvaluatedStr : evalRes.NumericValue.ToString();
-                    lblFormulaResult.Text = string.Format("Kết quả công thức (Formula result) = {0}", resDisplay);
+                    lblFormulaResult.Text = string.Format(AppL10n.T("Kết quả công thức (Formula result) = {0}", "Formula result = {0}"), resDisplay);
                 }
                 else
                 {
-                    lblFormulaResult.Text = "Cú pháp: " + formulaStr;
+                    lblFormulaResult.Text = AppL10n.T("Cú pháp: ", "Syntax: ") + formulaStr;
                 }
             }
             catch (Exception)
             {
-                lblFormulaResult.Text = "Kết quả công thức = (Đang kiểm tra cú pháp...)";
+                lblFormulaResult.Text = AppL10n.T("Kết quả công thức = (Đang kiểm tra cú pháp...)", "Formula result = (Checking syntax...)");
             }
         }
 

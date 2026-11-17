@@ -199,7 +199,7 @@ namespace ZenQOffice.UI
                 using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Bold))
                 using (SolidBrush b = new SolidBrush(categoryType == "Exclusive" ? Color.FromArgb(109, 40, 217) : Color.FromArgb(30, 41, 59)))
                 {
-                    g.DrawString(title, f, b, textX, 2);
+                    g.DrawString(AppL10n.Tr(title), f, b, textX, 2);
                 }
                 using (Pen p = new Pen(categoryType == "Exclusive" ? Color.FromArgb(233, 213, 255) : Color.FromArgb(235, 238, 242), 1.0f))
                 {
@@ -246,7 +246,7 @@ namespace ZenQOffice.UI
                     using (Font f = new Font("Segoe UI", 7.0f, isSelected ? FontStyle.Bold : FontStyle.Regular))
                     {
                         StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };
-                        g.DrawString(aName, f, Brushes.Black, new RectangleF(1, 33, itemW - 2, 32), sf);
+                        g.DrawString(AppL10n.Tr(aName), f, Brushes.Black, new RectangleF(1, 33, itemW - 2, 32), sf);
                     }
                 };
 
@@ -314,7 +314,7 @@ namespace ZenQOffice.UI
                 string catKey = linkCats[k];
                 Label linkLbl = new Label
                 {
-                    Text = linkTexts[k],
+                    Text = AppL10n.Tr(linkTexts[k]),
                     Font = new Font("Segoe UI", 9.0f),
                     ForeColor = linkColors[k],
                     Location = new Point(8, 8 + k * 26),

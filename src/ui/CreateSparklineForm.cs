@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -17,7 +18,7 @@ namespace ZenQOffice.UI
         public CreateSparklineForm(string defaultType, string defaultDataRange, string defaultLocRange)
         {
             SparklineType = defaultType;
-            this.Text = "Tạo Đồ Thị Nhỏ (Create Sparklines)";
+            this.Text = AppL10n.T("Tạo Đồ Thị Nhỏ (Create Sparklines)", "Create Sparklines");
             this.Size = new Size(460, 260);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -31,23 +32,23 @@ namespace ZenQOffice.UI
 
         private void BuildUI(string defaultType, string defaultDataRange, string defaultLocRange)
         {
-            Label lblType = new Label { Text = "Loại đồ thị nhỏ (Type):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Label lblType = new Label { Text = AppL10n.T("Loại đồ thị nhỏ (Type):", "Sparkline Type:"), Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblType);
 
             cboType = new ZenQOffice.UI.FluentComboBox { Location = new Point(180, 17), Size = new Size(235, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboType.Items.AddRange(new object[] { "Đường (Line)", "Cột (Column)", "Thắng/Thua (Win/Loss)" });
+            cboType.Items.AddRange(new object[] { AppL10n.T("Đường (Line)", "Line"), AppL10n.T("Cột (Column)", "Column"), AppL10n.T("Thắng/Thua (Win/Loss)", "Win/Loss") });
             if (defaultType == "Column") cboType.SelectedIndex = 1;
             else if (defaultType == "WinLoss") cboType.SelectedIndex = 2;
             else cboType.SelectedIndex = 0;
             this.Controls.Add(cboType);
 
-            Label lblData = new Label { Text = "Vùng dữ liệu (Data Range):", Location = new Point(20, 60), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Label lblData = new Label { Text = AppL10n.T("Vùng dữ liệu (Data Range):", "Data Range:"), Location = new Point(20, 60), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblData);
 
             txtDataRange = new TextBox { Location = new Point(180, 57), Size = new Size(235, 24), Text = defaultDataRange ?? "A1:D1" };
             this.Controls.Add(txtDataRange);
 
-            Label lblLoc = new Label { Text = "Vị trí đặt (Location Range):", Location = new Point(20, 100), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Label lblLoc = new Label { Text = AppL10n.T("Vị trí đặt (Location Range):", "Location Range:"), Location = new Point(20, 100), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblLoc);
 
             txtLocationRange = new TextBox { Location = new Point(180, 97), Size = new Size(235, 24), Text = defaultLocRange ?? "E1" };
@@ -59,7 +60,7 @@ namespace ZenQOffice.UI
 
             Button btnOK = new Button
             {
-                Text = "Đồng ý",
+                Text = AppL10n.T("Đồng ý", "OK"),
                 Location = new Point(230, 10),
                 Size = new Size(95, 28),
                 BackColor = Color.FromArgb(16, 124, 65),
@@ -81,7 +82,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Location = new Point(335, 10),
                 Size = new Size(80, 28),
                 BackColor = Color.White,

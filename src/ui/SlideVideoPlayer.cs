@@ -779,8 +779,8 @@ namespace ZenQOffice.UI
             {
                 using (WinForms.OpenFileDialog ofd = new WinForms.OpenFileDialog())
                 {
-                    ofd.Title = "Chọn tệp video để phát (" + (!string.IsNullOrEmpty(shape.VideoPath) ? Path.GetFileName(shape.VideoPath) : "Video") + ")...";
-                    ofd.Filter = "Tệp Video (*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.flv;*.webm)|*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.flv;*.webm|Tất cả tệp (*.*)|*.*";
+                    ofd.Title = ZenQOffice.Core.AppL10n.T("Chọn tệp video để phát (", "Select video file (") + (!string.IsNullOrEmpty(shape.VideoPath) ? Path.GetFileName(shape.VideoPath) : "Video") + ")...";
+                    ofd.Filter = ZenQOffice.Core.AppL10n.T("Tệp Video (*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.flv;*.webm)|*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.flv;*.webm|Tất cả tệp (*.*)|*.*", "Video Files (*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.flv;*.webm)|*.mp4;*.avi;*.mkv;*.mov;*.wmv;*.flv;*.webm|All Files (*.*)|*.*");
                     if (ofd.ShowDialog(_parentControl) == WinForms.DialogResult.OK)
                     {
                         shape.VideoPath = ofd.FileName;

@@ -63,7 +63,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            Text = "Tùy chỉnh phát sáng Neon";
+            Text = AppL10n.T("Tùy chỉnh phát sáng Neon", "Neon Glow Options");
             Size = new Size(420, 365);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -88,7 +88,7 @@ namespace ZenQOffice.UI
 
             Label lblHeader = new Label
             {
-                Text = "Tùy chỉnh phát sáng Neon",
+                Text = AppL10n.T("Tùy chỉnh phát sáng Neon", "Neon Glow Options"),
                 Font = new Font("Segoe UI", 10.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(14, 8),
@@ -111,7 +111,7 @@ namespace ZenQOffice.UI
 
             Button btnApply = new Button
             {
-                Text = "Áp dụng",
+                Text = AppL10n.T("Áp dụng", "Apply"),
                 Size = new Size(88, 28),
                 Location = new Point(pnlBottom.Width - 100, 9),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
@@ -132,7 +132,7 @@ namespace ZenQOffice.UI
 
             Button btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 Size = new Size(75, 28),
                 Location = new Point(pnlBottom.Width - 185, 9),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
@@ -156,13 +156,13 @@ namespace ZenQOffice.UI
                 Padding = new Point(14, 5)
             };
 
-            TabPage tabColor = new TabPage("Mục tiêu & Màu sắc")
+            TabPage tabColor = new TabPage(AppL10n.T("Mục tiêu & Màu sắc", "Target & Color"))
             {
                 BackColor = Color.White,
                 Padding = new Padding(14, 10, 14, 10)
             };
 
-            TabPage tabEffect = new TabPage("Hào quang & Lặp lại")
+            TabPage tabEffect = new TabPage(AppL10n.T("Hào quang & Lặp lại", "Glow & Loop"))
             {
                 BackColor = Color.White,
                 Padding = new Padding(14, 10, 14, 10)
@@ -193,7 +193,7 @@ namespace ZenQOffice.UI
             // 1. Mục tiêu áp dụng
             Label lblTarget = new Label
             {
-                Text = "Mục tiêu áp dụng:",
+                Text = AppL10n.T("Mục tiêu áp dụng:", "Apply target:"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(12, curY),
@@ -204,7 +204,7 @@ namespace ZenQOffice.UI
 
             rbTargetBoth = new RadioButton
             {
-                Text = "Cả khung viền và chữ",
+                Text = AppL10n.T("Cả khung viền và chữ", "Both border and text"),
                 Location = new Point(20, curY),
                 Size = new Size(180, 22),
                 Checked = true
@@ -215,7 +215,7 @@ namespace ZenQOffice.UI
 
             rbTargetShape = new RadioButton
             {
-                Text = "Chỉ khung viền",
+                Text = AppL10n.T("Chỉ khung viền", "Border only"),
                 Location = new Point(20, curY),
                 Size = new Size(180, 22)
             };
@@ -225,7 +225,7 @@ namespace ZenQOffice.UI
 
             rbTargetText = new RadioButton
             {
-                Text = "Chỉ văn bản",
+                Text = AppL10n.T("Chỉ văn bản", "Text only"),
                 Location = new Point(20, curY),
                 Size = new Size(180, 22)
             };
@@ -236,7 +236,7 @@ namespace ZenQOffice.UI
             // 2. Chế độ màu
             Label lblMode = new Label
             {
-                Text = "Chế độ màu:",
+                Text = AppL10n.T("Chế độ màu:", "Color mode:"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(12, curY),
@@ -247,7 +247,7 @@ namespace ZenQOffice.UI
 
             rbModeMono = new RadioButton
             {
-                Text = "Đơn sắc",
+                Text = AppL10n.T("Đơn sắc", "Single color"),
                 Location = new Point(20, curY),
                 Size = new Size(100, 22),
                 Checked = true
@@ -265,7 +265,7 @@ namespace ZenQOffice.UI
 
             rbModeRainbow = new RadioButton
             {
-                Text = "Cầu vồng",
+                Text = AppL10n.T("Cầu vồng", "Rainbow"),
                 Location = new Point(135, curY),
                 Size = new Size(120, 22)
             };
@@ -291,7 +291,7 @@ namespace ZenQOffice.UI
 
             Label lblColor = new Label
             {
-                Text = "Màu:",
+                Text = AppL10n.T("Màu:", "Color:"),
                 Location = new Point(4, 7),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(51, 65, 85)
@@ -353,7 +353,7 @@ namespace ZenQOffice.UI
 
             btnAutoColor = new Button
             {
-                Text = "Màu theo hình",
+                Text = AppL10n.T("Màu theo hình", "Preset color"),
                 Location = new Point(176, 3),
                 Size = new Size(105, 25),
                 FlatStyle = FlatStyle.Flat,
@@ -387,7 +387,7 @@ namespace ZenQOffice.UI
             // 1. Bán kính tỏa sáng
             lblBloomRadiusVal = new Label
             {
-                Text = "Bán kính tỏa sáng: 26 px",
+                Text = AppL10n.T("Bán kính tỏa sáng: 26 px", "Glow radius: 26 px"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(12, curY),
@@ -409,7 +409,7 @@ namespace ZenQOffice.UI
             tbBloomRadius.ValueChanged += (s, e) =>
             {
                 _anim.NeonBloomRadius = tbBloomRadius.Value;
-                lblBloomRadiusVal.Text = "Bán kính tỏa sáng: " + tbBloomRadius.Value + " px";
+                lblBloomRadiusVal.Text = AppL10n.T("Bán kính tỏa sáng: ", "Glow radius: ") + tbBloomRadius.Value + " px";
                 TriggerUpdate();
             };
             page.Controls.Add(tbBloomRadius);
@@ -418,7 +418,7 @@ namespace ZenQOffice.UI
             // 2. Cường độ phát sáng
             lblIntensityVal = new Label
             {
-                Text = "Cường độ phát sáng: 100 %",
+                Text = AppL10n.T("Cường độ phát sáng: 100 %", "Glow intensity: 100 %"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(12, curY),
@@ -440,7 +440,7 @@ namespace ZenQOffice.UI
             tbIntensity.ValueChanged += (s, e) =>
             {
                 _anim.NeonIntensity = tbIntensity.Value / 100.0f;
-                lblIntensityVal.Text = "Cường độ phát sáng: " + tbIntensity.Value + " %";
+                lblIntensityVal.Text = AppL10n.T("Cường độ phát sáng: ", "Glow intensity: ") + tbIntensity.Value + " %";
                 TriggerUpdate();
             };
             page.Controls.Add(tbIntensity);
@@ -449,7 +449,7 @@ namespace ZenQOffice.UI
             // 3. Tia lóe sáng 4 góc
             chkCornerFlares = new CheckBox
             {
-                Text = "Bật tia lóe sáng 4 góc",
+                Text = AppL10n.T("Bật tia lóe sáng 4 góc", "Enable 4-point sparkles"),
                 Location = new Point(16, curY),
                 Size = new Size(200, 22),
                 Checked = true
@@ -465,7 +465,7 @@ namespace ZenQOffice.UI
             // 4. Lặp vô hạn & Số lần lặp
             chkInfiniteLoop = new CheckBox
             {
-                Text = "Lặp vô hạn",
+                Text = AppL10n.T("Lặp vô hạn", "Loop infinitely"),
                 Location = new Point(16, curY),
                 Size = new Size(110, 22),
                 Checked = true
@@ -481,7 +481,7 @@ namespace ZenQOffice.UI
 
             lblRepeatCount = new Label
             {
-                Text = "Số lần:",
+                Text = AppL10n.T("Số lần:", "Repeat:"),
                 Location = new Point(135, curY + 2),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(51, 65, 85),
@@ -496,7 +496,7 @@ namespace ZenQOffice.UI
                 Size = new Size(95, 23),
                 Enabled = false
             };
-            cboRepeatCount.Items.AddRange(new object[] { "1 lần", "2 lần", "3 lần", "5 lần", "10 lần" });
+            cboRepeatCount.Items.AddRange(new object[] { AppL10n.T("1 lần", "1 time"), AppL10n.T("2 lần", "2 times"), AppL10n.T("3 lần", "3 times"), AppL10n.T("5 lần", "5 times"), AppL10n.T("10 lần", "10 times") });
             cboRepeatCount.SelectedIndex = 0;
             cboRepeatCount.SelectedIndexChanged += (s, e) =>
             {
@@ -555,12 +555,12 @@ namespace ZenQOffice.UI
             // Bloom
             int bloom = (int)Math.Max(6, Math.Min(60, _anim.NeonBloomRadius));
             tbBloomRadius.Value = bloom;
-            lblBloomRadiusVal.Text = "Bán kính tỏa sáng: " + bloom + " px";
+            lblBloomRadiusVal.Text = AppL10n.T("Bán kính tỏa sáng: ", "Glow radius: ") + bloom + " px";
 
             // Intensity
             int inten = (int)Math.Max(20, Math.Min(200, (_anim.NeonIntensity > 0 ? _anim.NeonIntensity : 1.0f) * 100));
             tbIntensity.Value = inten;
-            lblIntensityVal.Text = "Cường độ phát sáng: " + inten + " %";
+            lblIntensityVal.Text = AppL10n.T("Cường độ phát sáng: ", "Glow intensity: ") + inten + " %";
 
             // Corner Flares
             chkCornerFlares.Checked = _anim.NeonCornerFlares;

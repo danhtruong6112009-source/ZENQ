@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -64,7 +65,7 @@ namespace ZenQOffice.UI
 
             Label lblHeader = new Label
             {
-                Text = "Cặp phông chữ chủ đề (Theme Fonts)",
+                Text = AppL10n.Tr("Cặp phông chữ chủ đề (Theme Fonts)"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(10, 8),
@@ -145,7 +146,7 @@ namespace ZenQOffice.UI
             int customY = startY + _fontPairs.Count * (itemH + 2) + 6;
             Button btnCustom = new Button
             {
-                Text = "🔤  Tùy chỉnh phông chữ (Customize Fonts)...",
+                Text = AppL10n.Tr("🔤  Tùy chỉnh phông chữ (Customize Fonts)..."),
                 Location = new Point(8, customY),
                 Size = new Size(236, 28),
                 FlatStyle = FlatStyle.Flat,

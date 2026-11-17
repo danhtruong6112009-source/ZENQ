@@ -4,7 +4,8 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -41,7 +42,7 @@ namespace ZenQOffice.UI
 
         public PdfSignatureInputDialog(string defaultSigner = "Ban Giám Đốc", string defaultReason = "Đã phê duyệt tài liệu", Color? defaultColor = null, int initialTab = 0)
         {
-            this.Text = "Ký Tên Điện Tử - ZENQ PDF E-Sign (3 Phương thức Ký)";
+            this.Text = AppL10n.T("Ký Tên Điện Tử - ZENQ PDF E-Sign (3 Phương thức Ký)", "Electronic Signature - ZENQ PDF E-Sign");
             this.Size = new Size(580, 570);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -71,8 +72,8 @@ namespace ZenQOffice.UI
                 using (Font hFont = new Font("Segoe UI", 12f, FontStyle.Bold))
                 using (Font sFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("CHỨNG THỰC CHỮ KÝ ĐIỆN TỬ PDF", hFont, Brushes.White, 16, 12);
-                    e.Graphics.DrawString("Hỗ trợ 3 hình thức: Gõ thông tin chứng thư, Vẽ ký tay trực tiếp hoặc Tải ảnh chữ ký", sFont, Brushes.LightSteelBlue, 18, 38);
+                    e.Graphics.DrawString(AppL10n.T("CHỨNG THỰC CHỮ KÝ ĐIỆN TỬ PDF", "PDF ELECTRONIC SIGNATURE CERTIFICATE"), hFont, Brushes.White, 16, 12);
+                    e.Graphics.DrawString(AppL10n.T("Hỗ trợ 3 hình thức: Gõ thông tin chứng thư, Vẽ ký tay trực tiếp hoặc Tải ảnh chữ ký", "3 signing methods: Type certificate info, Draw signature directly, or Upload signature image"), sFont, Brushes.LightSteelBlue, 18, 38);
                 }
             };
             this.Controls.Add(pnlHeader);
@@ -86,21 +87,21 @@ namespace ZenQOffice.UI
             };
 
             // ==================== TAB 1: GÕ THÔNG TIN (TYPE) ====================
-            TabPage tabType = new TabPage("1. Gõ thông tin (Type)");
+            TabPage tabType = new TabPage(AppL10n.T("1. Gõ thông tin (Type)", "1. Type"));
             tabType.BackColor = Color.White;
             tabType.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
             BuildTypeTab(tabType, defaultSigner, defaultReason);
             tabControl.TabPages.Add(tabType);
 
             // ==================== TAB 2: VẼ TAY (DRAW) ====================
-            TabPage tabDraw = new TabPage("2. Vẽ tay chữ ký (Draw)");
+            TabPage tabDraw = new TabPage(AppL10n.T("2. Vẽ tay chữ ký (Draw)", "2. Draw"));
             tabDraw.BackColor = Color.White;
             tabDraw.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
             BuildDrawTab(tabDraw);
             tabControl.TabPages.Add(tabDraw);
 
             // ==================== TAB 3: TẢI ẢNH (UPLOAD) ====================
-            TabPage tabUpload = new TabPage("3. Tải ảnh chữ ký (Upload)");
+            TabPage tabUpload = new TabPage(AppL10n.T("3. Tải ảnh chữ ký (Upload)", "3. Upload"));
             tabUpload.BackColor = Color.White;
             tabUpload.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
             BuildUploadTab(tabUpload);
@@ -117,7 +118,7 @@ namespace ZenQOffice.UI
             int btnY = 485;
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Location = new Point(315, btnY),
                 Size = new Size(105, 36),
                 DialogResult = DialogResult.Cancel,
@@ -129,7 +130,7 @@ namespace ZenQOffice.UI
 
             Button btnOK = new Button
             {
-                Text = "Ký tài liệu",
+                Text = AppL10n.T("Ký tài liệu", "Sign Document"),
                 Location = new Point(430, btnY),
                 Size = new Size(120, 36),
                 BackColor = Color.FromArgb(30, 58, 138),
@@ -155,30 +156,30 @@ namespace ZenQOffice.UI
             int ctrlW = 310;
 
             // Người ký
-            Label lblSigner = new Label { Text = "Người ký / Đơn vị:", Location = new Point(lblX, startY + 3), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
-            txtSignerName = new TextBox { Location = new Point(txtX, startY), Width = ctrlW, Text = string.IsNullOrEmpty(defaultSigner) ? "Ban Giám Đốc" : defaultSigner };
+            Label lblSigner = new Label { Text = AppL10n.T("Người ký / Đơn vị:", "Signer / Org:"), Location = new Point(lblX, startY + 3), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            txtSignerName = new TextBox { Location = new Point(txtX, startY), Width = ctrlW, Text = (string.IsNullOrEmpty(defaultSigner) || defaultSigner == "Ban Giám Đốc") ? AppL10n.T("Ban Giám Đốc", "Management Board") : defaultSigner };
             page.Controls.Add(lblSigner);
             page.Controls.Add(txtSignerName);
 
             // Thời gian ký
             startY += 45;
-            Label lblDate = new Label { Text = "Thời gian ký:", Location = new Point(lblX, startY + 3), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            Label lblDate = new Label { Text = AppL10n.T("Thời gian ký:", "Sign date:"), Location = new Point(lblX, startY + 3), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
             txtSignDate = new TextBox { Location = new Point(txtX, startY), Width = ctrlW, Text = DateTime.Now.ToString("dd/MM/yyyy HH:mm") };
             page.Controls.Add(lblDate);
             page.Controls.Add(txtSignDate);
 
             // Lý do / Mục đích
             startY += 45;
-            Label lblReason = new Label { Text = "Mục đích ký:", Location = new Point(lblX, startY + 3), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            Label lblReason = new Label { Text = AppL10n.T("Mục đích ký:", "Reason:"), Location = new Point(lblX, startY + 3), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
             cbReason = new ZenQOffice.UI.FluentComboBox { Location = new Point(txtX, startY), Width = ctrlW, DropDownStyle = ComboBoxStyle.DropDown };
-            cbReason.Items.AddRange(new object[] { "Đã phê duyệt tài liệu", "Xác nhận tính pháp lý", "Ký duyệt hợp đồng", "Đã thanh toán hợp lệ", "Xác nhận đã đọc và đồng ý", "Bản thảo phê duyệt sơ bộ" });
-            cbReason.Text = string.IsNullOrEmpty(defaultReason) ? "Đã phê duyệt tài liệu" : defaultReason;
+            cbReason.Items.AddRange(new object[] { AppL10n.T("Đã phê duyệt tài liệu", "Document Approved"), AppL10n.T("Xác nhận tính pháp lý", "Legal Verification"), AppL10n.T("Ký duyệt hợp đồng", "Contract Approved"), AppL10n.T("Đã thanh toán hợp lệ", "Payment Verified"), AppL10n.T("Xác nhận đã đọc và đồng ý", "Read and Agreed"), AppL10n.T("Bản thảo phê duyệt sơ bộ", "Preliminary Draft Approved") });
+            cbReason.Text = (string.IsNullOrEmpty(defaultReason) || defaultReason == "Đã phê duyệt tài liệu") ? AppL10n.T("Đã phê duyệt tài liệu", "Document Approved") : defaultReason;
             page.Controls.Add(lblReason);
             page.Controls.Add(cbReason);
 
             // Màu chứng thư
             startY += 45;
-            Label lblColor = new Label { Text = "Màu chứng thư:", Location = new Point(lblX, startY + 4), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            Label lblColor = new Label { Text = AppL10n.T("Màu chứng thư:", "Badge color:"), Location = new Point(lblX, startY + 4), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
             pnlColorPreview = new Panel { Location = new Point(txtX, startY), Size = new Size(32, 26), BackColor = SignatureColor, BorderStyle = BorderStyle.FixedSingle };
 
             Color[] quickColors = new Color[] { Color.FromArgb(30, 58, 138), Color.FromArgb(220, 38, 38), Color.FromArgb(15, 23, 42), Color.FromArgb(4, 120, 87) };
@@ -194,7 +195,7 @@ namespace ZenQOffice.UI
                 qX += 32;
             }
 
-            Button btnMore = new Button { Text = "Màu khác...", Location = new Point(qX + 4, startY), Size = new Size(85, 26), Font = new Font("Segoe UI", 8.5f), BackColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            Button btnMore = new Button { Text = AppL10n.T("Màu khác...", "More colors..."), Location = new Point(qX + 4, startY), Size = new Size(85, 26), Font = new Font("Segoe UI", 8.5f), BackColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
             btnMore.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnMore.Click += (s, e) =>
             {
@@ -242,9 +243,9 @@ namespace ZenQOffice.UI
                 using (SolidBrush tb = new SolidBrush(SignatureColor))
                 using (SolidBrush gb = new SolidBrush(Color.FromArgb(71, 85, 105)))
                 {
-                    g.DrawString("ĐÃ KÝ ĐIỆN TỬ BỞI: " + txtSignerName.Text, tf, tb, 42, 16);
-                    g.DrawString("Thời gian: " + txtSignDate.Text, df, gb, 42, 45);
-                    g.DrawString("Mục đích: " + cbReason.Text, df, gb, 42, 68);
+                    g.DrawString(AppL10n.T("ĐÃ KÝ ĐIỆN TỬ BỞI: ", "DIGITALLY SIGNED BY: ") + txtSignerName.Text, tf, tb, 42, 16);
+                    g.DrawString(AppL10n.T("Thời gian: ", "Date: ") + txtSignDate.Text, df, gb, 42, 45);
+                    g.DrawString(AppL10n.T("Mục đích: ", "Reason: ") + cbReason.Text, df, gb, 42, 68);
                 }
             };
             txtSignerName.TextChanged += (s, e) => pnlPreviewBox.Invalidate();
@@ -257,7 +258,7 @@ namespace ZenQOffice.UI
         {
             Label lblHint = new Label
             {
-                Text = "Dùng chuột hoặc bút cảm ứng vẽ trực tiếp chữ ký vào khung bên dưới:",
+                Text = AppL10n.T("Dùng chuột hoặc bút cảm ứng vẽ trực tiếp chữ ký vào khung bên dưới:", "Use mouse or stylus to draw your signature below:"),
                 Location = new Point(14, 12),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Italic),
@@ -291,7 +292,7 @@ namespace ZenQOffice.UI
                     using (Font hintF = new Font("Segoe UI", 11f, FontStyle.Italic))
                     using (SolidBrush hintB = new SolidBrush(Color.FromArgb(203, 213, 225)))
                     {
-                        e.Graphics.DrawString("Ký tên vào đây...", hintF, hintB, 20, pnlDrawCanvas.Height / 2 - 12);
+                        e.Graphics.DrawString(AppL10n.T("Ký tên vào đây...", "Sign here..."), hintF, hintB, 20, pnlDrawCanvas.Height / 2 - 12);
                     }
                     return;
                 }
@@ -343,7 +344,7 @@ namespace ZenQOffice.UI
 
             // Controls below drawing canvas: Color selection & Clear button
             int ctrlY = 282;
-            Label lblInk = new Label { Text = "Màu mực:", Location = new Point(14, ctrlY + 6), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
+            Label lblInk = new Label { Text = AppL10n.T("Màu mực:", "Ink color:"), Location = new Point(14, ctrlY + 6), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(51, 65, 85) };
             pnlDrawColorPreview = new Panel { Location = new Point(90, ctrlY + 2), Size = new Size(30, 26), BackColor = drawColor, BorderStyle = BorderStyle.FixedSingle };
 
             Color[] inkColors = new Color[] { Color.FromArgb(30, 58, 138), Color.FromArgb(15, 23, 42), Color.FromArgb(220, 38, 38) };
@@ -361,7 +362,7 @@ namespace ZenQOffice.UI
 
             Button btnClear = new Button
             {
-                Text = "Xóa nét vẽ",
+                Text = AppL10n.T("Xóa nét vẽ", "Clear"),
                 Location = new Point(380, ctrlY),
                 Size = new Size(130, 30),
                 BackColor = Color.White,
@@ -387,7 +388,7 @@ namespace ZenQOffice.UI
         {
             Label lblHint = new Label
             {
-                Text = "Chọn file ảnh chữ ký hoặc con dấu cá nhân (PNG trong suốt, JPG, BMP):",
+                Text = AppL10n.T("Chọn file ảnh chữ ký hoặc con dấu cá nhân (PNG trong suốt, JPG, BMP):", "Select signature or stamp image file (transparent PNG, JPG, BMP):"),
                 Location = new Point(14, 12),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Italic),
@@ -397,7 +398,7 @@ namespace ZenQOffice.UI
 
             Button btnBrowse = new Button
             {
-                Text = "Chọn tệp ảnh...",
+                Text = AppL10n.T("Chọn tệp ảnh...", "Choose Image..."),
                 Location = new Point(14, 38),
                 Size = new Size(140, 34),
                 BackColor = Color.FromArgb(37, 99, 235),
@@ -410,7 +411,7 @@ namespace ZenQOffice.UI
 
             lblUploadStatus = new Label
             {
-                Text = "Chưa chọn tệp ảnh nào",
+                Text = AppL10n.T("Chưa chọn tệp ảnh nào", "No image file selected"),
                 Location = new Point(165, 46),
                 AutoSize = true,
                 ForeColor = Color.Gray
@@ -418,7 +419,7 @@ namespace ZenQOffice.UI
 
             chkRemoveWhiteBg = new CheckBox
             {
-                Text = "Tự động khử nền trắng (Làm trong suốt chữ ký)",
+                Text = AppL10n.T("Tự động khử nền trắng (Làm trong suốt chữ ký)", "Auto-remove white background (Make signature transparent)"),
                 Location = new Point(14, 82),
                 AutoSize = true,
                 Checked = true,
@@ -440,8 +441,8 @@ namespace ZenQOffice.UI
             {
                 using (OpenFileDialog ofd = new OpenFileDialog())
                 {
-                    ofd.Title = "Chọn ảnh chữ ký / con dấu cá nhân";
-                    ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|Tất cả tệp (*.*)|*.*";
+                    ofd.Title = AppL10n.T("Chọn ảnh chữ ký / con dấu cá nhân", "Select signature / stamp image");
+                    ofd.Filter = AppL10n.T("Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|Tất cả tệp (*.*)|*.*", "Image Files (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|All Files (*.*)|*.*");
                     if (ofd.ShowDialog(this) == DialogResult.OK)
                     {
                         try
@@ -453,7 +454,7 @@ namespace ZenQOffice.UI
                         }
                         catch (Exception ex)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Không thể mở tệp ảnh: " + ex.Message, "Lỗi nạp ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể mở tệp ảnh: ", "Unable to open image file: ") + ex.Message, AppL10n.T("Lỗi nạp ảnh", "Image Load Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }
@@ -507,11 +508,11 @@ namespace ZenQOffice.UI
             SigningMode = tabControl.SelectedIndex;
 
             SignerName = txtSignerName.Text.Trim();
-            if (string.IsNullOrEmpty(SignerName)) SignerName = "Ban Giám Đốc";
+            if (string.IsNullOrEmpty(SignerName)) SignerName = AppL10n.T("Ban Giám Đốc", "Management Board");
             SignDate = txtSignDate.Text.Trim();
             if (string.IsNullOrEmpty(SignDate)) SignDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
             Reason = cbReason.Text.Trim();
-            if (string.IsNullOrEmpty(Reason)) Reason = "Đã phê duyệt tài liệu";
+            if (string.IsNullOrEmpty(Reason)) Reason = AppL10n.T("Đã phê duyệt tài liệu", "Document Approved");
 
             if (SigningMode == 1) // Draw mode
             {

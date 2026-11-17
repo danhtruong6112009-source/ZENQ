@@ -30,7 +30,7 @@ namespace ZenQOffice.UI
         public PeripheralHubDialog(Func<string> getCurrentDocPathCallback = null)
         {
             GetCurrentDocumentPathCallback = getCurrentDocPathCallback;
-            Text = "Thiết bị & Cảm ứng";
+            Text = ZenQOffice.Core.AppL10n.T("Thiết bị & Cảm ứng", "Devices & Touch");
             ClientSize = new Size(640, 540);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -63,7 +63,7 @@ namespace ZenQOffice.UI
                 using (Brush bTitle = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 using (Pen borderPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
                 {
-                    e.Graphics.DrawString("Thiết bị & Cảm ứng", fTitle, bTitle, 42, 13);
+                    e.Graphics.DrawString(ZenQOffice.Core.AppL10n.T("Thiết bị & Cảm ứng", "Devices & Touch"), fTitle, bTitle, 42, 13);
                     e.Graphics.DrawLine(borderPen, 0, header.Height - 1, header.Width, header.Height - 1);
                 }
             };
@@ -91,14 +91,14 @@ namespace ZenQOffice.UI
             Controls.Add(body);
 
             // 1. Cảm ứng & Bút vẽ
-            Panel cardTouch = CreateSectionCard("Cảm ứng & Bút vẽ", '\uED5F', new Point(16, 12), new Size(608, 104));
+            Panel cardTouch = CreateSectionCard(ZenQOffice.Core.AppL10n.T("Cảm ứng & Bút vẽ", "Touch & Stylus"), '\uED5F', new Point(16, 12), new Size(608, 104));
             body.Controls.Add(cardTouch);
 
-            Button btnOpenOsk = CreateNeutralButton("Bàn phím ảo", new Point(356, 8), new Size(105, 25), '\uE765');
+            Button btnOpenOsk = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Bàn phím ảo", "Touch Keyboard"), new Point(356, 8), new Size(105, 25), '\uE765');
             btnOpenOsk.Click += (sender, e) => PeripheralDeviceManager.ToggleTouchKeyboard();
             cardTouch.Controls.Add(btnOpenOsk);
 
-            Button btnOpenConnect = CreateNeutralButton("Kết nối Mobile", new Point(468, 8), new Size(126, 25), '\uE8EA');
+            Button btnOpenConnect = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Kết nối Mobile", "ZenQ Connect"), new Point(468, 8), new Size(126, 25), '\uE8EA');
             btnOpenConnect.Click += (sender, e) =>
             {
                 using (var dlg = new ZenQConnectDialog())
@@ -108,10 +108,10 @@ namespace ZenQOffice.UI
             };
             cardTouch.Controls.Add(btnOpenConnect);
 
-            _chkTouchMode = CreateCheck("Chế độ cảm ứng (nút lớn & thanh nổi)", new Point(16, 40), new Size(284, 24), s.TouchModeEnabled);
-            _chkAutoPenInk = CreateCheck("Tự động bật Bút vẽ khi chạm bút", new Point(312, 40), new Size(280, 24), s.AutoSwitchPenInk);
-            _chkPenPressure = CreateCheck("Nhận lực nhấn & xoay bút để tẩy", new Point(16, 68), new Size(284, 24), s.PenPressureSensitivity);
-            _chkAutoTouchKbd = CreateCheck("Tự động mở bàn phím ảo khi nhập liệu", new Point(312, 68), new Size(280, 24), s.AutoSummonTouchKeyboard);
+            _chkTouchMode = CreateCheck(ZenQOffice.Core.AppL10n.T("Chế độ cảm ứng (nút lớn & thanh nổi)", "Touch Mode (larger targets & floating bar)"), new Point(16, 40), new Size(284, 24), s.TouchModeEnabled);
+            _chkAutoPenInk = CreateCheck(ZenQOffice.Core.AppL10n.T("Tự động bật Bút vẽ khi chạm bút", "Auto-enable Ink on Stylus touch"), new Point(312, 40), new Size(280, 24), s.AutoSwitchPenInk);
+            _chkPenPressure = CreateCheck(ZenQOffice.Core.AppL10n.T("Nhận lực nhấn & xoay bút để tẩy", "Pen pressure & eraser tilt support"), new Point(16, 68), new Size(284, 24), s.PenPressureSensitivity);
+            _chkAutoTouchKbd = CreateCheck(ZenQOffice.Core.AppL10n.T("Tự động mở bàn phím ảo khi nhập liệu", "Auto-show Touch Keyboard on text input"), new Point(312, 68), new Size(280, 24), s.AutoSummonTouchKeyboard);
 
             cardTouch.Controls.Add(_chkTouchMode);
             cardTouch.Controls.Add(_chkAutoPenInk);
@@ -119,12 +119,12 @@ namespace ZenQOffice.UI
             cardTouch.Controls.Add(_chkAutoTouchKbd);
 
             // 2. Màn hình & Trình chiếu
-            Panel cardMonitor = CreateSectionCard("Màn hình & Trình chiếu", '\uE7F4', new Point(16, 126), new Size(608, 80));
+            Panel cardMonitor = CreateSectionCard(ZenQOffice.Core.AppL10n.T("Màn hình & Trình chiếu", "Displays & Projection"), '\uE7F4', new Point(16, 126), new Size(608, 80));
             body.Controls.Add(cardMonitor);
 
             _lblMonitorStatus = new Label
             {
-                Text = "Đang kiểm tra...",
+                Text = ZenQOffice.Core.AppL10n.T("Đang kiểm tra...", "Detecting..."),
                 Font = new Font("Segoe UI", 8.5f),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 AutoSize = false,
@@ -135,15 +135,15 @@ namespace ZenQOffice.UI
             };
             cardMonitor.Controls.Add(_lblMonitorStatus);
 
-            Button btnProjExtend = CreateNeutralButton("Mở rộng", new Point(16, 40), new Size(134, 28));
+            Button btnProjExtend = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Mở rộng", "Extend"), new Point(16, 40), new Size(134, 28));
             btnProjExtend.Click += (sender, e) => PeripheralDeviceManager.SetDisplayProjectionMode("/extend");
             cardMonitor.Controls.Add(btnProjExtend);
 
-            Button btnProjClone = CreateNeutralButton("Nhân đôi", new Point(158, 40), new Size(134, 28));
+            Button btnProjClone = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Nhân đôi", "Duplicate"), new Point(158, 40), new Size(134, 28));
             btnProjClone.Click += (sender, e) => PeripheralDeviceManager.SetDisplayProjectionMode("/clone");
             cardMonitor.Controls.Add(btnProjClone);
 
-            Button btnProjInternal = CreateNeutralButton("Chỉ màn hình chính", new Point(300, 40), new Size(146, 28));
+            Button btnProjInternal = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Chỉ màn hình chính", "PC Screen Only"), new Point(300, 40), new Size(146, 28));
             btnProjInternal.Click += (sender, e) => PeripheralDeviceManager.SetDisplayProjectionMode("/internal");
             cardMonitor.Controls.Add(btnProjInternal);
 
@@ -158,7 +158,7 @@ namespace ZenQOffice.UI
             cardMonitor.Controls.Add(btnPresenter);
 
             // 3. Ổ đĩa USB
-            Panel cardUsb = CreateSectionCard("Ổ đĩa USB", '\uE88E', new Point(16, 216), new Size(608, 118));
+            Panel cardUsb = CreateSectionCard(ZenQOffice.Core.AppL10n.T("Ổ đĩa USB", "USB Drives"), '\uE88E', new Point(16, 216), new Size(608, 118));
             body.Controls.Add(cardUsb);
 
             _cboUsbDrives = new ZenQOffice.UI.FluentComboBox
@@ -171,15 +171,15 @@ namespace ZenQOffice.UI
             _cboUsbDrives.SelectedIndexChanged += (sender, e) => RefreshUsbFilesList();
             cardUsb.Controls.Add(_cboUsbDrives);
 
-            Button btnRefreshUsb = CreateNeutralButton("Làm mới", new Point(298, 36), new Size(92, 27), '\uE72C');
+            Button btnRefreshUsb = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Làm mới", "Refresh"), new Point(298, 36), new Size(92, 27), '\uE72C');
             btnRefreshUsb.Click += (sender, e) => RefreshDeviceLists();
             cardUsb.Controls.Add(btnRefreshUsb);
 
-            Button btnBackupUsb = CreateNeutralButton("Sao lưu", new Point(396, 36), new Size(96, 27), '\uEA35');
+            Button btnBackupUsb = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Sao lưu", "Back Up"), new Point(396, 36), new Size(96, 27), '\uEA35');
             btnBackupUsb.Click += (sender, e) => DoBackupToSelectedUsb();
             cardUsb.Controls.Add(btnBackupUsb);
 
-            Button btnOpenUsbFile = CreateNeutralButton("Mở tệp", new Point(498, 36), new Size(94, 27), '\uE838');
+            Button btnOpenUsbFile = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Mở tệp", "Open File"), new Point(498, 36), new Size(94, 27), '\uE838');
             btnOpenUsbFile.Click += (sender, e) => OpenSelectedUsbFile();
             cardUsb.Controls.Add(btnOpenUsbFile);
 
@@ -195,19 +195,19 @@ namespace ZenQOffice.UI
             cardUsb.Controls.Add(_lstUsbFiles);
 
             // 4. Máy quét & Thông báo
-            Panel cardScan = CreateSectionCard("Máy quét & Thông báo", '\uE896', new Point(16, 344), new Size(608, 86));
+            Panel cardScan = CreateSectionCard(ZenQOffice.Core.AppL10n.T("Máy quét & Thông báo", "Scanner & Notifications"), '\uE896', new Point(16, 344), new Size(608, 86));
             body.Controls.Add(cardScan);
 
-            _chkBarcodeMode = CreateCheck("Chế độ quét mã vạch trong bảng tính Calc", new Point(16, 36), new Size(340, 22), s.CalcBarcodeScannerMode);
-            _chkAutoNotify = CreateCheck("Thông báo khi kết nối USB hoặc màn hình phụ", new Point(16, 58), new Size(340, 22), s.PeripheralAutoNotify);
+            _chkBarcodeMode = CreateCheck(ZenQOffice.Core.AppL10n.T("Chế độ quét mã vạch trong bảng tính Calc", "Barcode Scanner mode in Calc"), new Point(16, 36), new Size(340, 22), s.CalcBarcodeScannerMode);
+            _chkAutoNotify = CreateCheck(ZenQOffice.Core.AppL10n.T("Thông báo khi kết nối USB hoặc màn hình phụ", "Notify on USB or external display connect"), new Point(16, 58), new Size(340, 22), s.PeripheralAutoNotify);
             cardScan.Controls.Add(_chkBarcodeMode);
             cardScan.Controls.Add(_chkAutoNotify);
 
-            Button btnWiaScan = CreateNeutralButton("Máy Scan", new Point(380, 42), new Size(102, 28));
+            Button btnWiaScan = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Máy Scan", "Scan"), new Point(380, 42), new Size(102, 28));
             btnWiaScan.Click += (sender, e) => PeripheralDeviceManager.LaunchWindowsScannerDialog();
             cardScan.Controls.Add(btnWiaScan);
 
-            Button btnDocEnhance = CreateNeutralButton("Làm nét ảnh", new Point(490, 42), new Size(102, 28));
+            Button btnDocEnhance = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Làm nét ảnh", "Enhance Photo"), new Point(490, 42), new Size(102, 28));
             btnDocEnhance.Click += (sender, e) => ImportAndEnhanceDocumentPhoto();
             cardScan.Controls.Add(btnDocEnhance);
 
@@ -227,7 +227,7 @@ namespace ZenQOffice.UI
             };
             Controls.Add(footer);
 
-            Button btnCancel = CreateNeutralButton("Đóng", new Point(422, 10), new Size(94, 30), '\uE711');
+            Button btnCancel = CreateNeutralButton(ZenQOffice.Core.AppL10n.T("Đóng", "Close"), new Point(422, 10), new Size(94, 30), '\uE711');
             btnCancel.Click += (sender, e) =>
             {
                 DialogResult = DialogResult.Cancel;
@@ -235,7 +235,7 @@ namespace ZenQOffice.UI
             };
             footer.Controls.Add(btnCancel);
 
-            Button btnApply = CreatePrimaryButton("Lưu", new Point(524, 10), new Size(100, 30), '\uE74E');
+            Button btnApply = CreatePrimaryButton(ZenQOffice.Core.AppL10n.T("Lưu", "Save"), new Point(524, 10), new Size(100, 30), '\uE74E');
             btnApply.Click += (sender, e) =>
             {
                 SaveSettingsFromUI();
@@ -346,9 +346,9 @@ namespace ZenQOffice.UI
             List<string> monDesc = new List<string>();
             foreach (var m in monitors)
             {
-                monDesc.Add(string.Format("{0}×{1}{2}", m.Bounds.Width, m.Bounds.Height, m.IsPrimary ? " (Chính)" : ""));
+                monDesc.Add(string.Format("{0}×{1}{2}", m.Bounds.Width, m.Bounds.Height, m.IsPrimary ? ZenQOffice.Core.AppL10n.T(" (Chính)", " (Primary)") : ""));
             }
-            _lblMonitorStatus.Text = string.Format("{0} màn hình: {1}",
+            _lblMonitorStatus.Text = string.Format(ZenQOffice.Core.AppL10n.T("{0} màn hình: {1}", "{0} display(s): {1}"),
                 monitors.Count, string.Join(" • ", monDesc.ToArray()));
 
             // USB drives
@@ -364,10 +364,10 @@ namespace ZenQOffice.UI
             }
             else
             {
-                _cboUsbDrives.Items.Add("Chưa phát hiện ổ đĩa USB");
+                _cboUsbDrives.Items.Add(ZenQOffice.Core.AppL10n.T("Chưa phát hiện ổ đĩa USB", "No USB drives detected"));
                 _cboUsbDrives.SelectedIndex = 0;
                 _lstUsbFiles.Items.Clear();
-                _lstUsbFiles.Items.Add("Chưa có USB nào được kết nối.");
+                _lstUsbFiles.Items.Add(ZenQOffice.Core.AppL10n.T("Chưa có USB nào được kết nối.", "No USB drive connected."));
             }
         }
 
@@ -378,7 +378,7 @@ namespace ZenQOffice.UI
             int idx = _cboUsbDrives.SelectedIndex;
             if (idx < 0 || idx >= drives.Count)
             {
-                _lstUsbFiles.Items.Add("Chưa có USB nào được kết nối.");
+                _lstUsbFiles.Items.Add(ZenQOffice.Core.AppL10n.T("Chưa có USB nào được kết nối.", "No USB drive connected."));
                 return;
             }
 
@@ -386,7 +386,7 @@ namespace ZenQOffice.UI
             var files = PeripheralDeviceManager.ScanUsbOfficeFiles(root, 40);
             if (files.Count == 0)
             {
-                _lstUsbFiles.Items.Add("Không có tệp Office trên " + root);
+                _lstUsbFiles.Items.Add(ZenQOffice.Core.AppL10n.T("Không có tệp Office trên ", "No Office files on ") + root);
             }
             else
             {
@@ -403,8 +403,7 @@ namespace ZenQOffice.UI
             int idx = _cboUsbDrives.SelectedIndex;
             if (idx < 0 || idx >= drives.Count)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Chưa có ổ đĩa USB nào được kết nối.",
-                    "Sao lưu ra USB", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Chưa có ổ đĩa USB nào được kết nối.", "No USB drive connected."), ZenQOffice.Core.AppL10n.T("Sao lưu ra USB", "Backup to USB"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -412,14 +411,12 @@ namespace ZenQOffice.UI
             string destPath, err;
             if (PeripheralDeviceManager.BackupFileToUsb(docPath, drives[idx].DriveLetter, out destPath, out err))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Đã sao lưu tài liệu tại:\n" + destPath,
-                    "Sao lưu thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã sao lưu tài liệu tại:\n", "Document backed up to:\n") + destPath, ZenQOffice.Core.AppL10n.T("Sao lưu thành công", "Backup Complete"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 RefreshUsbFilesList();
             }
             else
             {
-                ZenQOffice.UI.FluentMessageBox.Show(err ?? "Không thể sao lưu tệp ra USB.",
-                    "Sao lưu ra USB", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(err ?? ZenQOffice.Core.AppL10n.T("Không thể sao lưu tệp ra USB.", "Could not back up file to USB."), ZenQOffice.Core.AppL10n.T("Sao lưu ra USB", "Backup to USB"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -441,8 +438,8 @@ namespace ZenQOffice.UI
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
                         ofd.InitialDirectory = drives[idx].DriveLetter;
-                        ofd.Title = "Mở tài liệu từ USB";
-                        ofd.Filter = "Tài liệu Office (*.docx;*.xlsx;*.pptx;*.pdf;*.csv;*.txt)|*.docx;*.xlsx;*.pptx;*.pdf;*.csv;*.txt|Tất cả tệp (*.*)|*.*";
+                        ofd.Title = ZenQOffice.Core.AppL10n.T("Mở tài liệu từ USB", "Open Document from USB");
+                        ofd.Filter = ZenQOffice.Core.AppL10n.T("Tài liệu Office (*.docx;*.xlsx;*.pptx;*.pdf;*.csv;*.txt)|*.docx;*.xlsx;*.pptx;*.pdf;*.csv;*.txt|Tất cả tệp (*.*)|*.*", "Office Files (*.docx;*.xlsx;*.pptx;*.pdf;*.csv;*.txt)|*.docx;*.xlsx;*.pptx;*.pdf;*.csv;*.txt|All Files (*.*)|*.*");
                         if (ofd.ShowDialog(this) == DialogResult.OK)
                         {
                             SaveSettingsFromUI();
@@ -459,8 +456,8 @@ namespace ZenQOffice.UI
         {
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                ofd.Title = "Chọn ảnh tài liệu để làm nét";
-                ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.tif)|*.png;*.jpg;*.jpeg;*.bmp;*.tif";
+                ofd.Title = ZenQOffice.Core.AppL10n.T("Chọn ảnh tài liệu để làm nét", "Select Document Photo to Enhance");
+                ofd.Filter = ZenQOffice.Core.AppL10n.T("Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.tif)|*.png;*.jpg;*.jpeg;*.bmp;*.tif", "Image Files (*.png;*.jpg;*.jpeg;*.bmp;*.tif)|*.png;*.jpg;*.jpeg;*.bmp;*.tif");
                 if (ofd.ShowDialog(this) == DialogResult.OK)
                 {
                     try
@@ -468,8 +465,8 @@ namespace ZenQOffice.UI
                         using (Bitmap raw = new Bitmap(ofd.FileName))
                         {
                             DialogResult bwAsk = ZenQOffice.UI.FluentMessageBox.Show(
-                                "Chuyển ảnh sang chế độ Đen-Trắng độ tương phản cao?\n\n• Yes: Đen-Trắng (rõ chữ)\n• No: Giữ màu gốc",
-                                "Làm nét ảnh tài liệu",
+                                ZenQOffice.Core.AppL10n.T("Chuyển ảnh sang chế độ Đen-Trắng độ tương phản cao?\n\n• Yes: Đen-Trắng (rõ chữ)\n• No: Giữ màu gốc", "Convert photo to high-contrast Black & White?\n\n• Yes: Black & White (sharp text)\n• No: Keep original colors"),
+                                ZenQOffice.Core.AppL10n.T("Làm nét ảnh tài liệu", "Enhance Document Photo"),
                                 MessageBoxButtons.YesNo,
                                 MessageBoxIcon.Question);
 
@@ -481,7 +478,7 @@ namespace ZenQOffice.UI
                     }
                     catch (Exception ex)
                     {
-                        ZenQOffice.UI.FluentMessageBox.Show("Không thể xử lý ảnh: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Không thể xử lý ảnh: ", "Image processing error: ") + ex.Message, ZenQOffice.Core.AppL10n.Tr("Lỗi"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }

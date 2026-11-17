@@ -213,7 +213,7 @@ namespace ZenQOffice.UI
         {
             Label lblHeader = new Label
             {
-                Text = title,
+                Text = AppL10n.Tr(title),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(20, 45, 85),
                 Location = new Point(8, curY),
@@ -244,7 +244,7 @@ namespace ZenQOffice.UI
                 btn.FlatAppearance.BorderColor = Color.FromArgb(220, 225, 232);
                 btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(222, 236, 252);
 
-                tooltip.SetToolTip(btn, def.DisplayName);
+                tooltip.SetToolTip(btn, AppL10n.Tr(def.DisplayName));
 
                 btn.Paint += (s, e) =>
                 {

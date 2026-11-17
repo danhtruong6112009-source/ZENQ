@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -19,7 +20,7 @@ namespace ZenQOffice.UI
         {
             _writerView = writerView;
 
-            this.Text = "Chèn Bảng Chỉ Mục Tra Cứu (Insert Index)";
+            this.Text = AppL10n.T("Chèn Bảng Chỉ Mục Tra Cứu (Insert Index)", "Insert Index");
             this.Size = new Size(500, 390);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -34,29 +35,29 @@ namespace ZenQOffice.UI
 
         private void BuildUI()
         {
-            Label lblCols = new Label { Text = "Số cột hiển thị (Columns):", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Label lblCols = new Label { Text = AppL10n.T("Số cột hiển thị (Columns):", "Columns:"), Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblCols);
 
             cboColumns = new ZenQOffice.UI.FluentComboBox { Location = new Point(200, 14), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
-            cboColumns.Items.AddRange(new object[] { "2 Cột (Khuyên dùng)", "3 Cột", "1 Cột" });
+            cboColumns.Items.AddRange(new object[] { AppL10n.T("2 Cột (Khuyên dùng)", "2 Columns (Recommended)"), AppL10n.T("3 Cột", "3 Columns"), AppL10n.T("1 Cột", "1 Column") });
             cboColumns.SelectedIndex = 0;
             this.Controls.Add(cboColumns);
 
-            Label lblPrev = new Label { Text = "Xem trước bảng chỉ mục theo thứ tự A-Z:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblPrev = new Label { Text = AppL10n.T("Xem trước bảng chỉ mục theo thứ tự A-Z:", "Index preview (A-Z):"), Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             this.Controls.Add(lblPrev);
 
             lstPreview = new ZenQOffice.UI.FluentListBox { Location = new Point(20, 70), Size = new Size(445, 120), BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 8.5f) };
             this.Controls.Add(lstPreview);
 
-            chkRightAlign = new CheckBox { Text = "Căn lề phải số trang (Right align page numbers)", Location = new Point(20, 204), AutoSize = true, Checked = true };
+            chkRightAlign = new CheckBox { Text = AppL10n.T("Căn lề phải số trang (Right align page numbers)", "Right align page numbers"), Location = new Point(20, 204), AutoSize = true, Checked = true };
             chkRightAlign.CheckedChanged += (s, e) => UpdatePreview();
             this.Controls.Add(chkRightAlign);
 
-            Label lblLeader = new Label { Text = "Đường dẫn tab (Tab leader):", Location = new Point(20, 235), AutoSize = true };
+            Label lblLeader = new Label { Text = AppL10n.T("Đường dẫn tab (Tab leader):", "Tab leader:"), Location = new Point(20, 235), AutoSize = true };
             this.Controls.Add(lblLeader);
 
             cboTabLeader = new ZenQOffice.UI.FluentComboBox { Location = new Point(200, 232), Width = 170, DropDownStyle = ComboBoxStyle.DropDownList };
-            cboTabLeader.Items.AddRange(new object[] { ".................... (Chấm)", "-------------------- (Gạch)", "(Không có)" });
+            cboTabLeader.Items.AddRange(new object[] { AppL10n.T(".................... (Chấm)", ".................... (Dots)"), AppL10n.T("-------------------- (Gạch)", "-------------------- (Dashes)"), AppL10n.T("(Không có)", "(None)") });
             cboTabLeader.SelectedIndex = 0;
             cboTabLeader.SelectedIndexChanged += (s, e) => UpdatePreview();
             this.Controls.Add(cboTabLeader);
@@ -67,7 +68,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new Button
             {
-                Text = "Chèn Chỉ Mục",
+                Text = AppL10n.T("Chèn Chỉ Mục", "Insert Index"),
                 Location = new Point(265, 10),
                 Size = new Size(115, 28),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -81,7 +82,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(390, 10),
                 Size = new Size(75, 28),
                 BackColor = Color.White,
@@ -158,11 +159,11 @@ namespace ZenQOffice.UI
 
             if (map.Count == 0)
             {
-                lstPreview.Items.Add("(Chưa có mục nào được đánh dấu {XE} trong tài liệu)");
+                lstPreview.Items.Add(AppL10n.T("(Chưa có mục nào được đánh dấu {XE} trong tài liệu)", "(No {XE} index entries marked in this document)"));
                 lstPreview.Items.Add("• A");
-                lstPreview.Items.Add("  Thuật toán cơ bản .................... Trang 1");
+                lstPreview.Items.Add(AppL10n.T("  Thuật toán cơ bản .................... Trang 1", "  Basic Algorithms ..................... Page 1"));
                 lstPreview.Items.Add("• B");
-                lstPreview.Items.Add("  Biến toàn cục ........................ Trang 1, 2");
+                lstPreview.Items.Add(AppL10n.T("  Biến toàn cục ........................ Trang 1, 2", "  Global Variables ....................... Pages 1, 2"));
                 return;
             }
 
@@ -197,7 +198,7 @@ namespace ZenQOffice.UI
             var map = ScanIndexEntries();
             if (map.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Chưa tìm thấy từ khóa nào được đánh dấu tra cứu trong tài liệu.\n\nVui lòng bôi đen từ khóa và chọn 'Đánh dấu mục' (Alt + Shift + X) trước khi chèn bảng chỉ mục!", "Chèn Chỉ Mục", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Chưa tìm thấy từ khóa nào được đánh dấu tra cứu trong tài liệu.\n\nVui lòng bôi đen từ khóa và chọn 'Đánh dấu mục' (Alt + Shift + X) trước khi chèn bảng chỉ mục!", "No marked index entries found.\n\nPlease select text and choose 'Mark Entry' (Alt + Shift + X) first!"), AppL10n.T("Chèn Chỉ Mục", "Insert Index"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.None;
                 return;
             }
@@ -208,7 +209,7 @@ namespace ZenQOffice.UI
 
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
             sb.AppendLine();
-            sb.AppendLine("================== CHỈ MỤC TÀI LIỆU (INDEX) ==================");
+            sb.AppendLine(AppL10n.T("================== CHỈ MỤC TÀI LIỆU (INDEX) ==================", "================== DOCUMENT INDEX =================="));
             sb.AppendLine();
 
             char lastGroup = '\0';

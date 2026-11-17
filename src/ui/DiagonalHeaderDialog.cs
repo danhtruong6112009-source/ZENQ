@@ -37,7 +37,7 @@ namespace ZenQOffice.UI
 
         private void InitializeUI(CellData existingCell)
         {
-            this.Text = "Kẻ Chéo Ô & Tạo 2 Tiêu Đề";
+            this.Text = AppL10n.T("Kẻ Chéo Ô & Tạo 2 Tiêu Đề", "Diagonal Header Cell");
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -59,8 +59,8 @@ namespace ZenQOffice.UI
                 using (Font hFont = new Font("Segoe UI", 11f, FontStyle.Bold))
                 using (Font subFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("📐 Kẻ Đường Chéo & Chia Đôi Tiêu Đề Ô", hFont, Brushes.White, 14, 8);
-                    e.Graphics.DrawString("Tạo ô tiêu đề góc bảng chia 2 phần (Cột bên trên, Hàng bên dưới)", subFont, Brushes.WhiteSmoke, 16, 28);
+                    e.Graphics.DrawString(AppL10n.T("📐 Kẻ Đường Chéo & Chia Đôi Tiêu Đề Ô", "📐 Diagonal Line & Split Cell Header"), hFont, Brushes.White, 14, 8);
+                    e.Graphics.DrawString(AppL10n.T("Tạo ô tiêu đề góc bảng chia 2 phần (Cột bên trên, Hàng bên dưới)", "Create a split table corner header (Column on top, Row on bottom)"), subFont, Brushes.WhiteSmoke, 16, 28);
                 }
             };
             this.Controls.Add(pnlHeader);
@@ -70,7 +70,7 @@ namespace ZenQOffice.UI
             // Top-Right Title (Column Header)
             Label lblTR = new Label
             {
-                Text = "1. Tiêu đề Cột (Góc Trên - Phải):",
+                Text = AppL10n.T("1. Tiêu đề Cột (Góc Trên - Phải):", "1. Column Header (Top-Right):"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(16, curY),
@@ -85,7 +85,7 @@ namespace ZenQOffice.UI
                 Size = new Size(224, 24),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
                 Text = (existingCell != null && existingCell.Format != null && !string.IsNullOrEmpty(existingCell.Format.DiagonalTopRightText))
-                    ? existingCell.Format.DiagonalTopRightText : "Tháng"
+                    ? existingCell.Format.DiagonalTopRightText : AppL10n.T("Tháng", "Month")
             };
             txtTopRight.TextChanged += (s, e) => pnlPreview.Invalidate();
             this.Controls.Add(txtTopRight);
@@ -93,7 +93,7 @@ namespace ZenQOffice.UI
             // Bottom-Left Title (Row Header)
             Label lblBL = new Label
             {
-                Text = "2. Tiêu đề Hàng (Góc Dưới - Trái):",
+                Text = AppL10n.T("2. Tiêu đề Hàng (Góc Dưới - Trái):", "2. Row Header (Bottom-Left):"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(250, curY - 20),
@@ -107,7 +107,7 @@ namespace ZenQOffice.UI
                 Size = new Size(220, 24),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
                 Text = (existingCell != null && existingCell.Format != null && !string.IsNullOrEmpty(existingCell.Format.DiagonalBottomLeftText))
-                    ? existingCell.Format.DiagonalBottomLeftText : "Sản phẩm"
+                    ? existingCell.Format.DiagonalBottomLeftText : AppL10n.T("Sản phẩm", "Product")
             };
             txtBottomLeft.TextChanged += (s, e) => pnlPreview.Invalidate();
             this.Controls.Add(txtBottomLeft);
@@ -116,7 +116,7 @@ namespace ZenQOffice.UI
             // Quick Presets
             Label lblPresets = new Label
             {
-                Text = "Mẫu gợi ý nhanh:",
+                Text = AppL10n.T("Mẫu gợi ý nhanh:", "Quick Presets:"),
                 Font = new Font("Segoe UI", 8f, FontStyle.Italic),
                 ForeColor = Color.Gray,
                 Location = new Point(16, curY + 3),
@@ -125,10 +125,10 @@ namespace ZenQOffice.UI
             this.Controls.Add(lblPresets);
 
             string[,] presets = new string[,] {
-                { "Tháng", "Sản phẩm" },
-                { "Môn học", "Học sinh" },
-                { "Ngày", "Nội dung" },
-                { "Thứ", "Tiết học" }
+                { AppL10n.T("Tháng", "Month"), AppL10n.T("Sản phẩm", "Product") },
+                { AppL10n.T("Môn học", "Subject"), AppL10n.T("Học sinh", "Student") },
+                { AppL10n.T("Ngày", "Date"), AppL10n.T("Nội dung", "Item") },
+                { AppL10n.T("Thứ", "Day"), AppL10n.T("Tiết học", "Period") }
             };
 
             int prX = 114;
@@ -159,7 +159,7 @@ namespace ZenQOffice.UI
             curY += 32;
 
             // Diagonal Type & Style
-            Label lblType = new Label { Text = "Kiểu đường chéo:", Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(16, curY), AutoSize = true };
+            Label lblType = new Label { Text = AppL10n.T("Kiểu đường chéo:", "Diagonal style:"), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(16, curY), AutoSize = true };
             this.Controls.Add(lblType);
 
             cmbDiagonalType = new ZenQOffice.UI.FluentComboBox
@@ -168,13 +168,13 @@ namespace ZenQOffice.UI
                 Location = new Point(16, curY + 20),
                 Size = new Size(224, 24)
             };
-            cmbDiagonalType.Items.Add("╲ Đường chéo xuống (Chuẩn Excel)");
-            cmbDiagonalType.Items.Add("╱ Đường chéo lên");
+            cmbDiagonalType.Items.Add(AppL10n.T("╲ Đường chéo xuống (Chuẩn Excel)", "╲ Diagonal Down (Standard)"));
+            cmbDiagonalType.Items.Add(AppL10n.T("╱ Đường chéo lên", "╱ Diagonal Up"));
             cmbDiagonalType.SelectedIndex = (existingCell != null && existingCell.Format != null && existingCell.Format.Borders != null && existingCell.Format.Borders.DiagonalUp) ? 1 : 0;
             cmbDiagonalType.SelectedIndexChanged += (s, e) => pnlPreview.Invalidate();
             this.Controls.Add(cmbDiagonalType);
 
-            Label lblThick = new Label { Text = "Độ dày nét kẻ:", Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(250, curY), AutoSize = true };
+            Label lblThick = new Label { Text = AppL10n.T("Độ dày nét kẻ:", "Line thickness:"), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(250, curY), AutoSize = true };
             this.Controls.Add(lblThick);
 
             cmbThickness = new ZenQOffice.UI.FluentComboBox
@@ -183,9 +183,9 @@ namespace ZenQOffice.UI
                 Location = new Point(250, curY + 20),
                 Size = new Size(220, 24)
             };
-            cmbThickness.Items.Add("Mảnh (1px)");
-            cmbThickness.Items.Add("Vừa (2px)");
-            cmbThickness.Items.Add("Dày (3px)");
+            cmbThickness.Items.Add(AppL10n.T("Mảnh (1px)", "Thin (1px)"));
+            cmbThickness.Items.Add(AppL10n.T("Vừa (2px)", "Medium (2px)"));
+            cmbThickness.Items.Add(AppL10n.T("Dày (3px)", "Thick (3px)"));
             cmbThickness.SelectedIndex = (existingCell != null && existingCell.Format != null && existingCell.Format.Borders != null && existingCell.Format.Borders.DiagonalThickness > 0)
                 ? Math.Min(2, existingCell.Format.Borders.DiagonalThickness - 1) : 0;
             cmbThickness.SelectedIndexChanged += (s, e) => pnlPreview.Invalidate();
@@ -193,7 +193,7 @@ namespace ZenQOffice.UI
             curY += 52;
 
             // Modern Color Palette Swatches (No old Windows modal dialog)
-            Label lblColor = new Label { Text = "Màu nét kẻ:", Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(16, curY), AutoSize = true };
+            Label lblColor = new Label { Text = AppL10n.T("Màu nét kẻ:", "Line color:"), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(16, curY), AutoSize = true };
             this.Controls.Add(lblColor);
 
             Color[] quickColors = new Color[]
@@ -235,7 +235,7 @@ namespace ZenQOffice.UI
 
             btnPalette = new Button
             {
-                Text = "Bảng màu ▾",
+                Text = AppL10n.T("Bảng màu ▾", "Palette ▾"),
                 Location = new Point(swatchX + 6, curY + 20),
                 Size = new Size(110, 25),
                 BackColor = Color.White,
@@ -261,7 +261,7 @@ namespace ZenQOffice.UI
             curY += 54;
 
             // Live Preview Box
-            Label lblPrev = new Label { Text = "Xem trước trực tiếp (Live Preview):", Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(16, curY), AutoSize = true };
+            Label lblPrev = new Label { Text = AppL10n.T("Xem trước trực tiếp (Live Preview):", "Live Preview:"), Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Location = new Point(16, curY), AutoSize = true };
             this.Controls.Add(lblPrev);
             curY += 20;
 
@@ -286,7 +286,7 @@ namespace ZenQOffice.UI
 
             Button btnClear = new Button
             {
-                Text = "Xóa gạch chéo",
+                Text = AppL10n.T("Xóa gạch chéo", "Clear Diagonal"),
                 Size = new Size(110, 30),
                 Location = new Point(16, 9),
                 BackColor = Color.White,
@@ -305,7 +305,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new Button
             {
-                Text = "Áp dụng",
+                Text = AppL10n.T("Áp dụng", "Apply"),
                 DialogResult = DialogResult.OK,
                 Size = new Size(90, 30),
                 Location = new Point(284, 9),
@@ -320,7 +320,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Size = new Size(76, 30),
                 Location = new Point(382, 9),

@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -96,8 +97,8 @@ namespace ZenQOffice.UI
                     if (!_isClosing) { _isClosing = true; this.Close(); }
                     using (OpenFileDialog ofd = new OpenFileDialog())
                     {
-                        ofd.Title = "Chọn hình ảnh con dấu công ty (PNG/JPG)";
-                        ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|Tất cả tệp (*.*)|*.*";
+                        ofd.Title = AppL10n.Tr("Chọn hình ảnh con dấu công ty (PNG/JPG)");
+                        ofd.Filter = AppL10n.Tr("Tệp hình ảnh (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|Tất cả tệp (*.*)|*.*");
                         if (ofd.ShowDialog(owner != null && !owner.IsDisposed ? owner : null) == DialogResult.OK)
                         {
                             try
@@ -107,7 +108,7 @@ namespace ZenQOffice.UI
                             }
                             catch (Exception ex)
                             {
-                                ZenQOffice.UI.FluentMessageBox.Show("Không thể nạp tệp ảnh con dấu: " + ex.Message, "Lỗi con dấu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể nạp tệp ảnh con dấu: ", "Unable to load stamp image: ") + ex.Message, AppL10n.Tr("Lỗi con dấu"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
                     }
@@ -153,7 +154,7 @@ namespace ZenQOffice.UI
             // Header
             using (Font hFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
             {
-                g.DrawString("CON DẤU VĂN PHÒNG CÓ SẴN", hFont, Brushes.Gray, 12, 10);
+                g.DrawString(AppL10n.Tr("CON DẤU VĂN PHÒNG CÓ SẴN"), hFont, Brushes.Gray, 12, 10);
             }
 
             int itemH = 34;
@@ -184,7 +185,7 @@ namespace ZenQOffice.UI
                     {
                         g.FillRectangle(sbg, stampBox);
                         g.DrawRectangle(sp, stampBox);
-                        g.DrawString(StampLabels[i], itemFont, stxt, stampBox, sf);
+                        g.DrawString(AppL10n.Tr(StampLabels[i]), itemFont, stxt, stampBox, sf);
                     }
                 }
             }
@@ -213,7 +214,7 @@ namespace ZenQOffice.UI
                     g.DrawLine(p, 17, 226, 21, 226);
                     g.DrawLine(p, 17, 230, 21, 230);
                 }
-                g.DrawString("Tải con dấu công ty...", actFont, hovComp ? Brushes.DarkBlue : darkBrush, 36, 218);
+                g.DrawString(AppL10n.Tr("Tải con dấu công ty..."), actFont, hovComp ? Brushes.DarkBlue : darkBrush, 36, 218);
 
                 // Action 2: Custom Text Stamp
                 bool hovCust = (HoveredIndex == 6);
@@ -233,7 +234,7 @@ namespace ZenQOffice.UI
                     g.DrawLine(p, 27, 261, 17, 271);
                     g.DrawLine(p, 17, 271, 14, 268);
                 }
-                g.DrawString("Nhập chữ con dấu tùy chỉnh...", actFont, hovCust ? Brushes.DarkBlue : darkBrush, 36, 256);
+                g.DrawString(AppL10n.Tr("Nhập chữ con dấu tùy chỉnh..."), actFont, hovCust ? Brushes.DarkBlue : darkBrush, 36, 256);
             }
         }
 

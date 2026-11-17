@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -37,7 +38,7 @@ namespace ZenQOffice.UI
 
         public EquationGalleryForm()
         {
-            this.Text = "Chèn Công Thức Toán Học (Insert Equation)";
+            this.Text = AppL10n.Tr("Chèn Công Thức Toán Học (Insert Equation)");
             this.Size = new Size(540, 380);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -46,13 +47,13 @@ namespace ZenQOffice.UI
             this.BackColor = Color.FromArgb(248, 249, 250);
             this.Font = new Font("Segoe UI", 9.0f);
 
-            Label lblHeading = new Label { Text = "Chọn công thức toán học từ thư viện:", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Label lblHeading = new Label { Text = AppL10n.Tr("Chọn công thức toán học từ thư viện:"), Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblHeading);
 
             lstEquations = new ZenQOffice.UI.FluentListBox { Location = new Point(20, 38), Size = new Size(485, 235), BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 10.0f) };
             foreach (var eq in equations)
             {
-                lstEquations.Items.Add(string.Format("{0}:   {1}", eq.Name, eq.Formula.Replace("\n", " ")));
+                lstEquations.Items.Add(string.Format("{0}:   {1}", AppL10n.Tr(eq.Name), eq.Formula.Replace("\n", " ")));
             }
             lstEquations.SelectedIndex = 0;
             this.Controls.Add(lstEquations);
@@ -62,7 +63,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new Button
             {
-                Text = "Chèn Công Thức",
+                Text = AppL10n.Tr("Chèn Công Thức"),
                 Location = new Point(300, 10),
                 Size = new Size(125, 28),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -82,7 +83,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.Tr("Hủy"),
                 Location = new Point(430, 10),
                 Size = new Size(75, 28),
                 BackColor = Color.White,

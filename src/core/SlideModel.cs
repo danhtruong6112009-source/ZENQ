@@ -1959,11 +1959,11 @@ namespace ZenQOffice.Core
 
             {
 
-                if (PlaceholderType == "Title") return "Tiêu đề " + (index + 1);
+                if (PlaceholderType == "Title") return AppL10n.T("Tiêu đề ", "Title ") + (index + 1);
 
-                if (PlaceholderType == "Subtitle") return "Tiêu đề phụ " + (index + 1);
+                if (PlaceholderType == "Subtitle") return AppL10n.T("Tiêu đề phụ ", "Subtitle ") + (index + 1);
 
-                if (PlaceholderType == "Body") return "Nội dung " + (index + 1);
+                if (PlaceholderType == "Body") return AppL10n.T("Nội dung ", "Content ") + (index + 1);
 
             }
 
@@ -1975,7 +1975,7 @@ namespace ZenQOffice.Core
 
                 if (trimmed.Length > 22) trimmed = trimmed.Substring(0, 20) + "...";
 
-                if (!string.IsNullOrEmpty(trimmed) && trimmed != "Nhấp để thêm văn bản") return trimmed;
+                if (!string.IsNullOrEmpty(trimmed) && trimmed != "Nhấp để thêm văn bản" && trimmed != "Click to add text") return trimmed;
 
             }
 
@@ -1983,35 +1983,35 @@ namespace ZenQOffice.Core
 
             {
 
-                case ShapeType.TextBox: return "Hộp văn bản " + (index + 1);
+                case ShapeType.TextBox: return AppL10n.T("Hộp văn bản ", "Text Box ") + (index + 1);
 
-                case ShapeType.Rectangle: return "Hình chữ nhật " + (index + 1);
+                case ShapeType.Rectangle: return AppL10n.T("Hình chữ nhật ", "Rectangle ") + (index + 1);
 
-                case ShapeType.RoundedRectangle: return "Chữ nhật bo góc " + (index + 1);
+                case ShapeType.RoundedRectangle: return AppL10n.T("Chữ nhật bo góc ", "Rounded Rectangle ") + (index + 1);
 
-                case ShapeType.Ellipse: return "Hình tròn / Elip " + (index + 1);
+                case ShapeType.Ellipse: return AppL10n.T("Hình tròn / Elip ", "Oval ") + (index + 1);
 
-                case ShapeType.Triangle: return "Hình tam giác " + (index + 1);
+                case ShapeType.Triangle: return AppL10n.T("Hình tam giác ", "Triangle ") + (index + 1);
 
-                case ShapeType.Diamond: return "Hình thoi " + (index + 1);
+                case ShapeType.Diamond: return AppL10n.T("Hình thoi ", "Diamond ") + (index + 1);
 
-                case ShapeType.Star: return "Ngôi sao " + (index + 1);
+                case ShapeType.Star: return AppL10n.T("Ngôi sao ", "Star ") + (index + 1);
 
-                case ShapeType.Heart: return "Trái tim " + (index + 1);
+                case ShapeType.Heart: return AppL10n.T("Trái tim ", "Heart ") + (index + 1);
 
-                case ShapeType.Hexagon: return "Hình lục giác " + (index + 1);
+                case ShapeType.Hexagon: return AppL10n.T("Hình lục giác ", "Hexagon ") + (index + 1);
 
-                case ShapeType.Arrow: return "Mũi tên " + (index + 1);
+                case ShapeType.Arrow: return AppL10n.T("Mũi tên ", "Arrow ") + (index + 1);
 
-                case ShapeType.Callout: return "Hộp thoại " + (index + 1);
+                case ShapeType.Callout: return AppL10n.T("Hộp thoại ", "Callout ") + (index + 1);
 
-                case ShapeType.Image: return "Hình ảnh " + (index + 1);
+                case ShapeType.Image: return AppL10n.T("Hình ảnh ", "Picture ") + (index + 1);
 
-                case ShapeType.Audio: return "Âm thanh " + (index + 1);
+                case ShapeType.Audio: return AppL10n.T("Âm thanh ", "Audio ") + (index + 1);
 
-                case ShapeType.Table: return "Bảng dữ liệu " + (index + 1);
+                case ShapeType.Table: return AppL10n.T("Bảng dữ liệu ", "Table ") + (index + 1);
 
-                default: return "Hình vẽ " + (index + 1);
+                default: return AppL10n.T("Hình vẽ ", "Shape ") + (index + 1);
 
             }
 
@@ -2943,29 +2943,29 @@ namespace ZenQOffice.Core
 
             {
 
-                new PresetGradient("Bạc Kim loại (Titanium)", 90f, new GradientStop(0xFFFFFF, 0.0f), new GradientStop(0xE2E8F0, 0.5f), new GradientStop(0x94A3B8, 1.0f)),
+                new PresetGradient(AppL10n.T("Bạc Kim loại (Titanium)", "Titanium Silver"), 90f, new GradientStop(0xFFFFFF, 0.0f), new GradientStop(0xE2E8F0, 0.5f), new GradientStop(0x94A3B8, 1.0f)),
 
-                new PresetGradient("Hoàng hôn Ấm áp (Warm Sunset)", 90f, new GradientStop(0xFFF176, 0.0f), new GradientStop(0xFFB74D, 0.45f), new GradientStop(0xF06292, 1.0f)),
+                new PresetGradient(AppL10n.T("Hoàng hôn Ấm áp (Warm Sunset)", "Warm Sunset"), 90f, new GradientStop(0xFFF176, 0.0f), new GradientStop(0xFFB74D, 0.45f), new GradientStop(0xF06292, 1.0f)),
 
-                new PresetGradient("Đại dương Xanh (Ocean Breeze)", 90f, new GradientStop(0xE0F2FE, 0.0f), new GradientStop(0x38BDF8, 0.5f), new GradientStop(0x0284C7, 1.0f)),
+                new PresetGradient(AppL10n.T("Đại dương Xanh (Ocean Breeze)", "Ocean Breeze"), 90f, new GradientStop(0xE0F2FE, 0.0f), new GradientStop(0x38BDF8, 0.5f), new GradientStop(0x0284C7, 1.0f)),
 
-                new PresetGradient("Rừng Nhiệt đới (Emerald)", 90f, new GradientStop(0xECFDF5, 0.0f), new GradientStop(0x34D399, 0.5f), new GradientStop(0x059669, 1.0f)),
+                new PresetGradient(AppL10n.T("Rừng Nhiệt đới (Emerald)", "Tropical Emerald"), 90f, new GradientStop(0xECFDF5, 0.0f), new GradientStop(0x34D399, 0.5f), new GradientStop(0x059669, 1.0f)),
 
-                new PresetGradient("Hoàng gia Tím (Royal Purple)", 90f, new GradientStop(0xFAF5FF, 0.0f), new GradientStop(0xC084FC, 0.5f), new GradientStop(0x7E22CE, 1.0f)),
+                new PresetGradient(AppL10n.T("Hoàng gia Tím (Royal Purple)", "Royal Purple"), 90f, new GradientStop(0xFAF5FF, 0.0f), new GradientStop(0xC084FC, 0.5f), new GradientStop(0x7E22CE, 1.0f)),
 
                 new PresetGradient("Cyber Neon (Neon Glow)", 90f, new GradientStop(0x0F172A, 0.0f), new GradientStop(0x1E293B, 0.4f), new GradientStop(0x06B6D4, 1.0f)),
 
-                new PresetGradient("Vàng Champagne (Golden Hour)", 90f, new GradientStop(0xFFFBEB, 0.0f), new GradientStop(0xFDE68A, 0.5f), new GradientStop(0xF59E0B, 1.0f)),
+                new PresetGradient(AppL10n.T("Vàng Champagne (Golden Hour)", "Golden Hour"), 90f, new GradientStop(0xFFFBEB, 0.0f), new GradientStop(0xFDE68A, 0.5f), new GradientStop(0xF59E0B, 1.0f)),
 
-                new PresetGradient("Hoa Anh đào (Sakura Rose)", 90f, new GradientStop(0xFFF1F2, 0.0f), new GradientStop(0xFDA4AF, 0.5f), new GradientStop(0xF43F5E, 1.0f)),
+                new PresetGradient(AppL10n.T("Hoa Anh đào (Sakura Rose)", "Sakura Rose"), 90f, new GradientStop(0xFFF1F2, 0.0f), new GradientStop(0xFDA4AF, 0.5f), new GradientStop(0xF43F5E, 1.0f)),
 
-                new PresetGradient("Đêm Huyền bí (Midnight Blue)", 90f, new GradientStop(0x1E1B4B, 0.0f), new GradientStop(0x312E81, 0.5f), new GradientStop(0x4338CA, 1.0f)),
+                new PresetGradient(AppL10n.T("Đêm Huyền bí (Midnight Blue)", "Midnight Blue"), 90f, new GradientStop(0x1E1B4B, 0.0f), new GradientStop(0x312E81, 0.5f), new GradientStop(0x4338CA, 1.0f)),
 
-                new PresetGradient("Băng Tuyết Bạc hà (Mint Frost)", 90f, new GradientStop(0xF0FDFA, 0.0f), new GradientStop(0x99F6E4, 0.5f), new GradientStop(0x14B8A6, 1.0f)),
+                new PresetGradient(AppL10n.T("Băng Tuyết Bạc hà (Mint Frost)", "Mint Frost"), 90f, new GradientStop(0xF0FDFA, 0.0f), new GradientStop(0x99F6E4, 0.5f), new GradientStop(0x14B8A6, 1.0f)),
 
-                new PresetGradient("Hồng Pastel (Soft Coral)", 90f, new GradientStop(0xFFF7ED, 0.0f), new GradientStop(0xFFEDD5, 0.5f), new GradientStop(0xFB923C, 1.0f)),
+                new PresetGradient(AppL10n.T("Hồng Pastel (Soft Coral)", "Soft Coral"), 90f, new GradientStop(0xFFF7ED, 0.0f), new GradientStop(0xFFEDD5, 0.5f), new GradientStop(0xFB923C, 1.0f)),
 
-                new PresetGradient("Khói Núi (Charcoal Mist)", 90f, new GradientStop(0xF8FAFC, 0.0f), new GradientStop(0xE2E8F0, 0.5f), new GradientStop(0x64748B, 1.0f))
+                new PresetGradient(AppL10n.T("Khói Núi (Charcoal Mist)", "Charcoal Mist"), 90f, new GradientStop(0xF8FAFC, 0.0f), new GradientStop(0xE2E8F0, 0.5f), new GradientStop(0x64748B, 1.0f))
 
             };
 
@@ -3550,7 +3550,7 @@ namespace ZenQOffice.Core
 
             Id = Guid.NewGuid().ToString("N");
 
-            Title = "Slide không tên";
+            Title = AppL10n.T("Slide không tên", "Untitled Slide");
 
             IsThumbnailDirty = true;
 
@@ -3726,7 +3726,7 @@ namespace ZenQOffice.Core
 
                 Id = Guid.NewGuid().ToString("N"),
 
-                Title = Title + " (Bản sao)",
+                Title = Title + AppL10n.T(" (Bản sao)", " (Copy)"),
 
                 BgColor = BgColor,
 
@@ -3928,6 +3928,10 @@ namespace ZenQOffice.Core
         public List<PresentationTheme> Themes { get; set; }
 
         public Dictionary<string, int> ThemeColors { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<string, byte[]> EmbeddedFontFiles { get; set; } = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<string, string> EmbeddedFontTypefaces { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
 
 
@@ -4273,6 +4277,19 @@ namespace ZenQOffice.Core
 
             }
 
+            if (ThemeColors != null)
+            {
+                foreach (var kv in ThemeColors) copy.ThemeColors[kv.Key] = kv.Value;
+            }
+            if (EmbeddedFontFiles != null)
+            {
+                foreach (var kv in EmbeddedFontFiles) copy.EmbeddedFontFiles[kv.Key] = kv.Value;
+            }
+            if (EmbeddedFontTypefaces != null)
+            {
+                foreach (var kv in EmbeddedFontTypefaces) copy.EmbeddedFontTypefaces[kv.Key] = kv.Value;
+            }
+
             return copy;
 
         }
@@ -4327,6 +4344,8 @@ namespace ZenQOffice.Core
 
         private static readonly Dictionary<string, FontFamily> _fontMap = new Dictionary<string, FontFamily>(StringComparer.OrdinalIgnoreCase);
 
+        private static readonly Dictionary<string, FontFamily> _fallbackMap = new Dictionary<string, FontFamily>(StringComparer.OrdinalIgnoreCase);
+
         private static readonly HashSet<string> _loadedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private static readonly List<string> _customFontNames = new List<string>();
@@ -4336,29 +4355,23 @@ namespace ZenQOffice.Core
 
 
         static SlideFontManager()
-
         {
-
             RegisterFallback("Anton", "Impact");
-
+            RegisterFallback("Danh Da Bold", "Impact");
+            RegisterFallback("Danh Da", "Impact");
+            RegisterFallback("Đanh Đá Bold", "Impact");
+            RegisterFallback("Đanh Đá", "Impact");
+            RegisterFallback("Roboto Bold", "Segoe UI");
+            RegisterFallback("Roboto", "Segoe UI");
             RegisterFallback("Muli", "Segoe UI");
-
             RegisterFallback("Muli Heavy", "Segoe UI");
-
             RegisterFallback("Proxima Nova", "Segoe UI");
-
             RegisterFallback("Proxima Nova Bold", "Segoe UI");
-
             RegisterFallback("Proxima Nova Heavy", "Segoe UI");
-
             RegisterFallback("Noto Serif Display", "Arial");
-
             RegisterFallback("Noto Serif Display Bold", "Arial");
 
-
-
             LoadInternalFonts();
-
         }
 
 
@@ -4425,6 +4438,8 @@ namespace ZenQOffice.Core
 
                     List<string> dirsToScan = new List<string>();
 
+                    string d0 = AppDomain.CurrentDomain.BaseDirectory;
+                    if (Directory.Exists(d0)) dirsToScan.Add(d0);
                     string d1 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fonts");
 
                     if (Directory.Exists(d1)) dirsToScan.Add(d1);
@@ -4720,31 +4735,16 @@ namespace ZenQOffice.Core
 
 
         public static void RegisterFallback(string typeface, string fallbackFamily)
-
         {
-
             try
-
             {
-
-                using (Font f = new Font(fallbackFamily, 12f))
-
+                FontFamily fam = new FontFamily(fallbackFamily);
+                lock (_lock)
                 {
-
-                    if (!_fontMap.ContainsKey(typeface))
-
-                    {
-
-                        _fontMap[typeface] = f.FontFamily;
-
-                    }
-
+                    _fallbackMap[typeface] = fam;
                 }
-
             }
-
             catch { }
-
         }
 
 
@@ -4773,7 +4773,7 @@ namespace ZenQOffice.Core
 
 
 
-        public static void ExtractAndRegisterFonts(ZipArchive archive)
+        public static void ExtractAndRegisterFonts(ZipArchive archive, PresentationRoot pres = null)
 
         {
 
@@ -4933,17 +4933,30 @@ namespace ZenQOffice.Core
 
 
 
-                            // Cache embedded font data for preservation when saving
+                            // Cache embedded font data per-presentation and in collision-free global map
 
                             string entryFileName = Path.GetFileName(fn);
+                            string baseEntryName = Path.GetFileNameWithoutExtension(fn);
+                            string safeTfKey = string.IsNullOrEmpty(typeface)
+                                ? baseEntryName
+                                : string.Concat(typeface.Split(Path.GetInvalidFileNameChars())).Replace(' ', '_');
+                            string uniqueFontKey = $"{safeTfKey}_{baseEntryName}_{data.Length}.fntdata";
 
-                            EmbeddedFontFiles[entryFileName] = data;
+                            EmbeddedFontFiles[uniqueFontKey] = data;
+                            if (pres != null && pres.EmbeddedFontFiles != null)
+                            {
+                                pres.EmbeddedFontFiles[uniqueFontKey] = data;
+                            }
 
                             if (!string.IsNullOrEmpty(typeface))
 
                             {
 
-                                EmbeddedFontTypefaces[entryFileName] = typeface;
+                                EmbeddedFontTypefaces[uniqueFontKey] = typeface;
+                                if (pres != null && pres.EmbeddedFontTypefaces != null)
+                                {
+                                    pres.EmbeddedFontTypefaces[uniqueFontKey] = typeface;
+                                }
 
                                 try { ZenQOffice.UI.D2DGraphics.RegisterCustomFamilyName(typeface); } catch { }
 
@@ -5547,31 +5560,51 @@ namespace ZenQOffice.Core
 
                 {
 
-                    return new Font(fontName, size, style, unit);
+                    Font sysFont = new Font(fontName, size, style, unit);
+                    if (string.Equals(sysFont.Name, fontName, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(sysFont.FontFamily.Name, fontName, StringComparison.OrdinalIgnoreCase) ||
+                        fontName.StartsWith(sysFont.FontFamily.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return sysFont;
+                    }
+                    sysFont.Dispose();
 
                 }
 
                 catch { }
 
+                FontFamily fbFam = null;
+                lock (_lock)
+                {
+                    _fallbackMap.TryGetValue(fontName, out fbFam);
+                }
+                if (fbFam != null)
+                {
+                    try
+                    {
+                        FontStyle effFbStyle = style;
+                        if (!fbFam.IsStyleAvailable(effFbStyle))
+                        {
+                            if (fbFam.IsStyleAvailable(FontStyle.Regular)) effFbStyle = FontStyle.Regular;
+                            else if (fbFam.IsStyleAvailable(FontStyle.Bold)) effFbStyle = FontStyle.Bold;
+                            else if (fbFam.IsStyleAvailable(FontStyle.Italic)) effFbStyle = FontStyle.Italic;
+                        }
+                        return new Font(fbFam, size, effFbStyle, unit);
+                    }
+                    catch { }
+                }
+
             }
 
 
 
-            try
-
+            if (!string.IsNullOrEmpty(fontName) && (fontName.IndexOf("Anton", StringComparison.OrdinalIgnoreCase) >= 0 || fontName.IndexOf("Danh Da", StringComparison.OrdinalIgnoreCase) >= 0 || fontName.IndexOf("Đanh Đá", StringComparison.OrdinalIgnoreCase) >= 0 || fontName.IndexOf("Impact", StringComparison.OrdinalIgnoreCase) >= 0))
             {
-
-                return new Font("Segoe UI", size, style, unit);
-
+                try { return new Font("Impact", size, style, unit); } catch { }
             }
-
-            catch
-
-            {
-
-                return new Font(FontFamily.GenericSansSerif, size, style, unit);
-
-            }
+            try { return new Font("Segoe UI", size, style, unit); } catch { }
+            try { return new Font(FontFamily.GenericSansSerif, size, style, unit); } catch { }
+            return SystemFonts.DefaultFont;
 
         }
 

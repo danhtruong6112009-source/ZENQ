@@ -38,7 +38,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            Text = "Cài đặt trợ lý AI"; ClientSize = new Size(600, 610);
+            Text = ZenQOffice.Core.AppL10n.T("Cài đặt trợ lý AI", "AI Assistant Settings"); ClientSize = new Size(600, 610);
             MinimumSize = new Size(560, 520); StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.Sizable; MaximizeBox = false; MinimizeBox = false;
             ShowInTaskbar = false; BackColor = Color.White; Font = new Font("Segoe UI", 9.5f);
@@ -46,8 +46,8 @@ namespace ZenQOffice.UI
             var shell = new TableLayoutPanel { Dock=DockStyle.Fill, ColumnCount=1, RowCount=3, Margin=Padding.Empty };
             shell.RowStyles.Add(new RowStyle(SizeType.Absolute,76));shell.RowStyles.Add(new RowStyle(SizeType.Percent,100));shell.RowStyles.Add(new RowStyle(SizeType.Absolute,100));Controls.Add(shell);
             var header=new Panel{Dock=DockStyle.Fill,Padding=new Padding(24,14,24,8)};
-            header.Controls.Add(new Label{Text="Kết nối mô hình bạn muốn sử dụng cho ZenQ Office.",Dock=DockStyle.Bottom,Height=22,ForeColor=Color.FromArgb(100,110,125)});
-            header.Controls.Add(new Label{Text="Trợ lý AI",Dock=DockStyle.Top,Height=30,Font=new Font("Segoe UI",17,FontStyle.Bold),ForeColor=Color.FromArgb(28,37,52)});
+            header.Controls.Add(new Label{Text=ZenQOffice.Core.AppL10n.T("Kết nối mô hình bạn muốn sử dụng cho ZenQ Office.", "Connect the AI model you want to use in ZenQ Office."),Dock=DockStyle.Bottom,Height=22,ForeColor=Color.FromArgb(100,110,125)});
+            header.Controls.Add(new Label{Text=ZenQOffice.Core.AppL10n.T("Trợ lý AI", "AI Assistant"),Dock=DockStyle.Top,Height=30,Font=new Font("Segoe UI",17,FontStyle.Bold),ForeColor=Color.FromArgb(28,37,52)});
             shell.Controls.Add(header,0,0);
             var scroll=new Panel{Dock=DockStyle.Fill,AutoScroll=true,Padding=new Padding(24,4,24,8)};shell.Controls.Add(scroll,0,1);
             var fields=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=Padding.Empty};fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));scroll.Controls.Add(fields);
@@ -61,29 +61,29 @@ namespace ZenQOffice.UI
             foreach(AiProviderType provider in Enum.GetValues(typeof(AiProviderType)))cboProvider.Items.Add(AiConfig.GetProviderDisplayName(provider));
             cboModel=new FluentComboBox{DropDownStyle=ComboBoxStyle.DropDown,IntegralHeight=false,MaxDropDownItems=8};
             fields.RowStyles.Add(new RowStyle(SizeType.Absolute,72));fields.RowCount=1;
-            var providerField=Field("Nhà cung cấp",cboProvider);providerField.Margin=new Padding(0,0,10,12);fields.Controls.Add(providerField,0,0);
-            fields.Controls.Add(Field("Mô hình",cboModel),1,0);
+            var providerField=Field(ZenQOffice.Core.AppL10n.T("Nhà cung cấp","Provider"),cboProvider);providerField.Margin=new Padding(0,0,10,12);fields.Controls.Add(providerField,0,0);
+            fields.Controls.Add(Field(ZenQOffice.Core.AppL10n.T("Mô hình","Model"),cboModel),1,0);
             txtApiKey=new TextBox{BorderStyle=BorderStyle.None,UseSystemPasswordChar=true};
             var keyBox=new SettingsInputFrame(txtApiKey);
-            btnToggleKey=new SettingsActionButton{Text="Hiện",Size=new Size(48,24),TabStop=true,AccessibleName="Hiện hoặc ẩn khóa API"};keyBox.Controls.Add(btnToggleKey);keyBox.Padding=new Padding(10,7,58,5);keyBox.Layout+=(s,e)=>btnToggleKey.SetBounds(Math.Max(0,keyBox.Width-54),4,48,24);
-            btnToggleKey.Click+=(s,e)=>{txtApiKey.UseSystemPasswordChar=!txtApiKey.UseSystemPasswordChar;btnToggleKey.Text=txtApiKey.UseSystemPasswordChar?"Hiện":"Ẩn";};
-            Row(Field("Khóa API",keyBox),72);
-            txtEndpoint=new TextBox{BorderStyle=BorderStyle.None,PlaceholderText="Dùng địa chỉ mặc định của nhà cung cấp"};
-            Row(Field("Địa chỉ API · tùy chọn",new SettingsInputFrame(txtEndpoint)),72);
+            btnToggleKey=new SettingsActionButton{Text=ZenQOffice.Core.AppL10n.T("Hiện","Show"),Size=new Size(48,24),TabStop=true,AccessibleName=ZenQOffice.Core.AppL10n.T("Hiện hoặc ẩn khóa API","Show or hide API key")};keyBox.Controls.Add(btnToggleKey);keyBox.Padding=new Padding(10,7,58,5);keyBox.Layout+=(s,e)=>btnToggleKey.SetBounds(Math.Max(0,keyBox.Width-54),4,48,24);
+            btnToggleKey.Click+=(s,e)=>{txtApiKey.UseSystemPasswordChar=!txtApiKey.UseSystemPasswordChar;btnToggleKey.Text=txtApiKey.UseSystemPasswordChar?ZenQOffice.Core.AppL10n.T("Hiện","Show"):ZenQOffice.Core.AppL10n.T("Ẩn","Hide");};
+            Row(Field(ZenQOffice.Core.AppL10n.T("Khóa API","API Key"),keyBox),72);
+            txtEndpoint=new TextBox{BorderStyle=BorderStyle.None,PlaceholderText=ZenQOffice.Core.AppL10n.T("Dùng địa chỉ mặc định của nhà cung cấp","Use provider default endpoint")};
+            Row(Field(ZenQOffice.Core.AppL10n.T("Địa chỉ API · tùy chọn","API Endpoint · optional"),new SettingsInputFrame(txtEndpoint)),72);
             var temperature=new Panel{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,8)};
-            temperature.Controls.Add(new Label{Text="Độ sáng tạo",Location=new Point(0,0),AutoSize=true,ForeColor=Color.FromArgb(65,75,90)});
+            temperature.Controls.Add(new Label{Text=ZenQOffice.Core.AppL10n.T("Độ sáng tạo","Temperature"),Location=new Point(0,0),AutoSize=true,ForeColor=Color.FromArgb(65,75,90)});
             lblTempValue=new Label{Text="0.7",Dock=DockStyle.Right,Width=40,TextAlign=ContentAlignment.MiddleRight,ForeColor=Color.FromArgb(79,70,229)};temperature.Controls.Add(lblTempValue);
             trkTemp=new TrackBar{Minimum=0,Maximum=15,Value=7,TickStyle=TickStyle.None,AutoSize=false,Height=28,Dock=DockStyle.Bottom,BackColor=Color.White};temperature.Controls.Add(trkTemp);
             trkTemp.ValueChanged+=(s,e)=>lblTempValue.Text=(trkTemp.Value/10f).ToString("0.0");Row(temperature,58);
             txtSystemPrompt=new TextBox{BorderStyle=BorderStyle.None,Multiline=true,ScrollBars=ScrollBars.Vertical,AcceptsReturn=true};
-            Row(Field("Chỉ dẫn hệ thống",new SettingsInputFrame(txtSystemPrompt),100),140);
+            Row(Field(ZenQOffice.Core.AppL10n.T("Chỉ dẫn hệ thống","System Instructions"),new SettingsInputFrame(txtSystemPrompt),100),140);
             var footer=new Panel{Dock=DockStyle.Fill,Padding=new Padding(24,6,24,16),BackColor=Color.FromArgb(248,250,252)};shell.Controls.Add(footer,0,2);
-            lblStatus=new Label{Text="Chưa kiểm tra kết nối",Dock=DockStyle.Top,Height=30,ForeColor=Color.FromArgb(100,110,125),AutoEllipsis=true};footer.Controls.Add(lblStatus);
+            lblStatus=new Label{Text=ZenQOffice.Core.AppL10n.T("Chưa kiểm tra kết nối","Not tested"),Dock=DockStyle.Top,Height=30,ForeColor=Color.FromArgb(100,110,125),AutoEllipsis=true};footer.Controls.Add(lblStatus);
             var actions=new TableLayoutPanel{Dock=DockStyle.Bottom,Height=36,ColumnCount=4,RowCount=1};
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,138));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,80));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,120));
-            btnTest=new SettingsActionButton{Text="Kiểm tra kết nối",Dock=DockStyle.Fill,Margin=Padding.Empty};btnTest.Click+=BtnTest_Click;
-            btnClose=new SettingsActionButton{Text="Đóng",Dock=DockStyle.Fill,Margin=new Padding(0,0,8,0),DialogResult=DialogResult.Cancel};btnClose.Click+=(s,e)=>Close();
-            btnSave=new SettingsActionButton{Text="Lưu thiết lập",Primary=true,Dock=DockStyle.Fill,Margin=Padding.Empty};btnSave.Click+=BtnSave_Click;
+            btnTest=new SettingsActionButton{Text=ZenQOffice.Core.AppL10n.T("Kiểm tra kết nối","Test Connection"),Dock=DockStyle.Fill,Margin=Padding.Empty};btnTest.Click+=BtnTest_Click;
+            btnClose=new SettingsActionButton{Text=ZenQOffice.Core.AppL10n.T("Đóng","Close"),Dock=DockStyle.Fill,Margin=new Padding(0,0,8,0),DialogResult=DialogResult.Cancel};btnClose.Click+=(s,e)=>Close();
+            btnSave=new SettingsActionButton{Text=ZenQOffice.Core.AppL10n.T("Lưu thiết lập","Save"),Primary=true,Dock=DockStyle.Fill,Margin=Padding.Empty};btnSave.Click+=BtnSave_Click;
             actions.Controls.Add(btnTest,0,0);actions.Controls.Add(btnClose,2,0);actions.Controls.Add(btnSave,3,0);footer.Controls.Add(actions);
             CancelButton=btnClose; AcceptButton=btnSave;
             cboProvider.SelectedIndexChanged+=CboProvider_SelectedIndexChanged;
@@ -265,7 +265,7 @@ namespace ZenQOffice.UI
         private void BtnTest_Click(object sender, EventArgs e)
         {
             ReadUiToConfig();
-            lblStatus.Text = "Đang gửi yêu cầu kiểm tra kết nối tới " + Config.ModelName + "...";
+            lblStatus.Text = ZenQOffice.Core.AppL10n.T("Đang gửi yêu cầu kiểm tra kết nối tới ", "Testing connection to ") + Config.ModelName + "...";
             lblStatus.ForeColor = Color.FromArgb(202, 138, 4);
             btnTest.Enabled = false;
 
@@ -278,12 +278,12 @@ namespace ZenQOffice.UI
                     btnTest.Enabled = true;
                     if (resp.Success)
                     {
-                        lblStatus.Text = "Kết nối thành công! Phản hồi sau " + resp.DurationMs + " ms từ " + resp.ModelUsed;
+                        lblStatus.Text = ZenQOffice.Core.AppL10n.T($"Kết nối thành công! Phản hồi sau {resp.DurationMs} ms từ {resp.ModelUsed}", $"Connected! Response in {resp.DurationMs} ms from {resp.ModelUsed}");
                         lblStatus.ForeColor = Color.FromArgb(22, 163, 74);
                     }
                     else
                     {
-                        lblStatus.Text = "Kết nối thất bại: " + resp.ErrorMessage;
+                        lblStatus.Text = ZenQOffice.Core.AppL10n.T("Kết nối thất bại: ", "Connection failed: ") + resp.ErrorMessage;
                         lblStatus.ForeColor = Color.FromArgb(220, 38, 38);
                     }
                 }));
@@ -302,7 +302,7 @@ namespace ZenQOffice.UI
                     AppForm.Instance.AiSidebar.ReloadProfilesAndModels();
                 }
             }
-            MessageBox.Show("Đã lưu thiết lập Trợ lý AI thành công!\nBạn có thể sử dụng ngay trên tất cả các thẻ làm việc.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã lưu thiết lập Trợ lý AI thành công!\nBạn có thể sử dụng ngay trên tất cả các thẻ làm việc.", "AI Assistant settings saved!\nReady to use across all tabs."), "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Information);
             this.DialogResult = DialogResult.OK;
             this.Close();
         }

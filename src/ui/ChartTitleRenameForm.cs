@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -22,7 +23,7 @@ namespace ZenQOffice.UI
 
         private void InitializeUI(Point? screenPos)
         {
-            this.Text = "Đổi Tiêu Đề Biểu Đồ";
+            this.Text = AppL10n.T("Đổi Tiêu Đề Biểu Đồ", "Rename Chart Title");
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -48,8 +49,8 @@ namespace ZenQOffice.UI
                 using (Font hFont = new Font("Segoe UI", 11.5f, FontStyle.Bold))
                 using (Font subFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("📊 Đổi Tiêu Đề Biểu Đồ", hFont, Brushes.White, 16, 10);
-                    e.Graphics.DrawString("Nhập tên hoặc chỉnh sửa tiêu đề hiển thị trên biểu đồ", subFont, Brushes.WhiteSmoke, 18, 32);
+                    e.Graphics.DrawString(AppL10n.T("📊 Đổi Tiêu Đề Biểu Đồ", "📊 Rename Chart Title"), hFont, Brushes.White, 16, 10);
+                    e.Graphics.DrawString(AppL10n.T("Nhập tên hoặc chỉnh sửa tiêu đề hiển thị trên biểu đồ", "Enter or edit the chart display title"), subFont, Brushes.WhiteSmoke, 18, 32);
                 }
             };
             this.Controls.Add(pnlHeader);
@@ -64,7 +65,7 @@ namespace ZenQOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "Tên / Tiêu đề biểu đồ:",
+                Text = AppL10n.T("Tên / Tiêu đề biểu đồ:", "Chart Title:"),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(0, 4),
@@ -77,14 +78,14 @@ namespace ZenQOffice.UI
                 Location = new Point(0, 26),
                 Size = new Size(370, 26),
                 Font = new Font("Segoe UI", 10.5f, FontStyle.Regular),
-                Text = _chartData != null ? (_chartData.Title ?? "") : "Tiêu đề Biểu đồ"
+                Text = _chartData != null ? (_chartData.Title ?? "") : AppL10n.T("Tiêu đề Biểu đồ", "Chart Title")
             };
             txtTitle.SelectAll();
             pnlBody.Controls.Add(txtTitle);
 
             chkShowTitle = new CheckBox
             {
-                Text = "Hiển thị tiêu đề trên biểu đồ",
+                Text = AppL10n.T("Hiển thị tiêu đề trên biểu đồ", "Show chart title"),
                 Font = new Font("Segoe UI", 9f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 Location = new Point(2, 60),
@@ -96,7 +97,7 @@ namespace ZenQOffice.UI
             // Quick Preset Tags
             Label lblPresets = new Label
             {
-                Text = "Gợi ý nhanh:",
+                Text = AppL10n.T("Gợi ý nhanh:", "Quick Presets:"),
                 Font = new Font("Segoe UI", 8f, FontStyle.Italic),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(2, 86),
@@ -104,7 +105,7 @@ namespace ZenQOffice.UI
             };
             pnlBody.Controls.Add(lblPresets);
 
-            string[] presets = new string[] { "Doanh Thu", "Tăng Trưởng", "Báo Cáo", "Thị Phần" };
+            string[] presets = new string[] { AppL10n.T("Doanh Thu", "Revenue"), AppL10n.T("Tăng Trưởng", "Growth"), AppL10n.T("Báo Cáo", "Report"), AppL10n.T("Thị Phần", "Market Share") };
             int tagX = 80;
             foreach (var preset in presets)
             {
@@ -143,7 +144,7 @@ namespace ZenQOffice.UI
 
             btnOk = new Button
             {
-                Text = "Áp dụng",
+                Text = AppL10n.T("Áp dụng", "Apply"),
                 DialogResult = DialogResult.OK,
                 Size = new Size(95, 32),
                 Location = new Point(200, 10),
@@ -170,7 +171,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Size = new Size(80, 32),
                 Location = new Point(305, 10),

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -31,6 +31,16 @@ namespace ZenQOffice.UI
         public float TargetScrollY { get; set; } = 0f;
         private int _lastWidth = 1200;
         private int _lastHeight = 800;
+        private long _scrollLastTs = 0;
+        private double _openAnimStartMs = -10000.0;
+        private const double BackstageRevealDurationMs = 175.0;
+        private bool _sidebarPillInit = false;
+        private int _sidebarPillLastTab = -1;
+        private float _sidebarPillCurY = 0f;
+        private float _sidebarPillStartY = 0f;
+        private float _sidebarPillTargetY = 0f;
+        private double _sidebarPillStartMs = -10000.0;
+        private const double SidebarPillDurationMs = 160.0;
 
         // Trình chiếu Slides: Kích thước & Tùy chỉnh
         public bool ShowCustomSizePanel { get; set; } = false; // "bấm vô chữ tuỳ chỉnh nó mới hiện"
@@ -141,6 +151,10 @@ namespace ZenQOffice.UI
             OverrideNewMode = overrideMode;
             SmoothScrollY = 0f;
             TargetScrollY = 0f;
+            _scrollLastTs = 0;
+            _openAnimStartMs = FluentMotion.NowMs;
+            _sidebarPillInit = false;
+            _sidebarPillLastTab = -1;
             SearchText = "";
             IsSearchFocused = false;
             FocusedInputIndex = -1;
@@ -194,34 +208,20 @@ namespace ZenQOffice.UI
 
         public bool UpdateSmoothScroll(int windowHeight, int windowWidth)
         {
+            double dt = FluentMotion.DeltaSeconds(ref _scrollLastTs);
+            float scrollBlend = FluentMotion.DampFactor(dt, 0.026);
             int maxScroll = GetMaxScroll(windowHeight, windowWidth);
             TargetScrollY = Math.Max(0, Math.Min(maxScroll, (float)Math.Round(TargetScrollY)));
-            int prevInt = (int)Math.Round(SmoothScrollY);
-            int targetInt = (int)TargetScrollY;
 
-            float diff = TargetScrollY - SmoothScrollY;
-            if (Math.Abs(diff) <= 1.5f || prevInt == targetInt)
-            {
-                if (SmoothScrollY != TargetScrollY)
-                {
-                    SmoothScrollY = TargetScrollY;
-                }
-                return false;
-            }
+            float smooth = SmoothScrollY;
+            bool moving = FluentMotion.StepAxis(ref smooth, TargetScrollY, scrollBlend, 1.0f);
+            SmoothScrollY = smooth;
+            if (!moving) _scrollLastTs = 0;
 
-            float step = diff * 0.45f;
-            if (Math.Abs(step) < 2.0f) step = Math.Sign(diff) * Math.Min(Math.Abs(diff), 2.0f);
-            float nextSmooth = SmoothScrollY + step;
-            if (Math.Abs(TargetScrollY - nextSmooth) <= 1.5f)
-            {
-                SmoothScrollY = TargetScrollY;
-            }
-            else
-            {
-                SmoothScrollY = nextSmooth;
-            }
-
-            return true;
+            double now = FluentMotion.NowMs;
+            bool revealAnim = (now - _openAnimStartMs) >= 0 && (now - _openAnimStartMs) < BackstageRevealDurationMs;
+            bool pillAnim = _sidebarPillInit && (now - _sidebarPillStartMs) >= 0 && (now - _sidebarPillStartMs) < SidebarPillDurationMs;
+            return moving || revealAnim || pillAnim;
         }
 
         private int GetMaxScroll(int windowHeight, int windowWidth)
@@ -237,6 +237,33 @@ namespace ZenQOffice.UI
             return Math.Max(0, totalContentHeight - viewportH + 40);
         }
 
+        private static bool IsItemMatchingMode(RecentDocItem item, OfficeAppMode mode)
+        {
+            if (item == null) return false;
+            string pathOrTitle = !string.IsNullOrEmpty(item.FilePath) ? item.FilePath : (item.Title ?? "");
+            string ext = "";
+            try { ext = Path.GetExtension(pathOrTitle).ToLowerInvariant(); } catch { }
+
+            if (!string.IsNullOrEmpty(ext))
+            {
+                switch (mode)
+                {
+                    case OfficeAppMode.Slides:
+                        return ext == ".pptx" || ext == ".ppt";
+                    case OfficeAppMode.Writer:
+                        return ext == ".docx" || ext == ".doc" || ext == ".odt" || ext == ".rtf" || ext == ".txt";
+                    case OfficeAppMode.Calc:
+                        return ext == ".xlsx" || ext == ".xls" || ext == ".ods" || ext == ".csv" || ext == ".tsv";
+                    case OfficeAppMode.Pdf:
+                        return ext == ".pdf";
+                    case OfficeAppMode.Photo:
+                        return ext == ".svg" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp" || ext == ".bmp" || ext == ".tiff";
+                }
+            }
+
+            return item.Mode == mode;
+        }
+
         private List<RecentDocItem> GetDisplayDocs()
         {
             var result = new List<RecentDocItem>();
@@ -245,9 +272,11 @@ namespace ZenQOffice.UI
 
             var baseList = _appForm.HomeView.RecentDocs;
             string kw = SearchText.Trim().ToLowerInvariant();
+            OfficeAppMode curMode = GetEffectiveMode();
 
             foreach (var item in baseList)
             {
+                if (!IsItemMatchingMode(item, curMode)) continue;
                 if (ActiveRecentTab == 1 && !item.IsStarred) continue;
                 if (!string.IsNullOrEmpty(kw))
                 {
@@ -328,7 +357,7 @@ namespace ZenQOffice.UI
             using (Font titleFont = new Font("Segoe UI", 12.0f, FontStyle.Bold))
             using (SolidBrush txtBrush = new SolidBrush(Color.White))
             {
-                g.DrawString(GetAppDisplayName(), titleFont, txtBrush, 64, 21);
+                g.DrawString(AppL10n.Tr(GetAppDisplayName()), titleFont, txtBrush, 64, 21);
             }
 
             // 2.2 Các mục Menu Điều hướng bên trái
@@ -369,11 +398,59 @@ namespace ZenQOffice.UI
             float curItemY = 68f;
             using (Font itemFont = new Font("Segoe UI", 9.5f, FontStyle.Regular))
             using (Font itemActiveFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(60, 0, 0, 0)))
-            using (SolidBrush hoverBg = new SolidBrush(Color.FromArgb(35, 255, 255, 255)))
+            using (SolidBrush activeBg = new SolidBrush(Color.FromArgb(48, 0, 0, 0)))
+            using (SolidBrush hoverBg = new SolidBrush(Color.FromArgb(30, 255, 255, 255)))
             using (SolidBrush textBrush = new SolidBrush(Color.White))
-            using (Pen sepPen = new Pen(Color.FromArgb(50, 255, 255, 255), 1.0f))
+            using (Pen sepPen = new Pen(Color.FromArgb(45, 255, 255, 255), 1.0f))
             {
+                float targetPillY = -1f;
+                float scanY = 68f;
+                for (int i = 0; i < navLabels.Length; i++)
+                {
+                    if (navLabels[i] == "---") { scanY += 14f; continue; }
+                    if (ActiveSidebarTab == i) { targetPillY = scanY; break; }
+                    scanY += 39f;
+                }
+                if (targetPillY >= 0f)
+                {
+                    double pillNow = FluentMotion.NowMs;
+                    if (!_sidebarPillInit)
+                    {
+                        _sidebarPillInit = true;
+                        _sidebarPillLastTab = ActiveSidebarTab;
+                        _sidebarPillStartY = _sidebarPillCurY = _sidebarPillTargetY = targetPillY;
+                        _sidebarPillStartMs = -10000.0;
+                    }
+                    else if (_sidebarPillLastTab != ActiveSidebarTab)
+                    {
+                        _sidebarPillLastTab = ActiveSidebarTab;
+                        _sidebarPillStartY = _sidebarPillCurY;
+                        _sidebarPillTargetY = targetPillY;
+                        _sidebarPillStartMs = pillNow;
+                    }
+                    else
+                    {
+                        _sidebarPillTargetY = targetPillY;
+                    }
+
+                    double pillElapsed = pillNow - _sidebarPillStartMs;
+                    if (pillElapsed >= 0 && pillElapsed < SidebarPillDurationMs)
+                    {
+                        float pe = FluentMotion.EaseOutQuint((float)(pillElapsed / SidebarPillDurationMs));
+                        _sidebarPillCurY = FluentMotion.Lerp(_sidebarPillStartY, _sidebarPillTargetY, pe);
+                    }
+                    else
+                    {
+                        _sidebarPillCurY = _sidebarPillTargetY;
+                    }
+
+                    g.FillRoundedRectangle(activeBg, new RectangleF(8f, _sidebarPillCurY, sidebarWidth - 16f, 36f), 8f);
+                    using (SolidBrush lineBr = new SolidBrush(Color.White))
+                    {
+                        g.FillRoundedRectangle(lineBr, new RectangleF(8f, _sidebarPillCurY + 8f, 3.5f, 20f), 2f);
+                    }
+                }
+
                 for (int i = 0; i < navLabels.Length; i++)
                 {
                     if (navLabels[i] == "---")
@@ -384,83 +461,81 @@ namespace ZenQOffice.UI
                         continue;
                     }
 
-                    RectangleF itemRect = new RectangleF(0, curItemY, sidebarWidth, 38f);
-                    _sidebarItemBounds.Add(itemRect);
+                    RectangleF itemRect = new RectangleF(8f, curItemY, sidebarWidth - 16f, 36f);
+                    _sidebarItemBounds.Add(new RectangleF(0f, curItemY, sidebarWidth, 38f));
 
                     bool isActive = (ActiveSidebarTab == i);
                     bool isHover = (HoverSidebarIndex == i);
 
-                    if (isActive)
+                    if (!isActive && isHover)
                     {
-                        g.FillRectangle(activeBg, itemRect);
-                        // Vạch màu nhấn bên trái
-                        using (SolidBrush lineBr = new SolidBrush(Color.White))
-                        {
-                            g.FillRectangle(lineBr, 0, curItemY, 4f, 38f);
-                        }
-                    }
-                    else if (isHover)
-                    {
-                        g.FillRectangle(hoverBg, itemRect);
+                        g.FillRoundedRectangle(hoverBg, itemRect, 8f);
                     }
 
                     // Biểu tượng Vector
-                    FluentIconRenderer.DrawGlyph(g, navGlyphs[i], new Rectangle(20, (int)curItemY + 9, 20, 20), Color.White, 16f);
+                    FluentIconRenderer.DrawGlyph(g, navGlyphs[i], new Rectangle(20, (int)curItemY + 8, 20, 20), Color.White, 15.5f);
 
                     // Tiêu đề
-                    g.DrawString(navLabels[i], isActive ? itemActiveFont : itemFont, textBrush, 50, curItemY + 10);
+                    g.DrawString(AppL10n.Tr(navLabels[i]), isActive ? itemActiveFont : itemFont, textBrush, 48f, curItemY + 9f);
 
-                    curItemY += 40f;
+                    curItemY += 39f;
                 }
 
                 // Mục "Báo lỗi & Góp ý" ghim ngay trên Tùy chọn ở góc dưới Sidebar
                 _feedbackBtnBounds = new RectangleF(0, height - 88f, sidebarWidth, 38f);
+                RectangleF fbVisual = new RectangleF(8f, height - 87f, sidebarWidth - 16f, 36f);
                 bool isHoverFeedback = (HoverSidebarIndex == 101);
-                if (isHoverFeedback) g.FillRectangle(hoverBg, _feedbackBtnBounds);
-                FluentIconRenderer.DrawGlyph(g, '\uED15', new Rectangle(20, (int)_feedbackBtnBounds.Y + 9, 20, 20), Color.White, 16f);
-                g.DrawString("Báo lỗi & Góp ý", itemFont, textBrush, 50, _feedbackBtnBounds.Y + 10);
+                if (isHoverFeedback) g.FillRoundedRectangle(hoverBg, fbVisual, 8f);
+                FluentIconRenderer.DrawGlyph(g, '\uED15', new Rectangle(20, (int)_feedbackBtnBounds.Y + 9, 20, 20), Color.White, 15.5f);
+                g.DrawString(AppL10n.T("Báo lỗi & Góp ý", "Feedback"), itemFont, textBrush, 48f, _feedbackBtnBounds.Y + 10f);
 
                 // Mục "Tùy chọn / Cài đặt" ghim ở góc dưới Sidebar
                 _optionsBtnBounds = new RectangleF(0, height - 46f, sidebarWidth, 38f);
+                RectangleF optVisual = new RectangleF(8f, height - 45f, sidebarWidth - 16f, 36f);
                 bool isHoverOpt = (HoverSidebarIndex == 100);
-                if (isHoverOpt) g.FillRectangle(hoverBg, _optionsBtnBounds);
-                FluentIconRenderer.DrawGlyph(g, '\uE713', new Rectangle(20, (int)_optionsBtnBounds.Y + 9, 20, 20), Color.White, 16f);
-                g.DrawString("Tùy chọn", itemFont, textBrush, 50, _optionsBtnBounds.Y + 10);
+                if (isHoverOpt) g.FillRoundedRectangle(hoverBg, optVisual, 8f);
+                FluentIconRenderer.DrawGlyph(g, '\uE713', new Rectangle(20, (int)_optionsBtnBounds.Y + 9, 20, 20), Color.White, 15.5f);
+                g.DrawString(AppL10n.T("Tùy chọn", "Options"), itemFont, textBrush, 48f, _optionsBtnBounds.Y + 10f);
             }
 
             // 3. VÙNG NỘI DUNG CHÍNH (MAIN WORKSPACE CONTENT)
-            float contentX = sidebarWidth + 48f;
-            float contentW = width - contentX - 48f;
+            double revealElapsed = FluentMotion.NowMs - _openAnimStartMs;
+            float revealDx = (revealElapsed >= 0 && revealElapsed < BackstageRevealDurationMs)
+                ? 18f * (1f - FluentMotion.EaseOutQuint((float)(revealElapsed / BackstageRevealDurationMs)))
+                : 0f;
+            float contentX = sidebarWidth + 44f + revealDx;
+            float contentW = width - (sidebarWidth + 44f) - 44f;
             if (contentW < 400f) contentW = 400f;
 
             GraphicsState gClip = g.Save();
             g.SetClip(new RectangleF(sidebarWidth, 0, width - sidebarWidth, height));
 
-            float topY = 32f - scroll;
+            float topY = 28f - scroll;
 
             // 3.1 Tiêu đề Chào mừng theo thời gian (Good morning / Good afternoon / Good evening)
             int hour = DateTime.Now.Hour;
-            string greeting = (hour < 12) ? "Chào buổi sáng" : ((hour < 18) ? "Chào buổi chiều" : "Chào buổi tối");
-            using (Font greetFont = new Font("Segoe UI", 21.0f, FontStyle.Bold))
+            string greeting = (hour < 12) ? AppL10n.T("Chào buổi sáng", "Good morning") : ((hour < 18) ? AppL10n.T("Chào buổi chiều", "Good afternoon") : AppL10n.T("Chào buổi tối", "Good evening"));
+            using (Font greetFont = new Font("Segoe UI", 20.0f, FontStyle.Bold))
             using (SolidBrush greetBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
                 g.DrawString(greeting, greetFont, greetBrush, contentX, topY);
             }
-            topY += 48f;
+            topY += 46f;
 
             // 3.2 Nhóm: MỚI (NEW)
+            FluentIconRenderer.DrawGlyph(g, '\uE70D', new RectangleF(contentX, topY + 4f, 14f, 14f), Color.FromArgb(30, 41, 59), 10.5f);
             using (Font secFont = new Font("Segoe UI", 12.0f, FontStyle.Bold))
-            using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                g.DrawString("˅ Mới", secFont, secBrush, contentX, topY);
+                g.DrawString(AppL10n.T("Mới", "New"), secFont, secBrush, contentX + 18f, topY);
             }
 
             OfficeAppMode curMode = GetEffectiveMode();
 
-            // Mode switcher pills
+            // Mode switcher pills (bo tròn viên thuốc chuẩn Fluent, không gai góc)
             _modePillBounds.Clear();
-            float pillX = contentX + 65f;
-            float pillY = topY - 2f;
+            float pillX = contentX + 70f;
+            float pillY = topY - 3f;
             (OfficeAppMode mode, string title, char icon)[] pills = new (OfficeAppMode, string, char)[]
             {
                 (OfficeAppMode.Slides, "Bản trình chiếu", '\uE740'),
@@ -469,15 +544,16 @@ namespace ZenQOffice.UI
                 (OfficeAppMode.Photo, "Thiết kế & Ảnh", '\uEB9F')
             };
 
-            using (Font pillFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (Font pillFont = new Font("Segoe UI", 8.8f, FontStyle.Bold))
             {
                 for (int pIdx = 0; pIdx < pills.Length; pIdx++)
                 {
                     var pItem = pills[pIdx];
-                    SizeF sz = g.MeasureString(pItem.title, pillFont);
+                    string pTitleDisp = AppL10n.Tr(pItem.title);
+                    SizeF sz = g.MeasureString(pTitleDisp, pillFont);
                     float iconW = 16f;
-                    float pW = sz.Width + iconW + 22f;
-                    float pH = 26f;
+                    float pW = MathF.Round(sz.Width + iconW + 26f);
+                    float pH = 30f;
                     RectangleF pRect = new RectangleF(pillX, pillY, pW, pH);
                     _modePillBounds.Add(pRect);
 
@@ -488,38 +564,40 @@ namespace ZenQOffice.UI
                     {
                         using (SolidBrush selBg = new SolidBrush(themeColor))
                         {
-                            g.FillRectangle(selBg, pRect);
+                            g.FillRoundedRectangle(selBg, pRect, 15f);
                         }
-                        FluentIconRenderer.DrawGlyph(g, pItem.icon, new RectangleF(pillX + 8f, pillY + 5f, iconW, iconW), Color.White, 12f);
+                        FluentIconRenderer.DrawGlyph(g, pItem.icon, new RectangleF(pillX + 10f, pillY + 7f, iconW, iconW), Color.White, 12f);
                         using (SolidBrush pTxt = new SolidBrush(Color.White))
                         {
-                            g.DrawString(pItem.title, pillFont, pTxt, pillX + iconW + 11f, pillY + 4f);
+                            g.DrawString(pTitleDisp, pillFont, pTxt, pillX + iconW + 14f, pillY + 6f);
                         }
                     }
                     else
                     {
-                        using (SolidBrush idleBg = new SolidBrush(isPillHov ? Color.FromArgb(226, 232, 240) : Color.FromArgb(241, 245, 249)))
+                        using (SolidBrush idleBg = new SolidBrush(isPillHov ? Color.FromArgb(241, 245, 249) : Color.FromArgb(248, 250, 252)))
+                        using (Pen idlePen = new Pen(isPillHov ? Color.FromArgb(203, 213, 225) : Color.FromArgb(226, 232, 240), 1f))
                         {
-                            g.FillRectangle(idleBg, pRect);
+                            g.FillRoundedRectangle(idleBg, pRect, 15f);
+                            g.DrawRoundedRectangle(idlePen, pRect, 15f);
                         }
-                        FluentIconRenderer.DrawGlyph(g, pItem.icon, new RectangleF(pillX + 8f, pillY + 5f, iconW, iconW), Color.FromArgb(71, 85, 105), 12f);
-                        using (SolidBrush pTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
+                        FluentIconRenderer.DrawGlyph(g, pItem.icon, new RectangleF(pillX + 10f, pillY + 7f, iconW, iconW), Color.FromArgb(71, 85, 105), 12f);
+                        using (SolidBrush pTxt = new SolidBrush(Color.FromArgb(51, 65, 85)))
                         {
-                            g.DrawString(pItem.title, pillFont, pTxt, pillX + iconW + 11f, pillY + 4f);
+                            g.DrawString(pTitleDisp, pillFont, pTxt, pillX + iconW + 14f, pillY + 6f);
                         }
                     }
 
-                    pillX += pW + 8f;
+                    pillX += pW + 10f;
                 }
             }
 
-            topY += 34f;
+            topY += 38f;
 
             // Danh sách Thẻ Mẫu / Presets (Chuẩn tỷ lệ cho Slides, hoặc Templates cho Word/Excel)
             _templateCardBounds.Clear();
-            float cardW = 126f;
-            float cardH = 138f;
-            float cardSpacing = 16f;
+            float cardW = 132f;
+            float cardH = 142f;
+            float cardSpacing = 14f;
             float curCardX = contentX;
 
             if (curMode == OfficeAppMode.Slides)
@@ -538,7 +616,7 @@ namespace ZenQOffice.UI
                     DrawSlidePresetCard(g, cRect, SlidePresets[i], HoverTemplateCardIndex == i, themeColor);
                     curCardX += cardW + cardSpacing;
                 }
-                topY += cardH + 16f;
+                topY += cardH + 18f;
 
                 // ==========================================
                 // BẢNG ĐIỀU KHIỂN TÙY CHỈNH KÍCH THƯỚC (CUSTOM SIZE PANEL)
@@ -607,27 +685,27 @@ namespace ZenQOffice.UI
             {
                 // Nút "Gần đây"
                 _recentTabBtnBounds = new RectangleF(contentX, tabBtnY, 76f, 28f);
-                g.DrawString("Gần đây", ActiveRecentTab == 0 ? tabFont : tabIdleFont, ActiveRecentTab == 0 ? darkBr : grayBr, _recentTabBtnBounds.X, _recentTabBtnBounds.Y);
+                g.DrawString(AppL10n.T("Gần đây", "Recent"), ActiveRecentTab == 0 ? tabFont : tabIdleFont, ActiveRecentTab == 0 ? darkBr : grayBr, _recentTabBtnBounds.X, _recentTabBtnBounds.Y);
                 if (ActiveRecentTab == 0)
                 {
-                    g.FillRectangle(lineBr, _recentTabBtnBounds.X, _recentTabBtnBounds.Y + 24f, 60f, 2.8f);
+                    g.FillRoundedRectangle(lineBr, new RectangleF(_recentTabBtnBounds.X, _recentTabBtnBounds.Y + 24f, 58f, 3f), 1.5f);
                 }
 
                 // Nút "Đã ghim"
                 _pinnedTabBtnBounds = new RectangleF(contentX + 85f, tabBtnY, 76f, 28f);
-                g.DrawString("Đã ghim", ActiveRecentTab == 1 ? tabFont : tabIdleFont, ActiveRecentTab == 1 ? darkBr : grayBr, _pinnedTabBtnBounds.X, _pinnedTabBtnBounds.Y);
+                g.DrawString(AppL10n.T("Đã ghim", "Pinned"), ActiveRecentTab == 1 ? tabFont : tabIdleFont, ActiveRecentTab == 1 ? darkBr : grayBr, _pinnedTabBtnBounds.X, _pinnedTabBtnBounds.Y);
                 if (ActiveRecentTab == 1)
                 {
-                    g.FillRectangle(lineBr, _pinnedTabBtnBounds.X, _pinnedTabBtnBounds.Y + 24f, 60f, 2.8f);
+                    g.FillRoundedRectangle(lineBr, new RectangleF(_pinnedTabBtnBounds.X, _pinnedTabBtnBounds.Y + 24f, 58f, 3f), 1.5f);
                 }
             }
 
             // Hộp tìm kiếm tài liệu ở góc phải
-            float searchW = 220f;
-            _searchBoxBounds = new RectangleF(contentX + contentW - searchW, tabBtnY - 2f, searchW, 28f);
+            float searchW = 240f;
+            _searchBoxBounds = new RectangleF(contentX + contentW - searchW, tabBtnY - 2f, searchW, 30f);
             DrawSearchBox(g, _searchBoxBounds);
 
-            topY += 40f;
+            topY += 42f;
 
             // 3.4 BẢNG DANH SÁCH TÀI LIỆU GẦN ĐÂY
             DrawRecentFilesTable(g, contentX, topY, contentW, themeColor);
@@ -636,126 +714,174 @@ namespace ZenQOffice.UI
         }
 
         // ==========================================
-        // VẼ THẺ PRESET TỶ LỆ TRÌNH CHIẾU
+        // VẼ THẺ PRESET TỶ LỆ TRÌNH CHIẾU (FLUENT ANTI-ALIASED D2D)
         // ==========================================
         private void DrawSlidePresetCard(Graphics g, RectangleF bounds, SlideRatioPreset preset, bool isHover, Color themeColor)
         {
-            using (GraphicsPath path = CreateRoundedPath(bounds, 6f))
-            using (SolidBrush bgBrush = new SolidBrush(isHover ? Color.FromArgb(248, 250, 252) : Color.White))
-            using (Pen borderPen = new Pen(isHover ? themeColor : Color.FromArgb(226, 232, 240), isHover ? 1.5f : 1.0f))
+            // Đổ bóng nổi bật khử răng cưa mềm mại chuẩn Fluent Design
+            if (isHover)
             {
-                g.FillPath(bgBrush, path);
-                g.DrawPath(borderPen, path);
+                using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb(20, 15, 23, 42)))
+                {
+                    g.FillRoundedRectangle(shadowBr, new RectangleF(bounds.X, bounds.Y + 3f, bounds.Width, bounds.Height), 14f);
+                }
             }
 
-            // Vùng hình thu nhỏ tỷ lệ (Canvas aspect ratio thumbnail)
-            RectangleF thumbBox = new RectangleF(bounds.X + 12f, bounds.Y + 12f, bounds.Width - 24f, 68f);
-            using (SolidBrush tbBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
-            using (Pen tbPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+            using (SolidBrush bgBrush = new SolidBrush(isHover ? Color.FromArgb(254, 254, 255) : Color.White))
+            using (Pen borderPen = new Pen(isHover ? themeColor : Color.FromArgb(226, 232, 240), isHover ? 1.6f : 1.0f))
             {
-                g.FillRectangle(tbBg, thumbBox);
-                g.DrawRectangle(tbPen, thumbBox.X, thumbBox.Y, thumbBox.Width, thumbBox.Height);
+                g.FillRoundedRectangle(bgBrush, bounds, 14f);
+                g.DrawRoundedRectangle(borderPen, bounds, 14f);
+            }
+
+            // Vùng hình thu nhỏ tỷ lệ bo góc 10px mềm mại
+            RectangleF thumbBox = new RectangleF(bounds.X + 10f, bounds.Y + 10f, bounds.Width - 20f, 74f);
+            using (SolidBrush tbBg = new SolidBrush(isHover ? Color.FromArgb(238, 242, 250) : Color.FromArgb(246, 248, 251)))
+            using (Pen tbPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+            {
+                g.FillRoundedRectangle(tbBg, thumbBox, 10f);
+                g.DrawRoundedRectangle(tbPen, thumbBox, 10f);
             }
 
             if (preset.IsCustom)
             {
-                // Biểu tượng Thước kẻ / Cỡ tùy chỉnh
-                FluentIconRenderer.DrawGlyph(g, '\uE790', new Rectangle((int)thumbBox.X + (int)thumbBox.Width / 2 - 14, (int)thumbBox.Y + 14, 28, 28), themeColor, 24f);
-                using (Font cFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+                // Biểu tượng Bảng màu / Thước kẻ Cỡ tùy chỉnh hiện đại
+                Rectangle iconCircle = new Rectangle((int)thumbBox.X + (int)thumbBox.Width / 2 - 17, (int)thumbBox.Y + 10, 34, 34);
+                using (SolidBrush cirBg = new SolidBrush(Color.FromArgb(254, 242, 242)))
+                {
+                    g.FillEllipse(cirBg, iconCircle);
+                }
+                FluentIconRenderer.DrawGlyph(g, '\uE790', iconCircle, themeColor, 18f);
+                using (Font cFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
                 using (SolidBrush cBr = new SolidBrush(themeColor))
                 {
                     StringFormat sf = new StringFormat { Alignment = StringAlignment.Center };
-                    g.DrawString("Cỡ tùy chỉnh", cFont, cBr, thumbBox.X + thumbBox.Width / 2f, thumbBox.Y + 46f, sf);
+                    g.DrawString(AppL10n.T("Cỡ tùy chỉnh", "Custom Size"), cFont, cBr, thumbBox.X + thumbBox.Width / 2f, thumbBox.Y + 47f, sf);
                 }
             }
             else
             {
-                // Vẽ khung tỷ lệ chính xác thu nhỏ bên trong
-                float maxTw = thumbBox.Width - 14f;
-                float maxTh = thumbBox.Height - 14f;
+                // Vẽ khung tỷ lệ chính xác thu nhỏ bên trong (mô phỏng slide thực tế, chống gai góc)
+                float topPad = !string.IsNullOrEmpty(preset.Badge) ? 20f : 8f;
+                float availW = thumbBox.Width - 18f;
+                float availH = thumbBox.Height - topPad - 8f;
                 float aspect = preset.Width / Math.Max(1f, preset.Height);
 
-                float tw = maxTw;
+                float tw = availW;
                 float th = tw / aspect;
-                if (th > maxTh)
+                if (th > availH)
                 {
-                    th = maxTh;
+                    th = availH;
                     tw = th * aspect;
                 }
 
-                float tx = thumbBox.X + (thumbBox.Width - tw) / 2f;
-                float ty = thumbBox.Y + (thumbBox.Height - th) / 2f;
+                float tx = MathF.Round(thumbBox.X + (thumbBox.Width - tw) / 2f);
+                float ty = MathF.Round(thumbBox.Y + topPad + (availH - th) / 2f);
 
-                RectangleF miniSlide = new RectangleF(tx, ty, tw, th);
+                RectangleF miniSlide = new RectangleF(tx, ty, MathF.Round(tw), MathF.Round(th));
+                using (SolidBrush shadowMini = new SolidBrush(Color.FromArgb(18, 15, 23, 42)))
                 using (SolidBrush msBg = new SolidBrush(Color.White))
-                using (Pen msPen = new Pen(isHover ? themeColor : Color.FromArgb(148, 163, 184), 1.2f))
+                using (Pen msPen = new Pen(isHover ? themeColor : Color.FromArgb(203, 213, 225), 1.1f))
                 {
-                    g.FillRectangle(msBg, miniSlide);
-                    g.DrawRectangle(msPen, miniSlide.X, miniSlide.Y, miniSlide.Width, miniSlide.Height);
-
-                    // Duy nhất 1 trang trắng không chữ không hiệu ứng
+                    g.FillRoundedRectangle(shadowMini, new RectangleF(miniSlide.X, miniSlide.Y + 1.5f, miniSlide.Width, miniSlide.Height), 4f);
+                    g.FillRoundedRectangle(msBg, miniSlide, 4f);
+                    g.DrawRoundedRectangle(msPen, miniSlide, 4f);
                 }
 
-                // Huy hiệu tỷ lệ nhỏ (Badge)
-                using (Font bdFont = new Font("Segoe UI", 6.8f, FontStyle.Bold))
-                using (SolidBrush bdBg = new SolidBrush(Color.FromArgb(220, 241, 245, 249)))
-                using (SolidBrush bdTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
+                // Điểm nhấn bố cục slide thu nhỏ (dải tiêu đề và gạch nội dung mềm mại)
+                if (miniSlide.Width >= 24f && miniSlide.Height >= 16f)
                 {
-                    g.DrawString(preset.Badge, bdFont, bdTxt, thumbBox.X + 4f, thumbBox.Y + 4f);
+                    float padS = Math.Max(3f, miniSlide.Width * 0.08f);
+                    float barW = Math.Max(12f, miniSlide.Width * 0.45f);
+                    float barH = Math.Max(2f, Math.Min(4f, miniSlide.Height * 0.12f));
+                    using (SolidBrush lineAccent = new SolidBrush(isHover ? Color.FromArgb(140, themeColor) : Color.FromArgb(203, 213, 225)))
+                    using (SolidBrush lineSub = new SolidBrush(Color.FromArgb(226, 232, 240)))
+                    {
+                        g.FillRoundedRectangle(lineAccent, new RectangleF(miniSlide.X + padS, miniSlide.Y + padS, barW, barH), 1.5f);
+                        if (miniSlide.Height >= 24f)
+                        {
+                            g.FillRoundedRectangle(lineSub, new RectangleF(miniSlide.X + padS, miniSlide.Y + padS + barH + 3f, miniSlide.Width * 0.32f, barH * 0.8f), 1f);
+                        }
+                    }
+                }
+
+                // Huy hiệu tỷ lệ nhỏ (Badge pill)
+                if (!string.IsNullOrEmpty(preset.Badge))
+                {
+                    using (Font bdFont = new Font("Segoe UI", 6.8f, FontStyle.Bold))
+                    {
+                        SizeF bSz = g.MeasureString(preset.Badge, bdFont);
+                        float pillW = Math.Max(22f, MathF.Round(bSz.Width + 10f));
+                        RectangleF badgeRect = new RectangleF(thumbBox.X + 6f, thumbBox.Y + 4f, pillW, 14f);
+                        using (SolidBrush bdBg = new SolidBrush(isHover ? Color.FromArgb(32, themeColor) : Color.FromArgb(226, 232, 240)))
+                        using (SolidBrush bdTxt = new SolidBrush(isHover ? themeColor : Color.FromArgb(71, 85, 105)))
+                        {
+                            g.FillRoundedRectangle(bdBg, badgeRect, 7f);
+                            StringFormat bSf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                            g.DrawString(preset.Badge, bdFont, bdTxt, badgeRect, bSf);
+                        }
+                    }
                 }
             }
 
             // Tên và thông số kích thước bên dưới
-            using (Font titleF = new Font("Segoe UI", 8.2f, FontStyle.Bold))
-            using (Font subF = new Font("Segoe UI", 7.5f, FontStyle.Regular))
-            using (SolidBrush tBr = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (Font titleF = new Font("Segoe UI", 8.4f, FontStyle.Bold))
+            using (Font subF = new Font("Segoe UI", 7.6f, FontStyle.Regular))
+            using (SolidBrush tBr = new SolidBrush(Color.FromArgb(15, 23, 42)))
             using (SolidBrush sBr = new SolidBrush(Color.FromArgb(100, 116, 139)))
             {
                 StringFormat sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap };
-                g.DrawString(preset.Title, titleF, tBr, new RectangleF(bounds.X + 8f, bounds.Y + 88f, bounds.Width - 16f, 18f), sf);
-                g.DrawString(preset.Subtitle, subF, sBr, bounds.X + 8f, bounds.Y + 108f);
+                g.DrawString(AppL10n.Tr(preset.Title), titleF, tBr, new RectangleF(bounds.X + 10f, bounds.Y + 92f, bounds.Width - 20f, 18f), sf);
+                g.DrawString(AppL10n.Tr(preset.Subtitle), subF, sBr, bounds.X + 10f, bounds.Y + 112f);
             }
         }
 
         private void DrawGenericTemplateCard(Graphics g, RectangleF bounds, string title, char icon, bool isHover, Color themeColor, bool isBlank)
         {
-            using (GraphicsPath path = CreateRoundedPath(bounds, 6f))
-            using (SolidBrush bgBrush = new SolidBrush(isHover ? Color.FromArgb(248, 250, 252) : Color.White))
-            using (Pen borderPen = new Pen(isHover ? themeColor : Color.FromArgb(226, 232, 240), isHover ? 1.5f : 1.0f))
+            if (isHover)
             {
-                g.FillPath(bgBrush, path);
-                g.DrawPath(borderPen, path);
+                using (SolidBrush shadowBr = new SolidBrush(Color.FromArgb(14, 15, 23, 42)))
+                {
+                    g.FillRoundedRectangle(shadowBr, new RectangleF(bounds.X, bounds.Y + 2f, bounds.Width, bounds.Height), 12f);
+                }
             }
 
-            RectangleF thumbBox = new RectangleF(bounds.X + 14f, bounds.Y + 12f, bounds.Width - 28f, 68f);
-            using (SolidBrush tbBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
-            using (Pen tbPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+            using (SolidBrush bgBrush = new SolidBrush(isHover ? Color.FromArgb(252, 253, 255) : Color.White))
+            using (Pen borderPen = new Pen(isHover ? themeColor : Color.FromArgb(226, 232, 240), isHover ? 1.6f : 1.0f))
             {
-                g.FillRectangle(tbBg, thumbBox);
-                g.DrawRectangle(tbPen, thumbBox.X, thumbBox.Y, thumbBox.Width, thumbBox.Height);
+                g.FillRoundedRectangle(bgBrush, bounds, 12f);
+                g.DrawRoundedRectangle(borderPen, bounds, 12f);
+            }
+
+            RectangleF thumbBox = new RectangleF(bounds.X + 10f, bounds.Y + 10f, bounds.Width - 20f, 74f);
+            using (SolidBrush tbBg = new SolidBrush(isHover ? Color.FromArgb(241, 245, 249) : Color.FromArgb(248, 250, 252)))
+            using (Pen tbPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
+            {
+                g.FillRoundedRectangle(tbBg, thumbBox, 8f);
+                g.DrawRoundedRectangle(tbPen, thumbBox, 8f);
             }
 
             if (isBlank)
             {
-                // Thẻ tài liệu trắng cơ bản
+                // Thẻ tài liệu trắng cơ bản bo tròn
                 using (SolidBrush wBg = new SolidBrush(Color.White))
-                using (Pen wPen = new Pen(Color.FromArgb(148, 163, 184), 1f))
+                using (Pen wPen = new Pen(isHover ? themeColor : Color.FromArgb(148, 163, 184), 1.2f))
                 {
-                    RectangleF doc = new RectangleF(thumbBox.X + 16f, thumbBox.Y + 6f, thumbBox.Width - 32f, thumbBox.Height - 12f);
-                    g.FillRectangle(wBg, doc);
-                    g.DrawRectangle(wPen, doc.X, doc.Y, doc.Width, doc.Height);
+                    RectangleF doc = new RectangleF(thumbBox.X + 22f, thumbBox.Y + 8f, thumbBox.Width - 44f, thumbBox.Height - 16f);
+                    g.FillRoundedRectangle(wBg, doc, 3f);
+                    g.DrawRoundedRectangle(wPen, doc, 3f);
                 }
             }
             else
             {
-                FluentIconRenderer.DrawGlyph(g, icon, new Rectangle((int)thumbBox.X + (int)thumbBox.Width / 2 - 14, (int)thumbBox.Y + 18, 28, 28), themeColor, 22f);
+                FluentIconRenderer.DrawGlyph(g, icon, new Rectangle((int)thumbBox.X + (int)thumbBox.Width / 2 - 14, (int)thumbBox.Y + 22, 28, 28), themeColor, 22f);
             }
 
-            using (Font titleF = new Font("Segoe UI", 8.2f, FontStyle.Bold))
-            using (SolidBrush tBr = new SolidBrush(Color.FromArgb(30, 41, 59)))
+            using (Font titleF = new Font("Segoe UI", 8.4f, FontStyle.Bold))
+            using (SolidBrush tBr = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
                 StringFormat sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter };
-                g.DrawString(title, titleF, tBr, new RectangleF(bounds.X + 8f, bounds.Y + 90f, bounds.Width - 16f, 38f), sf);
+                g.DrawString(AppL10n.Tr(title), titleF, tBr, new RectangleF(bounds.X + 10f, bounds.Y + 92f, bounds.Width - 20f, 38f), sf);
             }
         }
 
@@ -766,26 +892,25 @@ namespace ZenQOffice.UI
         {
             _customPanelBounds = new RectangleF(x, y, width, 106f);
 
-            using (GraphicsPath cp = CreateRoundedPath(_customPanelBounds, 8f))
             using (SolidBrush cpBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
-            using (Pen cpPen = new Pen(Color.FromArgb(203, 213, 225), 1.2f))
+            using (Pen cpPen = new Pen(Color.FromArgb(226, 232, 240), 1.2f))
             {
-                g.FillPath(cpBg, cp);
-                g.DrawPath(cpPen, cp);
+                g.FillRoundedRectangle(cpBg, _customPanelBounds, 12f);
+                g.DrawRoundedRectangle(cpPen, _customPanelBounds, 12f);
             }
 
             // Vạch màu nhấn phân biệt
             using (SolidBrush acBr = new SolidBrush(themeColor))
             {
-                g.FillRectangle(acBr, x, y + 8f, 4f, _customPanelBounds.Height - 16f);
+                g.FillRoundedRectangle(acBr, new RectangleF(x + 6f, y + 12f, 4f, _customPanelBounds.Height - 24f), 2f);
             }
 
             // Tiêu đề bảng điều khiển
             using (Font hFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
             using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                FluentIconRenderer.DrawGlyph(g, '\uE740', new RectangleF(x + 16f, y + 13f, 15f, 15f), Color.FromArgb(30, 41, 59), 13f);
-                g.DrawString("Tùy chỉnh kích thước trang chiếu:", hFont, hBrush, x + 36f, y + 12f);
+                FluentIconRenderer.DrawGlyph(g, '\uE740', new RectangleF(x + 18f, y + 13f, 15f, 15f), Color.FromArgb(30, 41, 59), 13f);
+                g.DrawString(AppL10n.T("Tùy chỉnh kích thước trang chiếu:", "Custom Slide Dimensions:"), hFont, hBrush, x + 38f, y + 12f);
             }
 
             float rowY = y + 42f;
@@ -796,31 +921,29 @@ namespace ZenQOffice.UI
             using (SolidBrush lblBrush = new SolidBrush(Color.FromArgb(71, 85, 105)))
             using (SolidBrush valBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                g.DrawString("Chiều rộng:", lblFont, lblBrush, x + 16f, rowY + 6f);
-                _customWidthBoxBounds = new RectangleF(x + 88f, rowY, 82f, 32f);
+                g.DrawString(AppL10n.T("Chiều rộng:", "Width:"), lblFont, lblBrush, x + 18f, rowY + 6f);
+                _customWidthBoxBounds = new RectangleF(x + 90f, rowY, 82f, 32f);
 
                 bool isWFocus = (FocusedInputIndex == 0);
-                using (GraphicsPath wPath = CreateRoundedPath(_customWidthBoxBounds, 4f))
                 using (SolidBrush boxBg = new SolidBrush(Color.White))
-                using (Pen boxPen = new Pen(isWFocus ? Color.FromArgb(37, 99, 235) : Color.FromArgb(203, 213, 225), isWFocus ? 2.0f : 1.0f))
+                using (Pen boxPen = new Pen(isWFocus ? themeColor : Color.FromArgb(203, 213, 225), isWFocus ? 1.8f : 1.0f))
                 {
-                    g.FillPath(boxBg, wPath);
-                    g.DrawPath(boxPen, wPath);
+                    g.FillRoundedRectangle(boxBg, _customWidthBoxBounds, 6f);
+                    g.DrawRoundedRectangle(boxPen, _customWidthBoxBounds, 6f);
                     StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center };
                     g.DrawString(CustomWidthText + (isWFocus ? "|" : ""), valFont, valBrush, _customWidthBoxBounds, sf);
                 }
 
                 // 2. Ô nhập Chiều Cao
-                g.DrawString("Chiều cao:", lblFont, lblBrush, x + 185f, rowY + 6f);
-                _customHeightBoxBounds = new RectangleF(x + 250f, rowY, 82f, 32f);
+                g.DrawString(AppL10n.T("Chiều cao:", "Height:"), lblFont, lblBrush, x + 186f, rowY + 6f);
+                _customHeightBoxBounds = new RectangleF(x + 252f, rowY, 82f, 32f);
 
                 bool isHFocus = (FocusedInputIndex == 1);
-                using (GraphicsPath hPath = CreateRoundedPath(_customHeightBoxBounds, 4f))
                 using (SolidBrush boxBg = new SolidBrush(Color.White))
-                using (Pen boxPen = new Pen(isHFocus ? Color.FromArgb(37, 99, 235) : Color.FromArgb(203, 213, 225), isHFocus ? 2.0f : 1.0f))
+                using (Pen boxPen = new Pen(isHFocus ? themeColor : Color.FromArgb(203, 213, 225), isHFocus ? 1.8f : 1.0f))
                 {
-                    g.FillPath(boxBg, hPath);
-                    g.DrawPath(boxPen, hPath);
+                    g.FillRoundedRectangle(boxBg, _customHeightBoxBounds, 6f);
+                    g.DrawRoundedRectangle(boxPen, _customHeightBoxBounds, 6f);
                     StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center };
                     g.DrawString(CustomHeightText + (isHFocus ? "|" : ""), valFont, valBrush, _customHeightBoxBounds, sf);
                 }
@@ -840,13 +963,12 @@ namespace ZenQOffice.UI
                     bool isSelected = string.Equals(CustomUnit, units[u], StringComparison.OrdinalIgnoreCase);
                     bool isHoverU = (HoverUnitBtnIndex == u);
 
-                    using (GraphicsPath up = CreateRoundedPath(uRect, 4f))
                     using (SolidBrush uBg = new SolidBrush(isSelected ? themeColor : (isHoverU ? Color.FromArgb(226, 232, 240) : Color.White)))
                     using (Pen uPen = new Pen(isSelected ? themeColor : Color.FromArgb(203, 213, 225), 1f))
                     using (SolidBrush uTxt = new SolidBrush(isSelected ? Color.White : Color.FromArgb(71, 85, 105)))
                     {
-                        g.FillPath(uBg, up);
-                        g.DrawPath(uPen, up);
+                        g.FillRoundedRectangle(uBg, uRect, 6f);
+                        g.DrawRoundedRectangle(uPen, uRect, 6f);
                         StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center };
                         g.DrawString(units[u], uFont, uTxt, uRect, sf);
                     }
@@ -855,16 +977,15 @@ namespace ZenQOffice.UI
             }
 
             // 4. Nút bấm Tạo thiết kế mới (Primary Action Button)
-            _createCustomBtnBounds = new RectangleF(unitX + 16f, rowY, 150f, 32f);
-            using (GraphicsPath btnP = CreateRoundedPath(_createCustomBtnBounds, 5f))
+            _createCustomBtnBounds = new RectangleF(unitX + 16f, rowY, 152f, 32f);
             using (SolidBrush btnBg = new SolidBrush(HoverCreateCustomBtn ? ControlPaint.Light(themeColor, 0.15f) : themeColor))
             using (Font btnFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
             using (SolidBrush btnTxt = new SolidBrush(Color.White))
             {
-                g.FillPath(btnBg, btnP);
+                g.FillRoundedRectangle(btnBg, _createCustomBtnBounds, 8f);
                 FluentIconRenderer.DrawGlyph(g, '\uE710', new RectangleF(_createCustomBtnBounds.X + 10f, _createCustomBtnBounds.Y + 8f, 16f, 16f), Color.White, 13f);
                 StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Near };
-                g.DrawString("Tạo thiết kế mới", btnFont, btnTxt, new RectangleF(_createCustomBtnBounds.X + 30f, _createCustomBtnBounds.Y, _createCustomBtnBounds.Width - 32f, _createCustomBtnBounds.Height), sf);
+                g.DrawString(AppL10n.T("Tạo thiết kế mới", "Create Design"), btnFont, btnTxt, new RectangleF(_createCustomBtnBounds.X + 30f, _createCustomBtnBounds.Y, _createCustomBtnBounds.Width - 32f, _createCustomBtnBounds.Height), sf);
             }
         }
 
@@ -877,6 +998,7 @@ namespace ZenQOffice.UI
             _pinBtnBounds.Clear();
 
             List<RecentDocItem> docs = GetDisplayDocs();
+            OfficeAppMode curMode = GetEffectiveMode();
 
             // Tiêu đề cột
             float colNameW = width * 0.46f;
@@ -886,9 +1008,9 @@ namespace ZenQOffice.UI
             using (Font headFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
             using (SolidBrush headBr = new SolidBrush(Color.FromArgb(148, 163, 184)))
             {
-                g.DrawString("Tên", headFont, headBr, x + 40f, y);
-                g.DrawString("Vị trí", headFont, headBr, x + colNameW, y);
-                g.DrawString("Ngày sửa đổi", headFont, headBr, x + colNameW + colPathW, y);
+                g.DrawString(AppL10n.T("Tên", "Name"), headFont, headBr, x + 44f, y);
+                g.DrawString(AppL10n.T("Vị trí", "Location"), headFont, headBr, x + colNameW, y);
+                g.DrawString(AppL10n.T("Ngày sửa đổi", "Date Modified"), headFont, headBr, x + colNameW + colPathW, y);
             }
             y += 24f;
 
@@ -900,21 +1022,30 @@ namespace ZenQOffice.UI
 
             if (docs.Count == 0)
             {
-                using (Font emptyFont = new Font("Segoe UI", 10.0f, FontStyle.Italic))
+                using (Font emptyFont = new Font("Segoe UI", 9.8f, FontStyle.Regular))
                 using (SolidBrush emptyBr = new SolidBrush(Color.FromArgb(148, 163, 184)))
                 {
-                    g.DrawString("Không tìm thấy tệp nào trong danh sách gần đây.", emptyFont, emptyBr, x + 40f, y + 20f);
+                    string modeExtText = curMode switch
+                    {
+                        OfficeAppMode.Slides => AppL10n.T("trình chiếu (.pptx, .ppt)", "presentation (.pptx, .ppt)"),
+                        OfficeAppMode.Writer => AppL10n.T("văn bản (.docx, .doc, .odt, .rtf, .txt)", "document (.docx, .doc, .odt, .rtf, .txt)"),
+                        OfficeAppMode.Calc => AppL10n.T("bảng tính (.xlsx, .xls, .ods, .csv)", "spreadsheet (.xlsx, .xls, .ods, .csv)"),
+                        OfficeAppMode.Pdf => AppL10n.T("tài liệu PDF (.pdf)", "PDF (.pdf)"),
+                        OfficeAppMode.Photo => AppL10n.T("thiết kế & ảnh (.svg, .png, .jpg)", "design & image (.svg, .png, .jpg)"),
+                        _ => AppL10n.T("tài liệu", "document")
+                    };
+                    g.DrawString(AppL10n.T($"Chưa có tệp {modeExtText} nào trong danh sách gần đây.", $"No recent {modeExtText} files yet."), emptyFont, emptyBr, x + 44f, y + 20f);
                 }
                 return;
             }
 
-            float rowH = 50f;
+            float rowH = 52f;
             using (Font nameFont = new Font("Segoe UI", 9.2f, FontStyle.Bold))
             using (Font pathFont = new Font("Segoe UI", 8.4f, FontStyle.Regular))
             using (Font dateFont = new Font("Segoe UI", 8.4f, FontStyle.Regular))
             using (SolidBrush nameBr = new SolidBrush(Color.FromArgb(15, 23, 42)))
             using (SolidBrush grayBr = new SolidBrush(Color.FromArgb(100, 116, 139)))
-            using (SolidBrush hoverRowBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+            using (SolidBrush hoverRowBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
             using (Pen rowLine = new Pen(Color.FromArgb(241, 245, 249), 1.0f))
             {
                 StringFormat ellipsisSf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap };
@@ -927,46 +1058,36 @@ namespace ZenQOffice.UI
                     bool isHover = (HoverRecentRowIndex == r);
                     if (isHover)
                     {
-                        using (GraphicsPath rp = CreateRoundedPath(rRect, 4f))
-                        {
-                            g.FillPath(hoverRowBg, rp);
-                        }
+                        g.FillRoundedRectangle(hoverRowBg, rRect, 8f);
                     }
 
                     RecentDocItem item = docs[r];
 
-                    // Biểu tượng tệp theo định dạng
-                    char docIcon = '\uE7C3';
-                    Color iconCol = Color.FromArgb(24, 90, 189);
-                    if (item.Mode == OfficeAppMode.Calc) { docIcon = '\uF158'; iconCol = Color.FromArgb(16, 124, 65); }
-                    else if (item.Mode == OfficeAppMode.Slides) { docIcon = '\uE82E'; iconCol = Color.FromArgb(196, 62, 28); }
-                    else if (item.Mode == OfficeAppMode.Photo) { docIcon = '\uEB9F'; iconCol = Color.FromArgb(30, 41, 59); }
-                    else if (item.Mode == OfficeAppMode.Pdf) { docIcon = '\uEA90'; iconCol = Color.FromArgb(179, 11, 0); }
-
-                    FluentIconRenderer.DrawGlyph(g, docIcon, new Rectangle((int)x + 10, (int)y + 14, 20, 20), iconCol, 18f);
+                    // Biểu tượng ứng dụng 3D sắc nét theo đúng định dạng
+                    AppIconRenderer.DrawAppIcon(g, x + 10f, y + 13f, 26f, curMode);
 
                     // Tên tệp
-                    RectangleF nameRect = new RectangleF(x + 40f, y + 16f, colNameW - 46f, 20f);
+                    RectangleF nameRect = new RectangleF(x + 44f, y + 17f, colNameW - 50f, 20f);
                     g.DrawString(item.Title ?? "", nameFont, nameBr, nameRect, ellipsisSf);
 
                     // Đường dẫn thư mục
                     string dir = "";
                     try { dir = Path.GetDirectoryName(item.FilePath) ?? ""; } catch { }
-                    if (string.IsNullOrEmpty(dir)) dir = "Tài liệu";
-                    RectangleF pathRect = new RectangleF(x + colNameW, y + 16f, colPathW - 16f, 20f);
+                    if (string.IsNullOrEmpty(dir)) dir = AppL10n.T("Tài liệu", "Documents");
+                    RectangleF pathRect = new RectangleF(x + colNameW, y + 17f, colPathW - 16f, 20f);
                     g.DrawString(dir, pathFont, grayBr, pathRect, ellipsisSf);
 
                     // Ngày sửa đổi
-                    RectangleF dateRect = new RectangleF(x + colNameW + colPathW, y + 16f, colDateW - 36f, 20f);
+                    RectangleF dateRect = new RectangleF(x + colNameW + colPathW, y + 17f, colDateW - 36f, 20f);
                     g.DrawString(item.LastModified ?? "", dateFont, grayBr, dateRect, ellipsisSf);
 
                     // Biểu tượng Ghim (Pin 📌)
-                    RectangleF pinRect = new RectangleF(x + width - 30f, y + 15f, 20f, 20f);
+                    RectangleF pinRect = new RectangleF(x + width - 32f, y + 16f, 20f, 20f);
                     _pinBtnBounds.Add(pinRect);
 
                     bool isHoverPin = (HoverPinIndex == r);
                     char pinGlyph = item.IsStarred ? '\uE840' : '\uE718';
-                    Color pinColor = item.IsStarred ? themeColor : (isHoverPin ? Color.FromArgb(30, 41, 59) : Color.FromArgb(203, 213, 225));
+                    Color pinColor = item.IsStarred ? themeColor : (isHoverPin ? Color.FromArgb(30, 41, 59) : Color.FromArgb(148, 163, 184));
                     if (item.IsStarred || isHover || isHoverPin)
                     {
                         FluentIconRenderer.DrawGlyph(g, pinGlyph, new Rectangle((int)pinRect.X, (int)pinRect.Y, 18, 18), pinColor, 15f);
@@ -980,21 +1101,20 @@ namespace ZenQOffice.UI
 
         private void DrawSearchBox(Graphics g, RectangleF bounds)
         {
-            using (GraphicsPath sp = CreateRoundedPath(bounds, 14f))
-            using (SolidBrush sbBg = new SolidBrush(Color.White))
-            using (Pen sbPen = new Pen(IsSearchFocused ? Color.FromArgb(37, 99, 235) : Color.FromArgb(203, 213, 225), IsSearchFocused ? 1.5f : 1.0f))
+            using (SolidBrush sbBg = new SolidBrush(IsSearchFocused ? Color.White : Color.FromArgb(248, 250, 252)))
+            using (Pen sbPen = new Pen(IsSearchFocused ? GetThemeColor() : Color.FromArgb(226, 232, 240), IsSearchFocused ? 1.5f : 1.0f))
             {
-                g.FillPath(sbBg, sp);
-                g.DrawPath(sbPen, sp);
+                g.FillRoundedRectangle(sbBg, bounds, 15f);
+                g.DrawRoundedRectangle(sbPen, bounds, 15f);
             }
 
-            FluentIconRenderer.DrawGlyph(g, '\uE721', new Rectangle((int)bounds.X + 8, (int)bounds.Y + 6, 16, 16), Color.FromArgb(148, 163, 184), 13f);
+            FluentIconRenderer.DrawGlyph(g, '\uE721', new Rectangle((int)bounds.X + 10, (int)bounds.Y + 7, 16, 16), IsSearchFocused ? GetThemeColor() : Color.FromArgb(148, 163, 184), 13f);
 
             using (Font sFont = new Font("Segoe UI", 8.8f, FontStyle.Regular))
             using (SolidBrush sBr = new SolidBrush(string.IsNullOrEmpty(SearchText) ? Color.FromArgb(148, 163, 184) : Color.FromArgb(15, 23, 42)))
             {
-                string displayText = string.IsNullOrEmpty(SearchText) ? (IsSearchFocused ? "|" : "Tìm kiếm tệp gần đây...") : SearchText + (IsSearchFocused ? "|" : "");
-                g.DrawString(displayText, sFont, sBr, bounds.X + 28f, bounds.Y + 5f);
+                string displayText = string.IsNullOrEmpty(SearchText) ? (IsSearchFocused ? "|" : AppL10n.T("Tìm kiếm tệp gần đây...", "Search recent files...")) : SearchText + (IsSearchFocused ? "|" : "");
+                g.DrawString(displayText, sFont, sBr, bounds.X + 30f, bounds.Y + 6f);
             }
         }
 
@@ -1341,9 +1461,16 @@ namespace ZenQOffice.UI
                     SmoothScrollY = 0;
                     TargetScrollY = 0;
                     break;
-                case 2: // Mở (Open file)
-                    Close();
-                    if (_appForm != null) _appForm.PerformQuickOpen();
+                case 2: // Mở (Open file theo đúng phân hệ đang chọn)
+                    {
+                        OfficeAppMode openMode = GetEffectiveMode();
+                        Close();
+                        if (_appForm != null)
+                        {
+                            if (_appForm.Ribbon != null) _appForm.Ribbon.CurrentMode = openMode;
+                            _appForm.PerformQuickOpen();
+                        }
+                    }
                     break;
                 case 4: // Thông tin
                     ActiveSidebarTab = 4;
@@ -1360,62 +1487,48 @@ namespace ZenQOffice.UI
                     Close();
                     if (_appForm != null) _appForm.PerformPrint();
                     break;
-                case 8: // Chia sẻ & Gửi Email (Share / Email)
+                case 8: // Chia sẻ Cloud & Gửi Email (Share / Email)
                     Close();
                     if (_appForm != null)
                     {
-                        string curPath = null;
-                        string docTitle = "Tai_Lieu_ZenQOffice";
-                        if (_appForm.Ribbon != null && _appForm.Ribbon.ActiveDocIndex >= 0 && _appForm.Ribbon.ActiveDocIndex < _appForm.Ribbon.DocTabs.Count)
+                        var shareMenu = new ContextMenuStrip();
+                        shareMenu.Items.Add(AppL10n.T("Chia sẻ tới tài khoản ZenQ (200 MB)...", "Share to ZenQ Account (200 MB)..."), null, (ms, me) =>
                         {
-                            var activeTab = _appForm.Ribbon.DocTabs[_appForm.Ribbon.ActiveDocIndex];
-                            curPath = activeTab.FilePath;
-                            if (!string.IsNullOrEmpty(curPath))
-                                docTitle = System.IO.Path.GetFileNameWithoutExtension(curPath);
-                            else if (!string.IsNullOrEmpty(activeTab.Title))
-                                docTitle = activeTab.Title;
-                        }
+                            _appForm.OpenCloudShareDialogForCurrentDoc();
+                        });
+                        shareMenu.Items.Add(AppL10n.T("📧 Gửi qua ứng dụng Email...", "📧 Send via Email App..."), null, (ms, me) =>
+                        {
+                            string curPath = null;
+                            string docTitle = "Tai_Lieu_ZenQOffice";
+                            if (_appForm.Ribbon != null && _appForm.Ribbon.ActiveDocIndex >= 0 && _appForm.Ribbon.ActiveDocIndex < _appForm.Ribbon.DocTabs.Count)
+                            {
+                                var activeTab = _appForm.Ribbon.DocTabs[_appForm.Ribbon.ActiveDocIndex];
+                                curPath = activeTab.FilePath;
+                                if (!string.IsNullOrEmpty(curPath))
+                                    docTitle = System.IO.Path.GetFileNameWithoutExtension(curPath);
+                                else if (!string.IsNullOrEmpty(activeTab.Title))
+                                    docTitle = activeTab.Title;
+                            }
 
-                        using (var emailDlg = new SendEmailDialogForm(
-                            docTitle,
-                            curPath,
-                            saveTempCopyAction: (tempPath) =>
-                            {
-                                if (_appForm == null) return false;
-                                try
+                            using (var emailDlg = new SendEmailDialogForm(
+                                docTitle,
+                                curPath,
+                                saveTempCopyAction: (tempPath) => _appForm.ExportActiveDocumentForCloudShare(tempPath),
+                                exportPdfAction: (pdfPath) =>
                                 {
-                                    if (_appForm.Ribbon != null)
+                                    try
                                     {
-                                        if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Writer && _appForm.WriterView != null)
-                                            return _appForm.WriterView.SaveDocumentFile(tempPath, _appForm.Ribbon, false);
-                                        else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Calc && _appForm.CalcView != null)
-                                            return ZenQOffice.Format.XlsxHandler.SaveXlsxOrCsv(tempPath, _appForm.CalcView);
-                                        else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Slides && _appForm.SlidesView != null)
-                                            return ZenQOffice.Format.PptxHandler.SavePptx(tempPath, _appForm.SlidesView.Presentation);
+                                        if (_appForm.Ribbon != null && _appForm.Ribbon.CurrentMode == OfficeAppMode.Writer && _appForm.WriterView != null)
+                                            return _appForm.WriterView.ExportToPdf(pdfPath, _appForm.Ribbon);
                                     }
-                                    if (!string.IsNullOrEmpty(curPath) && File.Exists(curPath))
-                                    {
-                                        File.Copy(curPath, tempPath, true);
-                                        return true;
-                                    }
-                                }
-                                catch { }
-                                return false;
-                            },
-                            exportPdfAction: (pdfPath) =>
+                                    catch { }
+                                    return false;
+                                }))
                             {
-                                if (_appForm == null) return false;
-                                try
-                                {
-                                    if (_appForm.Ribbon != null && _appForm.Ribbon.CurrentMode == OfficeAppMode.Writer && _appForm.WriterView != null)
-                                        return _appForm.WriterView.ExportToPdf(pdfPath, _appForm.Ribbon);
-                                }
-                                catch { }
-                                return false;
-                            }))
-                        {
-                            emailDlg.ShowDialog(_appForm);
-                        }
+                                emailDlg.ShowDialog(_appForm);
+                            }
+                        });
+                        shareMenu.Show(Cursor.Position);
                     }
                     break;
                 case 9: // Xuất (Multi-Format Export)
@@ -1563,6 +1676,7 @@ namespace ZenQOffice.UI
                     if (_appForm.WriterView != null) _appForm.WriterView.LoadDocumentFile(openPath, _appForm.Ribbon);
                 }
             }
+            try { SessionManager.SaveSessionMetadata(_appForm); } catch { }
             _appForm.SetModeIcon(OfficeAppMode.Writer);
             _appForm.PositionAiConfigPanel();
             Close();
@@ -1626,19 +1740,27 @@ namespace ZenQOffice.UI
         {
             if (item == null || string.IsNullOrEmpty(item.FilePath) || !File.Exists(item.FilePath))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Tệp này không tồn tại hoặc đã bị di chuyển:\n" + (item?.FilePath ?? ""), "Không tìm thấy tệp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Tệp này không tồn tại hoặc đã bị di chuyển:\n", "This file does not exist or has been moved:\n") + (item?.FilePath ?? ""), AppL10n.T("Không tìm thấy tệp", "File Not Found"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (_appForm == null || _appForm.Ribbon == null) return;
 
-            _appForm.Ribbon.AddDocTab(item.Title, item.Mode, _appForm.SlidesView, _appForm.WriterView, _appForm.CalcView, _appForm.PdfView, _appForm.PhotoView);
+            OfficeAppMode targetMode = GetEffectiveMode();
+            if (!IsItemMatchingMode(item, targetMode))
+            {
+                return;
+            }
+            item.Mode = targetMode;
+
+            _appForm.Ribbon.AddDocTab(item.Title, targetMode, _appForm.SlidesView, _appForm.WriterView, _appForm.CalcView, _appForm.PdfView, _appForm.PhotoView);
             int activeIdx = _appForm.Ribbon.ActiveDocIndex;
             if (activeIdx >= 0 && activeIdx < _appForm.Ribbon.DocTabs.Count)
             {
                 _appForm.Ribbon.DocTabs[activeIdx].FilePath = item.FilePath;
                 _appForm.Ribbon.DocTabs[activeIdx].DraftFile = "";
             }
+            try { SessionManager.SaveSessionMetadata(_appForm); } catch { }
 
             if (item.Mode == OfficeAppMode.Writer && _appForm.WriterView != null)
             {

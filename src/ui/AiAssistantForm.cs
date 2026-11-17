@@ -44,7 +44,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "ZENQ AI Assistant - Trợ lý Trí tuệ Nhân tạo";
+            this.Text = AppL10n.T("ZENQ AI Assistant - Trợ lý Trí tuệ Nhân tạo", "ZENQ AI Assistant");
             this.Size = new Size(720, 780);
             this.MinimumSize = new Size(600, 650);
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -96,7 +96,7 @@ namespace ZenQOffice.UI
 
             btnSettings = new Button
             {
-                Text = "Thiết lập AI",
+                Text = AppL10n.T("Thiết lập AI", "AI Settings"),
                 Image = FluentIconRenderer.GetGlyphBitmap('\uE713', 15, 15, Color.FromArgb(51, 65, 85)),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -138,7 +138,7 @@ namespace ZenQOffice.UI
             // Section: Context Snippet
             Label lblCtx = new Label
             {
-                Text = "Ngữ cảnh tài liệu hiện tại:",
+                Text = AppL10n.T("Ngữ cảnh tài liệu hiện tại:", "Current Document Context:"),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(16, 8),
@@ -163,7 +163,7 @@ namespace ZenQOffice.UI
             // Section: Quick Action Chips
             Label lblChips = new Label
             {
-                Text = "Gợi ý tác vụ nhanh (Nhấp để chọn):",
+                Text = AppL10n.T("Gợi ý tác vụ nhanh (Nhấp để chọn):", "Quick Prompts (Click to use):"),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(16, 84),
@@ -184,7 +184,7 @@ namespace ZenQOffice.UI
             // Section: User Prompt
             Label lblPrompt = new Label
             {
-                Text = "Yêu cầu của bạn (Nhấn Enter để gửi, Shift+Enter để xuống dòng):",
+                Text = AppL10n.T("Yêu cầu của bạn (Nhấn Enter để gửi, Shift+Enter để xuống dòng):", "Your Prompt (Enter to send, Shift+Enter for new line):"),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(16, 180),
@@ -213,7 +213,7 @@ namespace ZenQOffice.UI
 
             btnSend = new Button
             {
-                Text = "Gửi yêu cầu",
+                Text = AppL10n.T("Gửi yêu cầu", "Send"),
                 Image = FluentIconRenderer.GetGlyphBitmap('\uE724', 16, 16, Color.White),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -234,7 +234,7 @@ namespace ZenQOffice.UI
 
             lblStatus = new Label
             {
-                Text = "Sẵn sàng nhận yêu cầu.",
+                Text = AppL10n.T("Sẵn sàng nhận yêu cầu.", "Ready."),
                 Location = new Point(16, 276),
                 Size = new Size(670, 22),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
@@ -246,7 +246,7 @@ namespace ZenQOffice.UI
             // Section: Output & Action Buttons
             Label lblOut = new Label
             {
-                Text = "Kết quả phản hồi từ AI:",
+                Text = AppL10n.T("Kết quả phản hồi từ AI:", "AI Response:"),
                 Font = new Font("Segoe UI", 9.2f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(16, 302),
@@ -276,7 +276,7 @@ namespace ZenQOffice.UI
 
             btnApply = new Button
             {
-                Text = "Áp dụng vào tài liệu",
+                Text = AppL10n.T("Áp dụng vào tài liệu", "Apply to Document"),
                 Image = FluentIconRenderer.GetGlyphBitmap('\uE73E', 16, 16, Color.White),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -297,7 +297,7 @@ namespace ZenQOffice.UI
 
             btnCopy = new Button
             {
-                Text = "Sao chép",
+                Text = AppL10n.T("Sao chép", "Copy"),
                 Image = FluentIconRenderer.GetGlyphBitmap('\uE8C8', 15, 15, Color.FromArgb(30, 41, 59)),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -317,14 +317,14 @@ namespace ZenQOffice.UI
                 if (!string.IsNullOrEmpty(txtResponse.Text))
                 {
                     Clipboard.SetText(txtResponse.Text);
-                    lblStatus.Text = "Đã sao chép nội dung vào Clipboard!";
+                    lblStatus.Text = AppL10n.T("Đã sao chép nội dung vào Clipboard!", "Copied response to Clipboard!");
                 }
             };
             pnlActionFooter.Controls.Add(btnCopy);
 
             btnClear = new Button
             {
-                Text = "Xóa trắng",
+                Text = AppL10n.T("Xóa trắng", "Clear"),
                 Location = new Point(380, 4),
                 Size = new Size(100, 38),
                 FlatStyle = FlatStyle.Flat,
@@ -347,7 +347,7 @@ namespace ZenQOffice.UI
 
         private string GetModelBadgeText()
         {
-            if (_config == null) return "Chưa cấu hình";
+            if (_config == null) return AppL10n.T("Chưa cấu hình", "Not configured");
             return string.Format("{0} • {1}", _config.Provider, _config.ModelName);
         }
 
@@ -380,15 +380,15 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    contextDesc = "Văn bản Word: Soạn thảo tại vị trí con trỏ.";
+                    contextDesc = AppL10n.T("Văn bản Word: Soạn thảo tại vị trí con trỏ.", "Word Document: Editing at cursor.");
                 }
 
-                AddChip("Viết bài tự động theo chủ đề...", "Hãy viết một bài văn bản hoàn chỉnh và chuyên nghiệp về chủ đề: ", '\uE70F');
-                AddChip("Viết lại đoạn văn chuyên nghiệp hơn", "Hãy viết lại đoạn văn bản sau đây với văn phong trang trọng, mượt mà và thuyết phục hơn:\n", '\uE90F');
-                AddChip("Tóm tắt nội dung chính", "Hãy tóm tắt ngắn gọn các ý chính của đoạn văn bản sau thành danh sách gạch đầu dòng:\n", '\uE7C3');
-                AddChip("Sửa lỗi chính tả & ngữ pháp", "Hãy rà soát và sửa tất cả các lỗi chính tả, dấu câu, ngữ pháp trong đoạn văn sau:\n", '\uE73E');
-                AddChip("Dịch sang Tiếng Anh chuẩn", "Hãy dịch đoạn văn bản sau sang tiếng Anh học thuật/công sở chuẩn xác:\n", '\uE774');
-                AddChip("Tạo bảng biểu số liệu mẫu", "Hãy tạo một bảng biểu mẫu gồm 4 cột (STT, Hạng mục, Số lượng, Đơn giá) với 5 hàng dữ liệu mẫu.", '\uE80A');
+                AddChip(AppL10n.T("Viết bài tự động theo chủ đề...", "Write article on topic..."), "Hãy viết một bài văn bản hoàn chỉnh và chuyên nghiệp về chủ đề: ", '\uE70F');
+                AddChip(AppL10n.T("Viết lại đoạn văn chuyên nghiệp hơn", "Rewrite more professionally"), "Hãy viết lại đoạn văn bản sau đây với văn phong trang trọng, mượt mà và thuyết phục hơn:\n", '\uE90F');
+                AddChip(AppL10n.T("Tóm tắt nội dung chính", "Summarize key points"), "Hãy tóm tắt ngắn gọn các ý chính của đoạn văn bản sau thành danh sách gạch đầu dòng:\n", '\uE7C3');
+                AddChip(AppL10n.T("Sửa lỗi chính tả & ngữ pháp", "Fix spelling & grammar"), "Hãy rà soát và sửa tất cả các lỗi chính tả, dấu câu, ngữ pháp trong đoạn văn sau:\n", '\uE73E');
+                AddChip(AppL10n.T("Dịch sang Tiếng Anh chuẩn", "Translate to English"), "Hãy dịch đoạn văn bản sau sang tiếng Anh học thuật/công sở chuẩn xác:\n", '\uE774');
+                AddChip(AppL10n.T("Tạo bảng biểu số liệu mẫu", "Create sample data table"), "Hãy tạo một bảng biểu mẫu gồm 4 cột (STT, Hạng mục, Số lượng, Đơn giá) với 5 hàng dữ liệu mẫu.", '\uE80A');
             }
             else if (mode == OfficeAppMode.Calc)
             {
@@ -400,14 +400,14 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    contextDesc = "Bảng tính Excel: Đang làm việc trên trang tính.";
+                    contextDesc = AppL10n.T("Bảng tính Excel: Đang làm việc trên trang tính.", "Spreadsheet: Active worksheet.");
                 }
 
-                AddChip("Viết công thức Excel theo yêu cầu", "Hãy viết công thức Excel chính xác (bắt đầu bằng dấu =) để: ", '\uE8EF');
-                AddChip("Tạo bảng dữ liệu bán hàng mẫu", "Hãy tạo một bảng số liệu doanh thu 5 sản phẩm gồm các cột: Mã SP, Tên SP, Số lượng, Đơn giá, Thành tiền (=C*D)", '\uE80A');
-                AddChip("Phân tích số liệu và xu hướng", "Hãy phân tích và đưa ra nhận xét chuyên sâu từ bảng số liệu sau:\n", '\uE9D9');
-                AddChip("Viết công thức VLOOKUP / XLOOKUP", "Hãy viết công thức XLOOKUP tìm kiếm mã sản phẩm ở cột A và lấy giá ở cột D.", '\uE721');
-                AddChip("Viết công thức tính tổng (SUMIFS)", "Hãy viết công thức SUMIFS tính tổng doanh thu theo điều kiện phòng ban.", '\uE8EF');
+                AddChip(AppL10n.T("Viết công thức Excel theo yêu cầu", "Write Excel formula"), "Hãy viết công thức Excel chính xác (bắt đầu bằng dấu =) để: ", '\uE8EF');
+                AddChip(AppL10n.T("Tạo bảng dữ liệu bán hàng mẫu", "Create sample sales table"), "Hãy tạo một bảng số liệu doanh thu 5 sản phẩm gồm các cột: Mã SP, Tên SP, Số lượng, Đơn giá, Thành tiền (=C*D)", '\uE80A');
+                AddChip(AppL10n.T("Phân tích số liệu và xu hướng", "Analyze data & trends"), "Hãy phân tích và đưa ra nhận xét chuyên sâu từ bảng số liệu sau:\n", '\uE9D9');
+                AddChip(AppL10n.T("Viết công thức VLOOKUP / XLOOKUP", "Write VLOOKUP / XLOOKUP"), "Hãy viết công thức XLOOKUP tìm kiếm mã sản phẩm ở cột A và lấy giá ở cột D.", '\uE721');
+                AddChip(AppL10n.T("Viết công thức tính tổng (SUMIFS)", "Write SUMIFS formula"), "Hãy viết công thức SUMIFS tính tổng doanh thu theo điều kiện phòng ban.", '\uE8EF');
             }
             else if (mode == OfficeAppMode.Slides)
             {
@@ -418,29 +418,29 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    contextDesc = "Trình chiếu ZenQ: Bản trình bày Slides.";
+                    contextDesc = AppL10n.T("Trình chiếu ZenQ: Bản trình bày Slides.", "ZenQ Slides: Presentation deck.");
                 }
 
-                AddChip("Tạo bài thuyết trình 5 slide hoàn chỉnh", "Hãy lập dàn ý và tạo bài thuyết trình hoàn chỉnh gồm 5 Slide (có Slide 1: Tiêu đề, Slide 2, 3, 4, 5 với các ý chính gạch đầu dòng) về chủ đề: ", '\uE714');
-                AddChip("Thêm slide mới phân tích chi tiết", "Hãy thêm 1 Slide mới có Tiêu đề và 4 gạch đầu dòng chi tiết về: ", '\uE710');
-                AddChip("Tóm tắt ý chính thành Bullet Points", "Hãy chuyển nội dung sau thành các gạch đầu dòng súc tích, ấn tượng cho slide thuyết trình:\n", '\uE8D2');
-                AddChip("Gợi ý dàn ý bài thuyết trình", "Hãy xây dựng cấu trúc dàn ý 7 slide thu hút nhà đầu tư cho dự án khởi nghiệp về: ", '\uE781');
+                AddChip(AppL10n.T("Tạo bài thuyết trình 5 slide hoàn chỉnh", "Create 5-slide presentation"), "Hãy lập dàn ý và tạo bài thuyết trình hoàn chỉnh gồm 5 Slide (có Slide 1: Tiêu đề, Slide 2, 3, 4, 5 với các ý chính gạch đầu dòng) về chủ đề: ", '\uE714');
+                AddChip(AppL10n.T("Thêm slide mới phân tích chi tiết", "Add detailed analysis slide"), "Hãy thêm 1 Slide mới có Tiêu đề và 4 gạch đầu dòng chi tiết về: ", '\uE710');
+                AddChip(AppL10n.T("Tóm tắt ý chính thành Bullet Points", "Convert text to bullet points"), "Hãy chuyển nội dung sau thành các gạch đầu dòng súc tích, ấn tượng cho slide thuyết trình:\n", '\uE8D2');
+                AddChip(AppL10n.T("Gợi ý dàn ý bài thuyết trình", "Suggest presentation outline"), "Hãy xây dựng cấu trúc dàn ý 7 slide thu hút nhà đầu tư cho dự án khởi nghiệp về: ", '\uE781');
             }
             else if (mode == OfficeAppMode.Pdf)
             {
                 var pdf = _appForm != null ? _appForm.PdfView : null;
                 contextDesc = string.Format("Tài liệu PDF: Đang xem trang {0}", pdf != null ? (pdf.ActivePageIndex + 1).ToString() : "1");
 
-                AddChip("Hỏi đáp về tài liệu PDF này", "Dựa trên nội dung tài liệu PDF, hãy giải đáp câu hỏi sau: ", '\uE897');
-                AddChip("Tóm tắt trang hiện tại", "Hãy tóm tắt các điểm then chốt nhất của trang tài liệu PDF này.", '\uE7C3');
-                AddChip("Trích xuất các số liệu quan trọng", "Hãy liệt kê toàn bộ các số liệu, mốc thời gian và thông tin cốt lõi trong tài liệu.", '\uE721');
+                AddChip(AppL10n.T("Hỏi đáp về tài liệu PDF này", "Ask about this PDF"), "Dựa trên nội dung tài liệu PDF, hãy giải đáp câu hỏi sau: ", '\uE897');
+                AddChip(AppL10n.T("Tóm tắt trang hiện tại", "Summarize current page"), "Hãy tóm tắt các điểm then chốt nhất của trang tài liệu PDF này.", '\uE7C3');
+                AddChip(AppL10n.T("Trích xuất các số liệu quan trọng", "Extract key figures"), "Hãy liệt kê toàn bộ các số liệu, mốc thời gian và thông tin cốt lõi trong tài liệu.", '\uE721');
             }
             else
             {
-                contextDesc = "Màn hình chính ZENQ OFFICE: Trợ lý sẵn sàng hỗ trợ mọi việc.";
-                AddChip("Gợi ý mẫu kế hoạch công việc", "Hãy tạo một bản kế hoạch công việc tuần chi tiết.", '\uE781');
-                AddChip("Soạn thư ngỏ gửi khách hàng", "Hãy soạn một email lịch sự và trang trọng gửi đối tác để: ", '\uE715');
-                AddChip("Viết hướng dẫn tin học văn phòng", "Hãy giải thích cách dùng hàm INDEX MATCH kết hợp trong Excel.", '\uE7F4');
+                contextDesc = AppL10n.T("Màn hình chính ZENQ OFFICE: Trợ lý sẵn sàng hỗ trợ mọi việc.", "ZENQ OFFICE Home: AI Assistant ready.");
+                AddChip(AppL10n.T("Gợi ý mẫu kế hoạch công việc", "Draft weekly work plan"), "Hãy tạo một bản kế hoạch công việc tuần chi tiết.", '\uE781');
+                AddChip(AppL10n.T("Soạn thư ngỏ gửi khách hàng", "Draft client email"), "Hãy soạn một email lịch sự và trang trọng gửi đối tác để: ", '\uE715');
+                AddChip(AppL10n.T("Viết hướng dẫn tin học văn phòng", "Explain Office tips / formulas"), "Hãy giải thích cách dùng hàm INDEX MATCH kết hợp trong Excel.", '\uE7F4');
             }
 
             txtContext.Text = contextDesc;
@@ -482,13 +482,13 @@ namespace ZenQOffice.UI
             string userPrompt = txtPrompt.Text.Trim();
             if (string.IsNullOrEmpty(userPrompt))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập yêu cầu của bạn trước khi gửi.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng nhập yêu cầu của bạn trước khi gửi.", "Please enter a prompt before sending."), "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (_config == null || (_config.Provider != AiProviderType.Ollama && string.IsNullOrWhiteSpace(_config.ApiKey)))
             {
-                var dr = ZenQOffice.UI.FluentMessageBox.Show("Bạn chưa nhập API Key cho Trợ lý AI.\nBạn có muốn mở bảng Cấu hình để nhập API Key ngay không?", "ZENQ AI - Chưa có API Key", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                var dr = ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Bạn chưa nhập API Key cho Trợ lý AI.\nBạn có muốn mở bảng Cấu hình để nhập API Key ngay không?", "No API Key configured yet.\nOpen AI Settings to configure it now?"), "ZENQ AI - Chưa có API Key", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (dr == DialogResult.Yes)
                 {
                     using (AiConfigDialog dlg = new AiConfigDialog())
@@ -511,7 +511,7 @@ namespace ZenQOffice.UI
             }
 
             btnSend.Enabled = false;
-            lblStatus.Text = "Đang gửi yêu cầu tới AI (" + _config.ModelName + ")... Vui lòng đợi...";
+            lblStatus.Text = AppL10n.T("Đang gửi yêu cầu tới AI (", "Sending request to AI (") + _config.ModelName + AppL10n.T(")... Vui lòng đợi...", ")... Please wait...");
             lblStatus.ForeColor = Color.FromArgb(202, 138, 4);
 
             string contextData = txtContext.Text;
@@ -530,14 +530,14 @@ namespace ZenQOffice.UI
                     if (resp.Success)
                     {
                         txtResponse.Text = resp.Text;
-                        lblStatus.Text = "Hoàn thành sau " + resp.DurationMs + " ms từ " + resp.ModelUsed;
+                        lblStatus.Text = AppL10n.T("Hoàn thành sau ", "Completed in ") + resp.DurationMs + AppL10n.T(" ms từ ", " ms from ") + resp.ModelUsed;
                         lblStatus.ForeColor = Color.FromArgb(22, 163, 74);
                         btnApply.Enabled = true;
                     }
                     else
                     {
-                        txtResponse.Text = "ĐÃ XẢY RA LỖI:\n" + resp.ErrorMessage;
-                        lblStatus.Text = "Lỗi khi gọi API: " + resp.ErrorMessage;
+                        txtResponse.Text = AppL10n.T("ĐÃ XẢY RA LỖI:\n", "ERROR:\n") + resp.ErrorMessage;
+                        lblStatus.Text = AppL10n.T("Lỗi khi gọi API: ", "API Error: ") + resp.ErrorMessage;
                         lblStatus.ForeColor = Color.FromArgb(220, 38, 38);
                         btnApply.Enabled = false;
                     }
@@ -558,7 +558,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                lblStatus.Text = "Đã xử lý yêu cầu.";
+                lblStatus.Text = AppL10n.T("Đã xử lý yêu cầu.", "Done.");
                 lblStatus.ForeColor = Color.FromArgb(79, 70, 229);
             }
         }

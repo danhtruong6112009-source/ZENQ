@@ -620,7 +620,7 @@ namespace ZenQOffice.UI
                 // Tab 1: Mục lục (Bookmarks)
                 g.FillRectangle(SidebarViewMode == 1 ? activeBg : inactiveBg, SidebarTabBookmarksRect);
                 g.DrawRectangle(borderP, SidebarTabBookmarksRect.X, SidebarTabBookmarksRect.Y, SidebarTabBookmarksRect.Width, SidebarTabBookmarksRect.Height);
-                g.DrawString($"🔖 Mục lục ({Document?.Bookmarks?.Count ?? 0})", tabFont, SidebarViewMode == 1 ? activeTxt : inactiveTxt, SidebarTabBookmarksRect, sf);
+                g.DrawString(ZenQOffice.Core.AppL10n.T($"🔖 Mục lục ({Document?.Bookmarks?.Count ?? 0})", $"🔖 Bookmarks ({Document?.Bookmarks?.Count ?? 0})"), tabFont, SidebarViewMode == 1 ? activeTxt : inactiveTxt, SidebarTabBookmarksRect, sf);
             }
 
             if (SidebarViewMode == 1)
@@ -1342,7 +1342,7 @@ namespace ZenQOffice.UI
                     using (Font ghostFont = new Font(f.FontFamily, scaledFontSize, FontStyle.Italic, GraphicsUnit.Pixel))
                     using (SolidBrush ghostBrush = new SolidBrush(Color.FromArgb(160, 174, 192)))
                     {
-                        g.DrawString("Nhập văn bản...", ghostFont, ghostBrush, screenRect.X + 2, screenRect.Y + 2);
+                        g.DrawString(ZenQOffice.Core.AppL10n.T("Nhập văn bản...", "Enter text..."), ghostFont, ghostBrush, screenRect.X + 2, screenRect.Y + 2);
                     }
 
                     if (ShowCursor)
@@ -1736,7 +1736,7 @@ namespace ZenQOffice.UI
                 }
 
                 // Badge overlay
-                string badge = string.IsNullOrEmpty(red.OverlayText) ? "ĐÃ ĐÁNH DẤU XÓA MẬT" : $"ĐÃ ĐÁNH DẤU: {red.OverlayText}";
+                string badge = string.IsNullOrEmpty(red.OverlayText) ? ZenQOffice.Core.AppL10n.T("ĐÃ ĐÁNH DẤU XÓA MẬT", "MARKED FOR REDACTION") : ZenQOffice.Core.AppL10n.T($"ĐÃ ĐÁNH DẤU: {red.OverlayText}", $"REDACTED: {red.OverlayText}");
                 using (Font badgeFont = new Font("Segoe UI", Math.Max(7f, 8f * ZoomLevel), FontStyle.Bold))
                 using (SolidBrush badgeBg = new SolidBrush(Color.FromArgb(220, 38, 38)))
                 using (SolidBrush badgeFg = new SolidBrush(Color.White))
@@ -1812,7 +1812,7 @@ namespace ZenQOffice.UI
             {
                 g.FillRectangle(btnBg, btnAddRect);
                 g.DrawRectangle(btnBorder, btnAddRect);
-                g.DrawString("🔖 + Thêm Dấu Trang", btnFont, btnTxt, btnAddRect, sf);
+                g.DrawString(ZenQOffice.Core.AppL10n.T("🔖 + Thêm Dấu Trang", "🔖 + Add Bookmark"), btnFont, btnTxt, btnAddRect, sf);
             }
 
             int curY = topOffset + 80;
@@ -1827,7 +1827,7 @@ namespace ZenQOffice.UI
                 using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center })
                 {
                     Rectangle hintRect = new Rectangle(12, curY + 20, SidebarWidth - 32, 60);
-                    g.DrawString("Chưa có dấu trang mục lục.\nNhấp '+ Thêm Dấu Trang' để tạo.", hintFont, hintBrush, hintRect, sf);
+                    g.DrawString(ZenQOffice.Core.AppL10n.T("Chưa có dấu trang mục lục.\nNhấp '+ Thêm Dấu Trang' để tạo.", "No bookmarks yet.\nClick '+ Add Bookmark' to create one."), hintFont, hintBrush, hintRect, sf);
                 }
             }
 
@@ -1898,9 +1898,9 @@ namespace ZenQOffice.UI
             using (Font titleF = new Font("Segoe UI", 9.8f, FontStyle.Bold))
             using (Font detailF = new Font("Segoe UI", 8.2f, FontStyle.Regular))
             {
-                string titleStr = "ĐÃ KÝ ĐIỆN TỬ BỞI: " + (signerName ?? "");
-                string dateStr = "Thời gian: " + (signDate ?? "");
-                string reasonStr = "Mục đích: " + (reason ?? "");
+                string titleStr = ZenQOffice.Core.AppL10n.T("ĐÃ KÝ ĐIỆN TỬ BỞI: ", "DIGITALLY SIGNED BY: ") + (signerName ?? "");
+                string dateStr = ZenQOffice.Core.AppL10n.T("Thời gian: ", "Date: ") + (signDate ?? "");
+                string reasonStr = ZenQOffice.Core.AppL10n.T("Mục đích: ", "Reason: ") + (reason ?? "");
 
                 SizeF szTitle = g.MeasureString(titleStr, titleF);
                 SizeF szDate = g.MeasureString(dateStr, detailF);
@@ -2006,9 +2006,9 @@ namespace ZenQOffice.UI
             using (SolidBrush titleTxt = new SolidBrush(certColor))
             using (SolidBrush grayTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
             {
-                g.DrawString("ĐÃ KÝ ĐIỆN TỬ BỞI: " + sig.SignerName, titleF, titleTxt, txtLeft, sRect.Y + 8 * ZoomLevel);
-                g.DrawString("Thời gian: " + sig.SignDate, detailF, grayTxt, txtLeft, sRect.Y + 28 * ZoomLevel);
-                g.DrawString("Mục đích: " + sig.Reason, detailF, grayTxt, txtLeft, sRect.Y + 45 * ZoomLevel);
+                g.DrawString(ZenQOffice.Core.AppL10n.T("ĐÃ KÝ ĐIỆN TỬ BỞI: ", "DIGITALLY SIGNED BY: ") + sig.SignerName, titleF, titleTxt, txtLeft, sRect.Y + 8 * ZoomLevel);
+                g.DrawString(ZenQOffice.Core.AppL10n.T("Thời gian: ", "Date: ") + sig.SignDate, detailF, grayTxt, txtLeft, sRect.Y + 28 * ZoomLevel);
+                g.DrawString(ZenQOffice.Core.AppL10n.T("Mục đích: ", "Reason: ") + sig.Reason, detailF, grayTxt, txtLeft, sRect.Y + 45 * ZoomLevel);
             }
 
             // Nếu chữ ký đang được chọn và đang ở công cụ Con trỏ: Vẽ 8 chốt vuông co giãn kích thước
@@ -2120,7 +2120,7 @@ namespace ZenQOffice.UI
 
                 // Khung nhập từ khóa tìm kiếm
                 Rectangle inputRect = new Rectangle(barRect.X + 34, barRect.Y + 11, 160, 20);
-                string displayTxt = string.IsNullOrEmpty(SearchQuery) ? "Tìm kiếm trong PDF..." : SearchQuery;
+                string displayTxt = string.IsNullOrEmpty(SearchQuery) ? ZenQOffice.Core.AppL10n.T("Tìm kiếm trong PDF...", "Search in PDF...") : SearchQuery;
                 Brush txtBrush = string.IsNullOrEmpty(SearchQuery) ? Brushes.Gray : Brushes.Black;
                 g.DrawString(displayTxt, sFont, txtBrush, inputRect.X, inputRect.Y);
 
@@ -2638,7 +2638,7 @@ namespace ZenQOffice.UI
                     if (BtnAddBookmarkRect.Contains(x, y))
                     {
                         PushUndoState("Thêm dấu trang");
-                        AddBookmark($"Dấu trang - Trang {ActivePageIndex + 1}", ActivePageIndex, ScrollY);
+                        AddBookmark(ZenQOffice.Core.AppL10n.T($"Dấu trang - Trang {ActivePageIndex + 1}", $"Bookmark - Page {ActivePageIndex + 1}"), ActivePageIndex, ScrollY);
                         if (parentForm != null) parentForm.Invalidate();
                         return true;
                     }
@@ -2782,6 +2782,32 @@ namespace ZenQOffice.UI
                 PointF pagePt = ScreenToPagePoint(new PointF(x, y), pageIdx, width, height, topOffset);
                 PdfPageModel page = Document.Pages[pageIdx];
 
+                // Tự động đồng bộ công cụ Cảm ứng Touch / Stylus từ Thanh công cụ nổi nếu đang ở chế độ vẽ/tẩy
+                if (SelectedTool == 0 && parentForm is AppForm af && af.Ribbon != null && af.Ribbon.ActiveDrawTool > 0)
+                {
+                    if (af.Ribbon.ActiveDrawTool == 6)
+                    {
+                        SelectedTool = 18;
+                    }
+                    else if (af.Ribbon.ActiveDrawTool >= 1 && af.Ribbon.ActiveDrawTool <= 7)
+                    {
+                        SelectedTool = 7;
+                        if (af.Ribbon.CustomPenIsHighlighter || af.Ribbon.ActiveDrawTool == 4 || af.Ribbon.ActiveDrawTool == 5)
+                        {
+                            Color hl = (af.Ribbon.CustomPenColor.IsEmpty || af.Ribbon.CustomPenColor == Color.Black)
+                                ? Color.FromArgb(250, 204, 21) : af.Ribbon.CustomPenColor;
+                            ActiveColor = Color.FromArgb(120, hl.R, hl.G, hl.B);
+                            ActiveStrokeWidth = (af.Ribbon.CustomPenWidth >= 8) ? af.Ribbon.CustomPenWidth : 16.0f;
+                        }
+                        else
+                        {
+                            Color p = af.Ribbon.CustomPenColor.IsEmpty ? Color.Black : af.Ribbon.CustomPenColor;
+                            ActiveColor = Color.FromArgb(255, p.R, p.G, p.B);
+                            ActiveStrokeWidth = (af.Ribbon.CustomPenWidth > 0 && af.Ribbon.CustomPenWidth <= 8) ? af.Ribbon.CustomPenWidth : 2.5f;
+                        }
+                    }
+                }
+
                 // Kiểm tra tương tác Biểu mẫu (AcroForms Form Filling)
                 if (SelectedTool == 12 || SelectedTool == 0)
                 {
@@ -2902,8 +2928,8 @@ namespace ZenQOffice.UI
                     PushUndoState("Thêm menu thả biểu mẫu");
                     var ff = new PdfFormFieldElement(PdfFormFieldType.ComboBox, new RectangleF(pagePt.X, pagePt.Y, 160, 26), "combo_" + (page.FormFields.Count + 1))
                     {
-                        Options = new List<string> { "Lựa chọn A", "Lựa chọn B", "Lựa chọn C" },
-                        Value = "Lựa chọn A"
+                        Options = new List<string> { ZenQOffice.Core.AppL10n.T("Lựa chọn A", "Option A"), ZenQOffice.Core.AppL10n.T("Lựa chọn B", "Option B"), ZenQOffice.Core.AppL10n.T("Lựa chọn C", "Option C") },
+                        Value = ZenQOffice.Core.AppL10n.T("Lựa chọn A", "Option A")
                     };
                     page.FormFields.Add(ff);
                     page.InvalidateCache();
@@ -3039,6 +3065,43 @@ namespace ZenQOffice.UI
                     return true;
                 }
 
+                // Nếu đang dùng công cụ Tẩy (Eraser - 18)
+                if (SelectedTool == 18)
+                {
+                    if (page.Annotations != null && page.Annotations.Count > 0)
+                    {
+                        for (int i = page.Annotations.Count - 1; i >= 0; i--)
+                        {
+                            var ann = page.Annotations[i];
+                            if (ann.AnnotationType == PdfAnnotationType.InkDrawing && ann.InkPoints != null)
+                            {
+                                foreach (var pt in ann.InkPoints)
+                                {
+                                    if (Math.Abs(pt.X - pagePt.X) <= 15 && Math.Abs(pt.Y - pagePt.Y) <= 15)
+                                    {
+                                        PushUndoState("Xóa nét vẽ");
+                                        page.Annotations.RemoveAt(i);
+                                        page.InvalidateCache();
+                                        Document.IsModified = true;
+                                        if (parentForm != null) parentForm.Invalidate();
+                                        return true;
+                                    }
+                                }
+                            }
+                            else if (ann.Bounds.Contains(pagePt))
+                            {
+                                PushUndoState("Xóa chú thích");
+                                page.Annotations.RemoveAt(i);
+                                page.InvalidateCache();
+                                Document.IsModified = true;
+                                if (parentForm != null) parentForm.Invalidate();
+                                return true;
+                            }
+                        }
+                    }
+                    return true;
+                }
+
                 // Nếu đang dùng công cụ Bút Vẽ Tay Tự Do (Freehand Pen - 7)
                 if (SelectedTool == 7)
                 {
@@ -3057,7 +3120,7 @@ namespace ZenQOffice.UI
                 {
                     PushUndoState("Đóng dấu mộc");
                     Color sCol = ActiveStampColor != Color.Empty ? ActiveStampColor : ActiveColor;
-                    string sTxt = !string.IsNullOrEmpty(ActiveStampText) ? ActiveStampText : "ĐÃ DUYỆT";
+                    string sTxt = !string.IsNullOrEmpty(ActiveStampText) ? ActiveStampText : ZenQOffice.Core.AppL10n.T("ĐÃ DUYỆT", "APPROVED");
                     float stampW = 120f;
                     float stampH = 40f;
                     using (Bitmap tb = new Bitmap(1, 1))
@@ -3310,7 +3373,7 @@ namespace ZenQOffice.UI
             }
 
             // Kéo vẽ tay tự do
-            if (IsDrawingFreehand && button == MouseButtons.Left)
+            if (IsDrawingFreehand)
             {
                 PointF pagePt = ScreenToPagePoint(new PointF(x, y), DrawingPageIndex, width, height, topOffset);
                 if (!pagePt.IsEmpty)
@@ -3318,6 +3381,38 @@ namespace ZenQOffice.UI
                     CurrentFreehandPoints.Add(pagePt);
                     return true;
                 }
+            }
+
+            // Kéo tẩy nét vẽ
+            if (SelectedTool == 18 && button == MouseButtons.Left)
+            {
+                int pIdx = GetPageIndexAtPoint(x, y, width, height, topOffset);
+                if (pIdx >= 0 && pIdx < Document.Pages.Count)
+                {
+                    PointF pPt = ScreenToPagePoint(new PointF(x, y), pIdx, width, height, topOffset);
+                    var pObj = Document.Pages[pIdx];
+                    if (pObj.Annotations != null && pObj.Annotations.Count > 0)
+                    {
+                        for (int i = pObj.Annotations.Count - 1; i >= 0; i--)
+                        {
+                            var ann = pObj.Annotations[i];
+                            if (ann.AnnotationType == PdfAnnotationType.InkDrawing && ann.InkPoints != null)
+                            {
+                                foreach (var pt in ann.InkPoints)
+                                {
+                                    if (Math.Abs(pt.X - pPt.X) <= 15 && Math.Abs(pt.Y - pPt.Y) <= 15)
+                                    {
+                                        pObj.Annotations.RemoveAt(i);
+                                        pObj.InvalidateCache();
+                                        Document.IsModified = true;
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return true;
             }
 
             // Kéo quét vùng chọn Box Selection
@@ -3411,7 +3506,7 @@ namespace ZenQOffice.UI
                         using (Graphics tg = Graphics.FromImage(tb))
                         using (Font sf = new Font("Segoe UI", 13f, FontStyle.Bold))
                         {
-                            SizeF sz = tg.MeasureString(SelectedAnnotation.StampText ?? "ĐÃ DUYỆT", sf);
+                            SizeF sz = tg.MeasureString(SelectedAnnotation.StampText ?? ZenQOffice.Core.AppL10n.T("ĐÃ DUYỆT", "APPROVED"), sf);
                             newBounds = new RectangleF(newBounds.X, newBounds.Y, Math.Max(sz.Width + 24f, newBounds.Width), Math.Max(sz.Height + 16f, newBounds.Height));
                         }
                     }
@@ -3474,8 +3569,12 @@ namespace ZenQOffice.UI
             // Kết thúc vẽ tay tự do -> lưu thành Annotation InkDrawing
             if (IsDrawingFreehand)
             {
-                if (CurrentFreehandPoints != null && CurrentFreehandPoints.Count > 1 && DrawingPageIndex < Document.Pages.Count)
+                if (CurrentFreehandPoints != null && CurrentFreehandPoints.Count > 0 && DrawingPageIndex < Document.Pages.Count)
                 {
+                    if (CurrentFreehandPoints.Count == 1)
+                    {
+                        CurrentFreehandPoints.Add(new PointF(CurrentFreehandPoints[0].X + 0.5f, CurrentFreehandPoints[0].Y + 0.5f));
+                    }
                     PushUndoState("Vẽ tay tự do");
                     var inkAnn = new PdfAnnotationElement(PdfAnnotationType.InkDrawing, RectangleF.Empty, ActiveColor);
                     inkAnn.InkPoints = new List<PointF>(CurrentFreehandPoints);
@@ -4066,6 +4165,33 @@ namespace ZenQOffice.UI
 
         public Cursor GetCursorAtPoint(int x, int y, int width, int height, int topOffset)
         {
+            // Tự động đồng bộ công cụ Cảm ứng / Stylus từ Thanh công cụ nổi / Ribbon
+            AppForm af = AppForm.Instance;
+            if (af != null && af.Ribbon != null && af.Ribbon.ActiveDrawTool > 0 && SelectedTool == 0)
+            {
+                if (af.Ribbon.ActiveDrawTool == 6)
+                {
+                    SelectedTool = 18;
+                }
+                else if (af.Ribbon.ActiveDrawTool >= 1 && af.Ribbon.ActiveDrawTool <= 7)
+                {
+                    SelectedTool = 7;
+                    if (af.Ribbon.CustomPenIsHighlighter || af.Ribbon.ActiveDrawTool == 4 || af.Ribbon.ActiveDrawTool == 5)
+                    {
+                        Color hl = (af.Ribbon.CustomPenColor.IsEmpty || af.Ribbon.CustomPenColor == Color.Black)
+                            ? Color.FromArgb(250, 204, 21) : af.Ribbon.CustomPenColor;
+                        ActiveColor = Color.FromArgb(120, hl.R, hl.G, hl.B);
+                        ActiveStrokeWidth = (af.Ribbon.CustomPenWidth >= 8) ? af.Ribbon.CustomPenWidth : 16.0f;
+                    }
+                    else
+                    {
+                        Color p = af.Ribbon.CustomPenColor.IsEmpty ? Color.Black : af.Ribbon.CustomPenColor;
+                        ActiveColor = Color.FromArgb(255, p.R, p.G, p.B);
+                        ActiveStrokeWidth = (af.Ribbon.CustomPenWidth > 0 && af.Ribbon.CustomPenWidth <= 8) ? af.Ribbon.CustomPenWidth : 2.5f;
+                    }
+                }
+            }
+
             // 0. Con trỏ trên thanh Khung Bầu Liquid Glass
             if (SelectedTool == 7 || SelectedTool == 8 || SelectedShape != null)
             {
@@ -4151,7 +4277,18 @@ namespace ZenQOffice.UI
             }
 
             if (SelectedTool == 1 || SelectedTool == 2) return Cursors.IBeam;
-            if (SelectedTool == 7 || SelectedTool == 8 || SelectedTool == 3) return Cursors.Cross;
+            if (SelectedTool == 18) return OfficeDrawingCursorHelper.GetEraserCursor();
+            if (SelectedTool == 7)
+            {
+                if (ActiveColor.A < 200)
+                    return OfficeDrawingCursorHelper.GetHighlighterCursor(ActiveColor.IsEmpty ? Color.FromArgb(250, 204, 21) : ActiveColor);
+                return OfficeDrawingCursorHelper.GetPenCursor(ActiveColor.IsEmpty ? Color.Black : ActiveColor);
+            }
+            if (SelectedTool == 3)
+            {
+                return OfficeDrawingCursorHelper.GetHighlighterCursor(ActiveColor.IsEmpty ? Color.FromArgb(250, 204, 21) : ActiveColor);
+            }
+            if (SelectedTool == 8) return Cursors.Cross;
             return Cursors.Default;
         }
 
@@ -4441,19 +4578,19 @@ namespace ZenQOffice.UI
                 dlg.BackColor = Color.FromArgb(248, 250, 252);
                 dlg.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
 
-                Label lblScope = new Label { Text = "Phạm vi xoay:", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
-                RadioButton rbCurrent = new RadioButton { Text = "Trang hiện tại (Trang " + (ActivePageIndex + 1) + ")", Location = new Point(30, 48), AutoSize = true, Checked = true };
-                RadioButton rbSpecific = new RadioButton { Text = "Trang số:", Location = new Point(30, 76), AutoSize = true };
+                Label lblScope = new Label { Text = AppL10n.T("Phạm vi xoay:", "Rotation range:"), Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                RadioButton rbCurrent = new RadioButton { Text = ZenQOffice.Core.AppL10n.T("Trang hiện tại (Trang " + (ActivePageIndex + 1) + ")", "Current Page (Page " + (ActivePageIndex + 1) + ")"), Location = new Point(30, 48), AutoSize = true, Checked = true };
+                RadioButton rbSpecific = new RadioButton { Text = ZenQOffice.Core.AppL10n.T("Trang số:", "Page number:"), Location = new Point(30, 76), AutoSize = true };
                 NumericUpDown numPage = new NumericUpDown { Location = new Point(120, 74), Width = 70, Minimum = 1, Maximum = Document.Pages.Count, Value = ActivePageIndex + 1 };
-                RadioButton rbAll = new RadioButton { Text = "Tất cả các trang (" + Document.Pages.Count + " trang)", Location = new Point(30, 104), AutoSize = true };
+                RadioButton rbAll = new RadioButton { Text = ZenQOffice.Core.AppL10n.T("Tất cả các trang (" + Document.Pages.Count + " trang)", "All pages (" + Document.Pages.Count + " pages)"), Location = new Point(30, 104), AutoSize = true };
 
-                Label lblAngle = new Label { Text = "Góc xoay:", Location = new Point(210, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                Label lblAngle = new Label { Text = ZenQOffice.Core.AppL10n.T("Góc xoay:", "Rotation:"), Location = new Point(210, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
                 ComboBox cbAngle = new ZenQOffice.UI.FluentComboBox { Location = new Point(210, 48), Width = 135, DropDownStyle = ComboBoxStyle.DropDownList };
-                cbAngle.Items.AddRange(new object[] { "90° Xuôi kim", "180° Đảo ngược", "270° Ngược kim" });
+                cbAngle.Items.AddRange(new object[] { ZenQOffice.Core.AppL10n.T("90° Xuôi kim", "90° Clockwise"), ZenQOffice.Core.AppL10n.T("180° Đảo ngược", "180° Upside Down"), ZenQOffice.Core.AppL10n.T("270° Ngược kim", "270° Counterclockwise") });
                 cbAngle.SelectedIndex = 0;
 
-                Button btnOk = new Button { Text = "Xoay trang", Location = new Point(160, 150), Width = 100, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(220, 38, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                Button btnCancel = new Button { Text = "Hủy bỏ", Location = new Point(270, 150), Width = 80, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
+                Button btnOk = new Button { Text = ZenQOffice.Core.AppL10n.T("Xoay trang", "Rotate Page"), Location = new Point(160, 150), Width = 100, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(220, 38, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                Button btnCancel = new Button { Text = ZenQOffice.Core.AppL10n.T("Hủy bỏ", "Cancel"), Location = new Point(270, 150), Width = 80, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
 
                 dlg.Controls.AddRange(new Control[] { lblScope, rbCurrent, rbSpecific, numPage, rbAll, lblAngle, cbAngle, btnOk, btnCancel });
                 dlg.AcceptButton = btnOk;
@@ -4493,13 +4630,13 @@ namespace ZenQOffice.UI
             if (Document == null || Document.Pages.Count == 0) return false;
             if (Document.Pages.Count <= 1)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Không thể xóa trang duy nhất còn lại của tài liệu PDF.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Không thể xóa trang duy nhất còn lại của tài liệu PDF.", "Cannot delete the only remaining page in the PDF document."), ZenQOffice.Core.AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
             using (Form dlg = new Form())
             {
-                dlg.Text = "Xóa Trang PDF - ZENQ PDF Engine";
+                dlg.Text = ZenQOffice.Core.AppL10n.T("Xóa Trang PDF - ZENQ PDF Engine", "Delete PDF Page");
                 dlg.Size = new Size(360, 200);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -4508,12 +4645,12 @@ namespace ZenQOffice.UI
                 dlg.BackColor = Color.FromArgb(248, 250, 252);
                 dlg.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
 
-                Label lbl = new Label { Text = "Nhập số trang cần xóa (1 - " + Document.Pages.Count + "):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                Label lbl = new Label { Text = ZenQOffice.Core.AppL10n.T("Nhập số trang cần xóa (1 - " + Document.Pages.Count + "):", "Enter page number to delete (1 - " + Document.Pages.Count + "):"), Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
                 NumericUpDown numPage = new NumericUpDown { Location = new Point(24, 52), Width = 100, Minimum = 1, Maximum = Document.Pages.Count, Value = ActivePageIndex + 1 };
-                Label lblInfo = new Label { Text = "Hành động này sẽ xóa vĩnh viễn trang được chọn khỏi tài liệu.", Location = new Point(20, 85), Width = 310, Height = 36, ForeColor = Color.FromArgb(100, 116, 139) };
+                Label lblInfo = new Label { Text = ZenQOffice.Core.AppL10n.T("Hành động này sẽ xóa vĩnh viễn trang được chọn khỏi tài liệu.", "This will permanently remove the selected page from the document."), Location = new Point(20, 85), Width = 310, Height = 36, ForeColor = Color.FromArgb(100, 116, 139) };
 
-                Button btnDel = new Button { Text = "Xóa trang", Location = new Point(140, 120), Width = 100, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(220, 38, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                Button btnCancel = new Button { Text = "Hủy bỏ", Location = new Point(250, 120), Width = 80, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
+                Button btnDel = new Button { Text = ZenQOffice.Core.AppL10n.T("Xóa trang", "Delete Page"), Location = new Point(140, 120), Width = 100, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(220, 38, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                Button btnCancel = new Button { Text = ZenQOffice.Core.AppL10n.T("Hủy bỏ", "Cancel"), Location = new Point(250, 120), Width = 80, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
 
                 dlg.Controls.AddRange(new Control[] { lbl, numPage, lblInfo, btnDel, btnCancel });
                 dlg.AcceptButton = btnDel;
@@ -4528,7 +4665,7 @@ namespace ZenQOffice.UI
                         if (ActivePageIndex >= Document.Pages.Count) ActivePageIndex = Document.Pages.Count - 1;
                         InvalidateAllCaches();
                         if (parentForm != null) parentForm.Invalidate();
-                        ZenQOffice.UI.FluentMessageBox.Show("Đã xóa trang " + (targetPageIdx + 1) + " thành công!", "ZENQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã xóa trang " + (targetPageIdx + 1) + " thành công!", "Deleted page " + (targetPageIdx + 1) + "!"), "ZENQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                 }
@@ -4540,8 +4677,8 @@ namespace ZenQOffice.UI
         {
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                ofd.Title = "Chọn nhiều tệp PDF cần ghép nối (Thuật toán Merge PDF)";
-                ofd.Filter = "Tệp PDF (*.pdf)|*.pdf";
+                ofd.Title = ZenQOffice.Core.AppL10n.T("Chọn nhiều tệp PDF cần ghép nối (Thuật toán Merge PDF)", "Select PDF files to merge");
+                ofd.Filter = ZenQOffice.Core.AppL10n.Tr("Tệp PDF (*.pdf)|*.pdf");
                 ofd.Multiselect = true;
 
                 if (ofd.ShowDialog(parentForm) == DialogResult.OK)
@@ -4552,9 +4689,9 @@ namespace ZenQOffice.UI
                     {
                         using (SaveFileDialog sfd = new SaveFileDialog())
                         {
-                            sfd.Title = "Lưu tệp PDF hợp nhất mới";
-                            sfd.Filter = "Tệp PDF (*.pdf)|*.pdf";
-                            sfd.FileName = "Tài liệu PDF Hợp nhất.pdf";
+                            sfd.Title = ZenQOffice.Core.AppL10n.T("Lưu tệp PDF hợp nhất mới", "Save Merged PDF");
+                            sfd.Filter = ZenQOffice.Core.AppL10n.Tr("Tệp PDF (*.pdf)|*.pdf");
+                            sfd.FileName = ZenQOffice.Core.AppL10n.T("Tài liệu PDF Hợp nhất.pdf", "Merged PDF Document.pdf");
 
                             if (sfd.ShowDialog(parentForm) == DialogResult.OK)
                             {
@@ -4571,7 +4708,7 @@ namespace ZenQOffice.UI
                                         onMerged(mergedDoc, sfd.FileName);
                                     }
 
-                                    ZenQOffice.UI.FluentMessageBox.Show("Đã ghép nối " + ofd.FileNames.Length + " tệp PDF thành công!\nTệp lưu tại: " + sfd.FileName, "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    ZenQOffice.UI.FluentMessageBox.Show(string.Format(AppL10n.T("Đã ghép nối {0} tệp PDF thành công!\nTệp lưu tại: {1}", "Merged {0} PDF files successfully!\nSaved to: {1}"), ofd.FileNames.Length, sfd.FileName), "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return true;
                                 }
                             }
@@ -4579,7 +4716,7 @@ namespace ZenQOffice.UI
                     }
                     catch (Exception ex)
                     {
-                        ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi ghép tệp PDF: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Lỗi khi ghép tệp PDF: ", "Error merging PDF files: ") + ex.Message, ZenQOffice.Core.AppL10n.Tr("Lỗi"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -4592,7 +4729,7 @@ namespace ZenQOffice.UI
 
             using (Form dlg = new Form())
             {
-                dlg.Text = "Tách Tệp PDF - ZENQ PDF Engine";
+                dlg.Text = ZenQOffice.Core.AppL10n.T("Tách Tệp PDF - ZENQ PDF Engine", "Split PDF Document");
                 dlg.Size = new Size(420, 240);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -4601,12 +4738,12 @@ namespace ZenQOffice.UI
                 dlg.BackColor = Color.FromArgb(248, 250, 252);
                 dlg.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
 
-                Label lbl = new Label { Text = "Nhập dải trang muốn trích xuất (Tổng số trang: " + Document.Pages.Count + "):", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                Label lbl = new Label { Text = ZenQOffice.Core.AppL10n.T("Nhập dải trang muốn trích xuất (Tổng số trang: " + Document.Pages.Count + "):", "Enter page range to extract (Total: " + Document.Pages.Count + " pages):"), Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
                 TextBox txtRange = new TextBox { Location = new Point(24, 46), Width = 355, Text = "1-" + Document.Pages.Count };
-                Label lblHelp = new Label { Text = "Ví dụ cú pháp hợp lệ: 1-3, 5, 7-10 hoặc 2, 4, 6", Location = new Point(20, 80), Width = 360, AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139) };
+                Label lblHelp = new Label { Text = ZenQOffice.Core.AppL10n.T("Ví dụ cú pháp hợp lệ: 1-3, 5, 7-10 hoặc 2, 4, 6", "Example valid syntax: 1-3, 5, 7-10 or 2, 4, 6"), Location = new Point(20, 80), Width = 360, AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139) };
 
-                Button btnSplit = new Button { Text = "Tách PDF...", Location = new Point(195, 145), Width = 105, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                Button btnCancel = new Button { Text = "Hủy bỏ", Location = new Point(310, 145), Width = 70, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
+                Button btnSplit = new Button { Text = ZenQOffice.Core.AppL10n.T("Tách PDF...", "Split PDF..."), Location = new Point(195, 145), Width = 105, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                Button btnCancel = new Button { Text = ZenQOffice.Core.AppL10n.T("Hủy bỏ", "Cancel"), Location = new Point(310, 145), Width = 70, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
 
                 dlg.Controls.AddRange(new Control[] { lbl, txtRange, lblHelp, btnSplit, btnCancel });
                 dlg.AcceptButton = btnSplit;
@@ -4619,9 +4756,9 @@ namespace ZenQOffice.UI
 
                     using (SaveFileDialog sfd = new SaveFileDialog())
                     {
-                        sfd.Title = "Lưu tệp PDF đã tách";
-                        sfd.Filter = "Tệp PDF (*.pdf)|*.pdf";
-                        sfd.FileName = "Tách - " + Document.Title;
+                        sfd.Title = ZenQOffice.Core.AppL10n.T("Lưu tệp PDF đã tách", "Save Split PDF");
+                        sfd.Filter = ZenQOffice.Core.AppL10n.Tr("Tệp PDF (*.pdf)|*.pdf");
+                        sfd.FileName = ZenQOffice.Core.AppL10n.T("Tách - ", "Split - ") + ZenQOffice.Core.AppL10n.TrDocTitle(Document.Title);
 
                         if (sfd.ShowDialog(parentForm) == DialogResult.OK)
                         {
@@ -4634,13 +4771,13 @@ namespace ZenQOffice.UI
                                     {
                                         onSplit(splitDoc, sfd.FileName);
                                     }
-                                    ZenQOffice.UI.FluentMessageBox.Show("Đã tách " + splitDoc.Pages.Count + " trang PDF và lưu thành công tại:\n" + sfd.FileName, "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã tách " + splitDoc.Pages.Count + " trang PDF và lưu thành công tại:\n" + sfd.FileName, "Split " + splitDoc.Pages.Count + " PDF page(s) and saved to:\n" + sfd.FileName), "ZENQ PDF Editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     return true;
                                 }
                             }
                             catch (Exception ex)
                             {
-                                ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi tách PDF: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Lỗi khi tách PDF: ", "Error splitting PDF: ") + ex.Message, ZenQOffice.Core.AppL10n.Tr("Lỗi"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
                     }
@@ -4661,7 +4798,7 @@ namespace ZenQOffice.UI
             OcrProgress = 0.0f;
             IsOcrBackgroundCompleted = false;
             OcrResultElements = null;
-            OcrStatusMessage = "✨ Khởi động AI OCR...";
+            OcrStatusMessage = ZenQOffice.Core.AppL10n.T("✨ Khởi động AI OCR...", "✨ Starting AI OCR...");
 
             // Bắt đầu tác vụ nhận dạng ngầm
             ThreadPool.QueueUserWorkItem((state) =>
@@ -4739,13 +4876,13 @@ namespace ZenQOffice.UI
 
                 // Cập nhật câu trạng thái hiển thị
                 if (OcrProgress < 0.25f)
-                    OcrStatusMessage = "✨ Đang quét phân tích bố cục quang học...";
+                    OcrStatusMessage = ZenQOffice.Core.AppL10n.T("✨ Đang quét phân tích bố cục quang học...", "✨ Scanning optical layout...");
                 else if (OcrProgress < 0.65f)
-                    OcrStatusMessage = "⚡ AI đang trích xuất các khối văn bản...";
+                    OcrStatusMessage = ZenQOffice.Core.AppL10n.T("⚡ AI đang trích xuất các khối văn bản...", "⚡ Extracting text blocks with AI...");
                 else if (OcrProgress < 0.88f)
-                    OcrStatusMessage = "🎨 Đang lấy mẫu màu sắc & phông chữ...";
+                    OcrStatusMessage = ZenQOffice.Core.AppL10n.T("🎨 Đang lấy mẫu màu sắc & phông chữ...", "🎨 Sampling colors & fonts...");
                 else
-                    OcrStatusMessage = "✨ Hoàn tất! Đang đưa khối chữ vào trang...";
+                    OcrStatusMessage = ZenQOffice.Core.AppL10n.T("✨ Hoàn tất! Đang đưa khối chữ vào trang...", "✨ Done! Placing text blocks onto page...");
 
                 if (OcrParentForm != null) OcrParentForm.Invalidate();
             };
@@ -5016,7 +5153,7 @@ namespace ZenQOffice.UI
 
             using (Form dlg = new Form())
             {
-                dlg.Text = "Đánh Số Bates Pháp Lý - ZENQ PDF Legal Engine";
+                dlg.Text = ZenQOffice.Core.AppL10n.T("Đánh Số Bates Pháp Lý - ZENQ PDF Legal Engine", "Legal Bates Numbering");
                 dlg.Size = new Size(380, 310);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -5025,24 +5162,24 @@ namespace ZenQOffice.UI
                 dlg.BackColor = Color.FromArgb(248, 250, 252);
                 dlg.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
 
-                Label lblPrefix = new Label { Text = "Tiền tố (Prefix):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                Label lblPrefix = new Label { Text = ZenQOffice.Core.AppL10n.T("Tiền tố (Prefix):", "Prefix:"), Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
                 TextBox txtPrefix = new TextBox { Text = "CONFIDENTIAL-", Location = new Point(20, 45), Width = 150 };
 
-                Label lblStart = new Label { Text = "Số bắt đầu:", Location = new Point(190, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                Label lblStart = new Label { Text = ZenQOffice.Core.AppL10n.T("Số bắt đầu:", "Start Number:"), Location = new Point(190, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
                 NumericUpDown numStart = new NumericUpDown { Location = new Point(190, 45), Width = 80, Minimum = 1, Maximum = 1000000, Value = 1 };
 
-                Label lblDigits = new Label { Text = "Số chữ số (Digits):", Location = new Point(20, 85), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                Label lblDigits = new Label { Text = ZenQOffice.Core.AppL10n.T("Số chữ số (Digits):", "Digits:"), Location = new Point(20, 85), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
                 NumericUpDown numDigits = new NumericUpDown { Location = new Point(20, 110), Width = 80, Minimum = 1, Maximum = 12, Value = 6 };
 
-                Label lblPos = new Label { Text = "Vị trí đánh số:", Location = new Point(140, 85), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                Label lblPos = new Label { Text = ZenQOffice.Core.AppL10n.T("Vị trí đánh số:", "Position:"), Location = new Point(140, 85), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
                 ComboBox cbPos = new ZenQOffice.UI.FluentComboBox { Location = new Point(140, 110), Width = 190, DropDownStyle = ComboBoxStyle.DropDownList };
-                cbPos.Items.AddRange(new object[] { "Góc dưới cùng bên phải", "Góc dưới cùng ở giữa", "Góc dưới cùng bên trái", "Góc trên cùng bên phải", "Góc trên cùng ở giữa", "Góc trên cùng bên trái" });
+                cbPos.Items.AddRange(new object[] { ZenQOffice.Core.AppL10n.T("Góc dưới cùng bên phải", "Bottom Right"), ZenQOffice.Core.AppL10n.T("Góc dưới cùng ở giữa", "Bottom Center"), ZenQOffice.Core.AppL10n.T("Góc dưới cùng bên trái", "Bottom Left"), ZenQOffice.Core.AppL10n.T("Góc trên cùng bên phải", "Top Right"), ZenQOffice.Core.AppL10n.T("Góc trên cùng ở giữa", "Top Center"), ZenQOffice.Core.AppL10n.T("Góc trên cùng bên trái", "Top Left") });
                 cbPos.SelectedIndex = 0;
 
-                Label lblFont = new Label { Text = "Cỡ chữ: 10 pt Courier | Màu mực: Đen", Location = new Point(20, 155), AutoSize = true, ForeColor = Color.DarkSlateGray };
+                Label lblFont = new Label { Text = ZenQOffice.Core.AppL10n.T("Cỡ chữ: 10 pt Courier | Màu mực: Đen", "Font: 10 pt Courier | Ink: Black"), Location = new Point(20, 155), AutoSize = true, ForeColor = Color.DarkSlateGray };
 
-                Button btnOk = new Button { Text = "Đánh số", Location = new Point(160, 210), Width = 100, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                Button btnCancel = new Button { Text = "Hủy bỏ", Location = new Point(270, 210), Width = 80, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
+                Button btnOk = new Button { Text = ZenQOffice.Core.AppL10n.T("Đánh số", "Apply"), Location = new Point(160, 210), Width = 100, Height = 32, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                Button btnCancel = new Button { Text = ZenQOffice.Core.AppL10n.T("Hủy bỏ", "Cancel"), Location = new Point(270, 210), Width = 80, Height = 32, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
 
                 dlg.Controls.AddRange(new Control[] { lblPrefix, txtPrefix, lblStart, numStart, lblDigits, numDigits, lblPos, cbPos, lblFont, btnOk, btnCancel });
                 dlg.AcceptButton = btnOk;
@@ -5082,7 +5219,7 @@ namespace ZenQOffice.UI
 
             using (Form dlg = new Form())
             {
-                dlg.Text = "Thêm Dấu Trang / Mục Lục - ZENQ PDF";
+                dlg.Text = ZenQOffice.Core.AppL10n.T("Thêm Dấu Trang / Mục Lục - ZENQ PDF", "Add Bookmark - ZENQ PDF");
                 dlg.Size = new Size(360, 180);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -5091,11 +5228,11 @@ namespace ZenQOffice.UI
                 dlg.BackColor = Color.FromArgb(248, 250, 252);
                 dlg.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
 
-                Label lblTitle = new Label { Text = "Tiêu đề mục lục (Trang " + (ActivePageIndex + 1) + "):", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+                Label lblTitle = new Label { Text = ZenQOffice.Core.AppL10n.T("Tiêu đề mục lục (Trang " + (ActivePageIndex + 1) + "):", "Bookmark title (Page " + (ActivePageIndex + 1) + "):"), Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
                 TextBox txtTitle = new TextBox { Text = "Trang " + (ActivePageIndex + 1), Location = new Point(20, 48), Width = 300 };
 
-                Button btnOk = new Button { Text = "Thêm", Location = new Point(140, 90), Width = 90, Height = 30, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-                Button btnCancel = new Button { Text = "Hủy", Location = new Point(240, 90), Width = 80, Height = 30, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
+                Button btnOk = new Button { Text = ZenQOffice.Core.AppL10n.T("Thêm", "Add"), Location = new Point(140, 90), Width = 90, Height = 30, DialogResult = DialogResult.OK, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                Button btnCancel = new Button { Text = ZenQOffice.Core.AppL10n.T("Hủy", "Cancel"), Location = new Point(240, 90), Width = 80, Height = 30, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat };
 
                 dlg.Controls.AddRange(new Control[] { lblTitle, txtTitle, btnOk, btnCancel });
                 dlg.AcceptButton = btnOk;
@@ -5126,13 +5263,13 @@ namespace ZenQOffice.UI
                     {
                         PushUndoState("Gỡ mật khẩu bảo mật PDF");
                         Document.RemovePasswordProtection(dlg.OpenPassword ?? "");
-                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã gỡ bỏ toàn bộ mật khẩu bảo vệ và hạn chế thao tác trên tài liệu!", "Bảo mật ZenQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Đã gỡ bỏ toàn bộ mật khẩu bảo vệ và hạn chế thao tác trên tài liệu!", "Removed all password protection and restrictions!"), ZenQOffice.Core.AppL10n.T("Bảo mật ZenQ PDF", "ZenQ PDF Security"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else if (dlg.IsProtected)
                     {
                         PushUndoState("Thiết lập mật khẩu bảo mật PDF");
                         Document.SetPasswordProtection(dlg.OpenPassword, dlg.PermissionPassword, dlg.AllowPrinting, dlg.AllowCopying, dlg.AllowModifying, dlg.KeyLength);
-                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã thiết lập mật khẩu mã hóa thành công theo chuẩn " + dlg.KeyLength + "-bit AES!", "Bảo mật ZenQ PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Đã thiết lập mật khẩu mã hóa thành công theo chuẩn " + dlg.KeyLength + "-bit AES!", "Encrypted PDF using " + dlg.KeyLength + "-bit AES!"), ZenQOffice.Core.AppL10n.T("Bảo mật ZenQ PDF", "ZenQ PDF Security"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     if (parentForm != null) parentForm.Invalidate();
                     return true;
@@ -5151,7 +5288,7 @@ namespace ZenQOffice.UI
                 {
                     if (dlg.SelectedPageIndices == null || dlg.SelectedPageIndices.Count == 0) return false;
 
-                    string extractedTitle = "Trích xuất - " + (string.IsNullOrEmpty(Document.Title) ? "Tài liệu" : Document.Title);
+                    string extractedTitle = ZenQOffice.Core.AppL10n.T("Trích xuất - ", "Extracted - ") + (string.IsNullOrEmpty(Document.Title) ? ZenQOffice.Core.AppL10n.T("Tài liệu", "Document") : ZenQOffice.Core.AppL10n.TrDocTitle(Document.Title));
                     var extractedDoc = Document.ExtractPages(dlg.SelectedPageIndices, extractedTitle);
 
                     if (dlg.DeleteAfterExtract)
@@ -5175,7 +5312,7 @@ namespace ZenQOffice.UI
                         bool saved = PdfHandler.SavePdf(extractedDoc, dlg.OutputFilePath);
                         if (saved)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã trích xuất " + dlg.SelectedPageIndices.Count + " trang và lưu thành công vào:\n" + dlg.OutputFilePath, "Trích xuất Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Đã trích xuất " + dlg.SelectedPageIndices.Count + " trang và lưu thành công vào:\n" + dlg.OutputFilePath, "Extracted " + dlg.SelectedPageIndices.Count + " page(s) and saved to:\n" + dlg.OutputFilePath), ZenQOffice.Core.AppL10n.T("Trích xuất Trang PDF", "Extract PDF Pages"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                     }
                     else
@@ -5186,7 +5323,7 @@ namespace ZenQOffice.UI
                         }
                         else
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã trích xuất thành công " + dlg.SelectedPageIndices.Count + " trang!", "Trích xuất Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Đã trích xuất thành công " + dlg.SelectedPageIndices.Count + " trang!", "Extracted " + dlg.SelectedPageIndices.Count + " page(s)!"), ZenQOffice.Core.AppL10n.T("Trích xuất Trang PDF", "Extract PDF Pages"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                     }
                     return true;
@@ -5208,7 +5345,7 @@ namespace ZenQOffice.UI
                         var externalDoc = PdfHandler.LoadPdf(dlg.SelectedFilePath);
                         if (externalDoc == null || externalDoc.Pages == null || externalDoc.Pages.Count == 0)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Không thể đọc nội dung từ tệp PDF đã chọn!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Không thể đọc nội dung từ tệp PDF đã chọn!", "Could not read selected PDF file!"), ZenQOffice.Core.AppL10n.Tr("Lỗi"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                             return false;
                         }
 
@@ -5218,12 +5355,12 @@ namespace ZenQOffice.UI
                         InvalidateAllCaches();
                         if (parentForm != null) parentForm.Invalidate();
 
-                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã chèn thành công " + externalDoc.Pages.Count + " trang từ:\n" + Path.GetFileName(dlg.SelectedFilePath), "Chèn Trang PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Đã chèn thành công " + externalDoc.Pages.Count + " trang từ:\n" + Path.GetFileName(dlg.SelectedFilePath), "Inserted " + externalDoc.Pages.Count + " page(s) from:\n" + Path.GetFileName(dlg.SelectedFilePath)), ZenQOffice.Core.AppL10n.T("Chèn Trang PDF", "Insert PDF Pages"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                     catch (Exception ex)
                     {
-                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Lỗi khi chèn trang: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Lỗi khi chèn trang: ", "Error inserting pages: ") + ex.Message, ZenQOffice.Core.AppL10n.Tr("Lỗi"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -5248,19 +5385,19 @@ namespace ZenQOffice.UI
                     if (ok)
                     {
                         long compressedBytes = File.Exists(dlg.OutputFilePath) ? new FileInfo(dlg.OutputFilePath).Length : 0;
-                        string msg = "Tối ưu hóa và nén tài liệu PDF thành công!";
+                        string msg = ZenQOffice.Core.AppL10n.T("Tối ưu hóa và nén tài liệu PDF thành công!", "Compressed and optimized PDF document!");
                         if (originalBytes > 0 && compressedBytes > 0)
                         {
                             double savedPct = Math.Max(0, (1.0 - ((double)compressedBytes / originalBytes)) * 100);
-                            msg += $"\n\n- Dung lượng gốc: {originalBytes / 1024:N0} KB\n- Dung lượng nén: {compressedBytes / 1024:N0} KB\n- Tiết kiệm: {savedPct:0.#}%";
+                            msg += ZenQOffice.Core.AppL10n.T($"\n\n- Dung lượng gốc: {originalBytes / 1024:N0} KB\n- Dung lượng nén: {compressedBytes / 1024:N0} KB\n- Tiết kiệm: {savedPct:0.#}%", $"\n\n- Original size: {originalBytes / 1024:N0} KB\n- Compressed size: {compressedBytes / 1024:N0} KB\n- Saved: {savedPct:0.#}%");
                         }
-                        msg += $"\n\nTệp đã lưu tại:\n{dlg.OutputFilePath}";
-                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, msg, "Nén & Tối ưu hóa PDF", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        msg += ZenQOffice.Core.AppL10n.T($"\n\nTệp đã lưu tại:\n{dlg.OutputFilePath}", $"\n\nSaved to:\n{dlg.OutputFilePath}");
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, msg, ZenQOffice.Core.AppL10n.T("Nén & Tối ưu hóa PDF", "Compress & Optimize PDF"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                     else
                     {
-                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Không thể hoàn tất nén tài liệu PDF!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Không thể hoàn tất nén tài liệu PDF!", "Could not compress PDF document!"), "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -5270,7 +5407,7 @@ namespace ZenQOffice.UI
         public bool PromptExportWord(Form parentForm)
         {
             if (Document == null) return false;
-            using (var sfd = new SaveFileDialog { Filter = "Tài liệu Word (*.docx)|*.docx", Title = "Xuất PDF sang Word (.docx)" })
+            using (var sfd = new SaveFileDialog { Filter = ZenQOffice.Core.AppL10n.Tr("Tài liệu Word (*.docx)|*.docx"), Title = ZenQOffice.Core.AppL10n.T("Xuất PDF sang Word (.docx)", "Export PDF to Word (.docx)") })
             {
                 string defName = !string.IsNullOrEmpty(Document.FilePath) ? Path.GetFileNameWithoutExtension(Document.FilePath) : "Document";
                 sfd.FileName = defName + ".docx";
@@ -5279,7 +5416,7 @@ namespace ZenQOffice.UI
                     bool ok = PdfConverterEngine.ExportToDocx(Document, sfd.FileName);
                     if (ok)
                     {
-                        var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã xuất tài liệu sang Microsoft Word (.docx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Xuất Word 365", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Đã xuất tài liệu sang Microsoft Word (.docx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Exported document to Microsoft Word (.docx)!\n\nOpen file now?"), ZenQOffice.Core.AppL10n.T("Xuất Word 365", "Export to Word"), MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                         if (res == DialogResult.Yes)
                         {
                             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
@@ -5294,7 +5431,7 @@ namespace ZenQOffice.UI
         public bool PromptExportExcel(Form parentForm)
         {
             if (Document == null) return false;
-            using (var sfd = new SaveFileDialog { Filter = "Bảng tính Excel (*.xlsx)|*.xlsx", Title = "Xuất PDF sang Excel (.xlsx)" })
+            using (var sfd = new SaveFileDialog { Filter = ZenQOffice.Core.AppL10n.Tr("Bảng tính Excel (*.xlsx)|*.xlsx"), Title = ZenQOffice.Core.AppL10n.T("Xuất PDF sang Excel (.xlsx)", "Export PDF to Excel (.xlsx)") })
             {
                 string defName = !string.IsNullOrEmpty(Document.FilePath) ? Path.GetFileNameWithoutExtension(Document.FilePath) : "Document";
                 sfd.FileName = defName + ".xlsx";
@@ -5303,7 +5440,7 @@ namespace ZenQOffice.UI
                     bool ok = PdfConverterEngine.ExportToXlsx(Document, sfd.FileName);
                     if (ok)
                     {
-                        var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Đã xuất bảng biểu sang Microsoft Excel (.xlsx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Xuất Excel 365", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Đã xuất bảng biểu sang Microsoft Excel (.xlsx) thành công!\n\nBạn có muốn mở tệp ngay bây giờ?", "Exported tables to Microsoft Excel (.xlsx)!\n\nOpen file now?"), ZenQOffice.Core.AppL10n.T("Xuất Excel 365", "Export to Excel"), MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                         if (res == DialogResult.Yes)
                         {
                             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
@@ -5318,14 +5455,14 @@ namespace ZenQOffice.UI
         public bool PromptExportImages(Form parentForm)
         {
             if (Document == null) return false;
-            using (var fbd = new FolderBrowserDialog { Description = "Chọn thư mục lưu hình ảnh từng trang PDF" })
+            using (var fbd = new FolderBrowserDialog { Description = ZenQOffice.Core.AppL10n.T("Chọn thư mục lưu hình ảnh từng trang PDF", "Select folder to save PDF page images") })
             {
                 if (fbd.ShowDialog(parentForm) == DialogResult.OK)
                 {
                     var list = PdfConverterEngine.ExportToImages(Document, fbd.SelectedPath, "PNG", 150);
                     if (list.Count > 0)
                     {
-                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, $"Đã xuất thành công {list.Count} trang thành hình ảnh PNG tại:\n{fbd.SelectedPath}", "Xuất Hình Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T($"Đã xuất thành công {list.Count} trang thành hình ảnh PNG tại:\n{fbd.SelectedPath}", $"Exported {list.Count} page(s) as PNG images to:\n{fbd.SelectedPath}"), ZenQOffice.Core.AppL10n.T("Xuất Hình Ảnh", "Export Images"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return true;
                     }
                 }
@@ -5339,16 +5476,16 @@ namespace ZenQOffice.UI
             string text = PdfConverterEngine.ExtractAllText(Document, includePageHeaders: true);
             if (string.IsNullOrEmpty(text))
             {
-                ZenQOffice.UI.FluentMessageBox.Show(parentForm, "Tài liệu PDF không chứa nội dung văn bản có thể trích xuất.", "Trích xuất Văn bản", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T("Tài liệu PDF không chứa nội dung văn bản có thể trích xuất.", "This PDF contains no extractable text."), ZenQOffice.Core.AppL10n.T("Trích xuất Văn bản", "Extract Text"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return false;
             }
 
             try { Clipboard.SetText(text); } catch { }
 
-            var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, $"Đã trích xuất toàn bộ văn bản ({text.Length:N0} ký tự) và sao chép vào Clipboard!\n\nBạn có muốn lưu nội dung này ra tệp văn bản thuần (.txt) không?", "Trích xuất Văn bản", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+            var res = ZenQOffice.UI.FluentMessageBox.Show(parentForm, ZenQOffice.Core.AppL10n.T($"Đã trích xuất toàn bộ văn bản ({text.Length:N0} ký tự) và sao chép vào Clipboard!\n\nBạn có muốn lưu nội dung này ra tệp văn bản thuần (.txt) không?", $"Extracted all text ({text.Length:N0} chars) and copied to Clipboard!\n\nSave to a plain text (.txt) file?"), ZenQOffice.Core.AppL10n.T("Trích xuất Văn bản", "Extract Text"), MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (res == DialogResult.Yes)
             {
-                using (var sfd = new SaveFileDialog { Filter = "Tệp văn bản (*.txt)|*.txt", Title = "Lưu văn bản trích xuất" })
+                using (var sfd = new SaveFileDialog { Filter = ZenQOffice.Core.AppL10n.T("Tệp văn bản (*.txt)|*.txt", "Text File (*.txt)|*.txt"), Title = ZenQOffice.Core.AppL10n.T("Lưu văn bản trích xuất", "Save Extracted Text") })
                 {
                     string defName = !string.IsNullOrEmpty(Document.FilePath) ? Path.GetFileNameWithoutExtension(Document.FilePath) : "Document";
                     sfd.FileName = defName + "_Text.txt";

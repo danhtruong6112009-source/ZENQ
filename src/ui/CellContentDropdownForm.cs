@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -45,7 +46,7 @@ namespace ZenQOffice.UI
 
             // AutoFit Row Height Button
             _btnAutoFit = new Button();
-            _btnAutoFit.Text = "⇕ Tự dãn hàng";
+            _btnAutoFit.Text = AppL10n.Tr("⇕ Tự dãn hàng");
             _btnAutoFit.Font = new Font("Segoe UI", 8.25f, FontStyle.Regular);
             _btnAutoFit.Size = new Size(110, 24);
             _btnAutoFit.Location = new Point(formW - 150, 6);
@@ -170,7 +171,7 @@ namespace ZenQOffice.UI
             using (SolidBrush bTitle = new SolidBrush(Color.FromArgb(51, 65, 85)))
             {
                 float titleX = 8 + g.MeasureString(_cellCoord, new Font("Segoe UI", 9.0f, FontStyle.Bold)).Width + 20;
-                g.DrawString("Nội dung ô tính (Scrollable Reader / Editor)", fTitle, bTitle, titleX, 9);
+                g.DrawString(AppL10n.Tr("Nội dung ô tính (Scrollable Reader / Editor)"), fTitle, bTitle, titleX, 9);
             }
 
             // Divider line below header

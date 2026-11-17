@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -189,6 +189,78 @@ namespace ZenQOffice.UI
         public uint ScrollRow { get; set; }
         public uint ScrollCol { get; set; }
 
+        public List<CollabPresenceInfo> RemoteCollabPresences { get; set; } = new List<CollabPresenceInfo>();
+
+        public void RefreshAfterRemoteEdit()
+        {
+            RecalcAfterEdit(false);
+        }
+
+        private void DrawRemoteCollabCellOverlays(D2DGraphics g, int headerW, int startY, int headerH)
+        {
+            if (RemoteCollabPresences == null || RemoteCollabPresences.Count == 0) return;
+            using Font tagFont = new Font("Segoe UI", 7.8f, FontStyle.Bold);
+            foreach (var p in RemoteCollabPresences)
+            {
+                if (p == null || p.IsStale || p.SlideIndex != ActiveSheetIndex || string.IsNullOrEmpty(p.SelectedId)) continue;
+                var parts = p.SelectedId.Split(':');
+                if (parts.Length < 3) continue;
+                if (!uint.TryParse(parts[1], out uint r) || !uint.TryParse(parts[2], out uint c)) continue;
+                if (r < ScrollRow || c < ScrollCol) continue;
+
+                int rx = GetColScreenX(c, headerW);
+                int ry = GetRowScreenY(r, startY, headerH);
+                int rw = GetColWidth(c);
+                int rh = GetRowHeight(r);
+                if (rx < headerW || ry < startY + headerH || rw <= 0 || rh <= 0) continue;
+
+                Color peerCol = Color.FromArgb(37, 99, 235);
+                try { peerCol = ColorTranslator.FromHtml(p.ColorHex); } catch { }
+
+                using Pen pPen = new Pen(peerCol, 2.0f);
+                g.DrawRectangle(pPen, rx + 1, ry + 1, Math.Max(2, rw - 2), Math.Max(2, rh - 2));
+
+                string label = "@" + (p.Username ?? "peer");
+                SizeF sz = g.MeasureString(label, tagFont);
+                float tagW = sz.Width + 10f;
+                float tagH = 16f;
+                float tagY = Math.Max(startY + 2, ry - tagH + 1);
+                RectangleF tagRect = new RectangleF(rx, tagY, tagW, tagH);
+                using GraphicsPath gp = CreateRoundedPath(new Rectangle((int)tagRect.X, (int)tagRect.Y, (int)Math.Ceiling(tagRect.Width), (int)tagRect.Height), 4);
+                using SolidBrush bg = new SolidBrush(peerCol);
+                g.FillPath(bg, gp);
+                g.DrawString(label, tagFont, Brushes.White, tagRect.X + 5f, tagRect.Y + 1.5f);
+            }
+        }
+
+        // Excel 365 Smooth Focus Cell Glide & Sheet Tab Indicator Animation
+        private bool _selAnimInitialized = false;
+        private float _selAnimStartX, _selAnimStartY, _selAnimStartW, _selAnimStartH;
+        private float _selAnimCurX, _selAnimCurY, _selAnimCurW, _selAnimCurH;
+        private int _selAnimTargetX, _selAnimTargetY, _selAnimTargetW, _selAnimTargetH;
+        private uint _selAnimLastScrollR, _selAnimLastScrollC;
+        private int _selAnimLastSheet = -1;
+        private float _selAnimLastZoom = 1f;
+        private double _selAnimStartMs = -10000.0;
+        private const double CalcFocusGlideDurationMs = 115.0;
+
+        private bool _sheetTabIndInit = false;
+        private int _sheetTabLastIdx = -1;
+        private float _sheetTabCurX, _sheetTabCurW, _sheetTabStartX, _sheetTabStartW, _sheetTabTargetX, _sheetTabTargetW;
+        private double _sheetTabStartMs = -10000.0;
+        private const double CalcSheetTabDurationMs = 165.0;
+
+        public bool UpdateAnimations()
+        {
+            double now = FluentMotion.NowMs;
+            bool active = false;
+            if (_selAnimInitialized && (now - _selAnimStartMs) >= 0 && (now - _selAnimStartMs) < CalcFocusGlideDurationMs)
+                active = true;
+            if (_sheetTabIndInit && (now - _sheetTabStartMs) >= 0 && (now - _sheetTabStartMs) < CalcSheetTabDurationMs)
+                active = true;
+            return active;
+        }
+
         public Dictionary<uint, int> CustomColWidths { get; set; }
         public Dictionary<uint, int> CustomRowHeights { get; set; }
 
@@ -205,6 +277,38 @@ namespace ZenQOffice.UI
         private uint _clipSourceStartRow = 0;
         private uint _clipSourceStartCol = 0;
 
+        public const uint CalcMaxRows = 1000;
+        public const uint CalcMaxCols = 250;
+
+        public class CalcSelRange
+        {
+            public uint StartRow { get; set; }
+            public uint StartCol { get; set; }
+            public uint EndRow { get; set; }
+            public uint EndCol { get; set; }
+
+            public uint MinRow => Math.Min(StartRow, EndRow);
+            public uint MaxRow => Math.Max(StartRow, EndRow);
+            public uint MinCol => Math.Min(StartCol, EndCol);
+            public uint MaxCol => Math.Max(StartCol, EndCol);
+
+            public CalcSelRange(uint r1, uint c1, uint r2, uint c2)
+            {
+                StartRow = r1;
+                StartCol = c1;
+                EndRow = r2;
+                EndCol = c2;
+            }
+
+            public bool Contains(uint r, uint c)
+            {
+                return r >= MinRow && r <= MaxRow && c >= MinCol && c <= MaxCol;
+            }
+        }
+
+        public List<CalcSelRange> AdditionalSelections { get; } = new List<CalcSelRange>();
+        public bool AutoCalculation { get; set; } = true;
+
         public bool IsEditing { get; set; }
         public string EditText { get; set; }
         public int EditCursorPos { get; set; }
@@ -213,6 +317,48 @@ namespace ZenQOffice.UI
         public int EditSelectionAnchor { get; set; }
         public bool IsDraggingTextSelection { get; set; }
         public Rectangle ActiveEditingCellRect { get; set; }
+
+        // Formula Point Mode & Cross-Sheet Reference Entry
+        public int FormulaSourceSheetIndex { get; private set; } = -1;
+        public uint FormulaSourceRow { get; private set; } = 1;
+        public uint FormulaSourceCol { get; private set; } = 1;
+        public bool IsFormulaPointMode { get; set; }
+        public bool IsSelectingPointRange { get; set; }
+        private int _pointInsertStart = -1;
+        private int _pointInsertLength = 0;
+        private uint _pointAnchorRow = 1;
+        private uint _pointAnchorCol = 1;
+        private uint _pointCursorRow = 1;
+        private uint _pointCursorCol = 1;
+
+        // Name Box Inline Editor & Hitboxes
+        public bool IsEditingNameBox { get; set; }
+        public string NameBoxEditText { get; set; } = "";
+        public int NameBoxCursorPos { get; set; } = 0;
+        private Rectangle _lastNameBoxRect = new Rectangle(8, 158, 75, 23);
+        private Rectangle _lastCancelBtnRect = new Rectangle(95, 158, 23, 23);
+        private Rectangle _lastEnterBtnRect = new Rectangle(120, 158, 23, 23);
+        private Rectangle _lastFxBtnRect = new Rectangle(145, 158, 26, 23);
+        private Rectangle _lastFormulaInputRect = new Rectangle(177, 158, 400, 23);
+
+        private static readonly Color[] FormulaRefPalette = new Color[]
+        {
+            Color.FromArgb(37, 99, 235),
+            Color.FromArgb(220, 38, 38),
+            Color.FromArgb(147, 51, 234),
+            Color.FromArgb(5, 150, 105),
+            Color.FromArgb(217, 119, 6),
+            Color.FromArgb(13, 148, 136)
+        };
+
+        private class FormulaRefHighlight
+        {
+            public uint MinRow;
+            public uint MaxRow;
+            public uint MinCol;
+            public uint MaxCol;
+            public Color RefColor;
+        }
 
         // Column & Row Resize Dragging
         public bool IsResizingCol { get; set; }
@@ -846,6 +992,25 @@ namespace ZenQOffice.UI
         {
             if (newIndex >= 0 && newIndex < Sheets.Count)
             {
+                if (IsEditing && !string.IsNullOrEmpty(EditText) && EditText.TrimStart().StartsWith("="))
+                {
+                    if (FormulaSourceSheetIndex < 0)
+                    {
+                        FormulaSourceSheetIndex = _activeSheetIndex;
+                        FormulaSourceRow = SelectedRow;
+                        FormulaSourceCol = SelectedCol;
+                    }
+                    SaveCurrentSheetState();
+                    _activeSheetIndex = newIndex;
+                    LoadSheetState(newIndex);
+                    IsFormulaPointMode = true;
+                    _pointInsertStart = -1;
+                    _pointInsertLength = 0;
+                    FilterFormulaSuggestions();
+                    return;
+                }
+
+                ClearAdditionalSelections();
                 SaveCurrentSheetState();
                 _activeSheetIndex = newIndex;
                 LoadSheetState(newIndex);
@@ -991,15 +1156,15 @@ namespace ZenQOffice.UI
                 prompt.Width = 360;
                 prompt.Height = 150;
                 prompt.FormBorderStyle = FormBorderStyle.FixedDialog;
-                prompt.Text = "Đổi Tên Sheet";
+                prompt.Text = AppL10n.T("Đổi Tên Sheet", "Rename Sheet");
                 prompt.StartPosition = FormStartPosition.CenterParent;
                 prompt.MaximizeBox = false;
                 prompt.MinimizeBox = false;
 
-                Label textLabel = new Label() { Left = 20, Top = 15, Text = "Tên mới cho trang tính:" };
+                Label textLabel = new Label() { Left = 20, Top = 15, Text = AppL10n.T("Tên mới cho trang tính:", "New sheet name:") };
                 TextBox textBox = new TextBox() { Left = 20, Top = 40, Width = 300, Text = SheetNames[sheetIndex] };
                 Button confirmation = new Button() { Text = "OK", Left = 160, Width = 75, Top = 75, DialogResult = DialogResult.OK };
-                Button cancel = new Button() { Text = "Hủy", Left = 245, Width = 75, Top = 75, DialogResult = DialogResult.Cancel };
+                Button cancel = new Button() { Text = AppL10n.T("Hủy", "Cancel"), Left = 245, Width = 75, Top = 75, DialogResult = DialogResult.Cancel };
                 prompt.Controls.Add(textBox);
                 prompt.Controls.Add(confirmation);
                 prompt.Controls.Add(cancel);
@@ -1021,19 +1186,19 @@ namespace ZenQOffice.UI
             ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.Font = new Font("Segoe UI", 9f);
 
-            cms.Items.Add("✏️ Đổi tên Sheet (Rename)...", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("✏️ Đổi tên Sheet (Rename)...", "✏️ Rename Sheet..."), null, (s, e) =>
             {
                 PromptRenameSheet(sheetIndex, parentControl);
             });
 
-            cms.Items.Add("➕ Chèn Sheet mới (Insert Sheet)", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("➕ Chèn Sheet mới (Insert Sheet)", "➕ Insert Sheet"), null, (s, e) =>
             {
                 AddSheet("Sheet" + (SheetNames.Count + 1));
                 SwitchToSheet(SheetNames.Count - 1);
                 if (parentControl != null) parentControl.Invalidate();
             });
 
-            cms.Items.Add("📋 Nhân bản Sheet (Duplicate Sheet)", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("📋 Nhân bản Sheet (Duplicate Sheet)", "📋 Duplicate Sheet"), null, (s, e) =>
             {
                 DuplicateSheet(sheetIndex);
                 if (parentControl != null) parentControl.Invalidate();
@@ -1041,14 +1206,14 @@ namespace ZenQOffice.UI
 
             cms.Items.Add(new ToolStripSeparator());
 
-            var delItem = cms.Items.Add("🗑️ Xóa Sheet (Delete Sheet)", null, (s, e) =>
+            var delItem = cms.Items.Add(AppL10n.T("🗑️ Xóa Sheet (Delete Sheet)", "🗑️ Delete Sheet"), null, (s, e) =>
             {
                 if (Sheets.Count <= 1)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show("Bảng tính phải có ít nhất 1 sheet!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Bảng tính phải có ít nhất 1 sheet!", "A workbook must contain at least one visible sheet!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                if (ZenQOffice.UI.FluentMessageBox.Show(string.Format("Bạn có chắc chắn muốn xóa sheet \"{0}\"?", SheetNames[sheetIndex]), "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                if (ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T(string.Format("Bạn có chắc chắn muốn xóa sheet \"{0}\"?", SheetNames[sheetIndex]), string.Format("Are you sure you want to delete sheet \"{0}\"?", SheetNames[sheetIndex])), AppL10n.T("Xác nhận xóa", "Confirm Delete"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
                     DeleteSheet(sheetIndex);
                     if (parentControl != null) parentControl.Invalidate();
@@ -1058,7 +1223,7 @@ namespace ZenQOffice.UI
 
             cms.Items.Add(new ToolStripSeparator());
 
-            var moveLeftItem = cms.Items.Add("⬅️ Di chuyển sang trái", null, (s, e) =>
+            var moveLeftItem = cms.Items.Add(AppL10n.T("⬅️ Di chuyển sang trái", "⬅️ Move Left"), null, (s, e) =>
             {
                 if (sheetIndex > 0)
                 {
@@ -1082,7 +1247,7 @@ namespace ZenQOffice.UI
             });
             moveLeftItem.Enabled = (sheetIndex > 0);
 
-            var moveRightItem = cms.Items.Add("➡️ Di chuyển sang phải", null, (s, e) =>
+            var moveRightItem = cms.Items.Add(AppL10n.T("➡️ Di chuyển sang phải", "➡️ Move Right"), null, (s, e) =>
             {
                 if (sheetIndex < Sheets.Count - 1)
                 {
@@ -1170,7 +1335,7 @@ namespace ZenQOffice.UI
                     CustomRowHeights = new Dictionary<uint, int>(prev.RowHeights);
                     IsEditing = false;
                     EditSelLength = 0;
-                    FormulaEngine.EvaluateSheet(CurrentSheet);
+                    RecalcAfterEdit();
                 }
             }
         }
@@ -1193,7 +1358,7 @@ namespace ZenQOffice.UI
                     CustomRowHeights = new Dictionary<uint, int>(next.RowHeights);
                     IsEditing = false;
                     EditSelLength = 0;
-                    FormulaEngine.EvaluateSheet(CurrentSheet);
+                    RecalcAfterEdit();
                 }
             }
         }
@@ -1421,23 +1586,33 @@ namespace ZenQOffice.UI
 
                 // 1.1 Name Box (A1 / Range Address)
                 Rectangle nameBox = new Rectangle(8, fBarY + 3, 75, 23);
+                _lastNameBoxRect = nameBox;
                 using (GraphicsPath nPath = CreateRoundedPath(nameBox, 3))
                 {
-                    g.FillPath(IsHoveringNameBox ? Brushes.WhiteSmoke : Brushes.White, nPath);
-                    using (Pen nPen = new Pen(Color.FromArgb(203, 213, 225))) g.DrawPath(nPen, nPath);
+                    g.FillPath(IsEditingNameBox ? Brushes.White : (IsHoveringNameBox ? Brushes.WhiteSmoke : Brushes.White), nPath);
+                    using (Pen nPen = new Pen(IsEditingNameBox ? Color.FromArgb(16, 124, 65) : Color.FromArgb(203, 213, 225), IsEditingNameBox ? 1.5f : 1f))
+                        g.DrawPath(nPen, nPath);
                 }
 
                 using (Font boldFont = new Font("Segoe UI", 9f, FontStyle.Bold))
                 using (Font symFont = new Font("Segoe UI", 8f, FontStyle.Regular))
                 {
-                    string addr = SparseMatrix.ColIndexToName(SelectedCol) + SelectedRow;
-                    if (SelectedRow != SelEndRow || SelectedCol != SelEndCol)
+                    string addr = GetDisplayNameBoxText();
+                    Region prevNbClip = g.Clip;
+                    g.SetClip(new Rectangle(nameBox.X + 3, nameBox.Y + 2, nameBox.Width - 18, nameBox.Height - 4));
+                    if (IsEditingNameBox)
                     {
-                        uint rCount = (uint)(Math.Abs((int)SelEndRow - (int)SelectedRow) + 1);
-                        uint cCount = (uint)(Math.Abs((int)SelEndCol - (int)SelectedCol) + 1);
-                        addr = string.Format("{0}R x {1}C", rCount, cCount);
+                        string nbStr = NameBoxEditText ?? "";
+                        g.DrawString(nbStr, boldFont, Brushes.Black, nameBox.X + 5, nameBox.Y + 4);
+                        int cIdx = Math.Max(0, Math.Min(nbStr.Length, NameBoxCursorPos));
+                        int cX = nameBox.X + 5 + (int)g.MeasureString(nbStr.Substring(0, cIdx), boldFont, 2000, StringFormat.GenericTypographic).Width;
+                        g.DrawLine(Pens.Black, cX, nameBox.Y + 4, cX, nameBox.Bottom - 4);
                     }
-                    g.DrawString(addr, boldFont, Brushes.Black, nameBox.X + 8, nameBox.Y + 4);
+                    else
+                    {
+                        g.DrawString(addr, boldFont, Brushes.Black, nameBox.X + 6, nameBox.Y + 4);
+                    }
+                    g.Clip = prevNbClip;
                     g.DrawString("▾", symFont, Brushes.DimGray, nameBox.Right - 14, nameBox.Y + 4);
                 }
 
@@ -1449,6 +1624,7 @@ namespace ZenQOffice.UI
 
                 // Cancel Button ✕
                 Rectangle cancelBox = new Rectangle(btnStartX, fBarY + 3, 23, 23);
+                _lastCancelBtnRect = cancelBox;
                 if (IsHoveringCancel || IsEditing)
                 {
                     using (GraphicsPath p = CreateRoundedPath(cancelBox, 3))
@@ -1464,6 +1640,7 @@ namespace ZenQOffice.UI
 
                 // Enter Button ✓
                 Rectangle enterBox = new Rectangle(btnStartX + 25, fBarY + 3, 23, 23);
+                _lastEnterBtnRect = enterBox;
                 if (IsHoveringEnter || IsEditing)
                 {
                     using (GraphicsPath p = CreateRoundedPath(enterBox, 3))
@@ -1479,6 +1656,7 @@ namespace ZenQOffice.UI
 
                 // Insert Function Button fx
                 Rectangle fxBox = new Rectangle(btnStartX + 50, fBarY + 3, 26, 23);
+                _lastFxBtnRect = fxBox;
                 if (IsHoveringFx)
                 {
                     using (GraphicsPath p = CreateRoundedPath(fxBox, 3))
@@ -1501,6 +1679,7 @@ namespace ZenQOffice.UI
                 int fInputW = width - fInputX - 10 - fChevronW;
                 int fInputH = IsFormulaBarExpanded ? (fBarH - 8) : 23;
                 Rectangle fBox = new Rectangle(fInputX, fBarY + 3, fInputW, fInputH);
+                _lastFormulaInputRect = fBox;
                 using (GraphicsPath fPath = CreateRoundedPath(fBox, 3))
                 {
                     g.FillPath(Brushes.White, fPath);
@@ -1615,7 +1794,7 @@ namespace ZenQOffice.UI
                 {
                     int cW = GetColWidth(colIdx);
                     Rectangle cRect = new Rectangle(curX, startY, cW, headerH);
-                    bool isColSelected = (colIdx >= minSelC && colIdx <= maxSelC);
+                    bool isColSelected = IsColSelected(colIdx);
 
                     if (isColSelected)
                     {
@@ -1665,7 +1844,7 @@ namespace ZenQOffice.UI
                     continue;
                 }
                 int rH = GetRowHeight(rowIdx);
-                bool isRowSelected = (rowIdx >= minSelR && rowIdx <= maxSelR);
+                bool isRowSelected = IsRowSelected(rowIdx);
 
                 // Row Header
                 if (ShowHeadings)
@@ -1903,21 +2082,76 @@ namespace ZenQOffice.UI
             GraphicsState gStateSel = g.Save();
             g.SetClip(gridClipArea);
 
+            DrawAdditionalSelectionRanges(g, headerW, startY, headerH, width, height);
+            DrawFormulaReferenceHighlights(g, headerW, startY, headerH, width, height);
+
             if (selW > 0 && selH > 0)
             {
+                double animNow = FluentMotion.NowMs;
+                bool resetSelGlide = !_selAnimInitialized || _selAnimLastScrollR != ScrollRow || _selAnimLastScrollC != ScrollCol ||
+                    _selAnimLastSheet != ActiveSheetIndex || Math.Abs(_selAnimLastZoom - ZoomFactor) > 0.01f || IsSelectingRange ||
+                    Math.Abs(selX1 - _selAnimCurX) > 700f || Math.Abs(selY1 - _selAnimCurY) > 500f;
+                if (resetSelGlide)
+                {
+                    _selAnimInitialized = true;
+                    _selAnimStartX = _selAnimCurX = _selAnimTargetX = selX1;
+                    _selAnimStartY = _selAnimCurY = _selAnimTargetY = selY1;
+                    _selAnimStartW = _selAnimCurW = _selAnimTargetW = selW;
+                    _selAnimStartH = _selAnimCurH = _selAnimTargetH = selH;
+                    _selAnimStartMs = -10000.0;
+                }
+                else if (selX1 != _selAnimTargetX || selY1 != _selAnimTargetY || selW != _selAnimTargetW || selH != _selAnimTargetH)
+                {
+                    _selAnimStartX = _selAnimCurX;
+                    _selAnimStartY = _selAnimCurY;
+                    _selAnimStartW = _selAnimCurW;
+                    _selAnimStartH = _selAnimCurH;
+                    _selAnimTargetX = selX1;
+                    _selAnimTargetY = selY1;
+                    _selAnimTargetW = selW;
+                    _selAnimTargetH = selH;
+                    _selAnimStartMs = animNow;
+                }
+                _selAnimLastScrollR = ScrollRow;
+                _selAnimLastScrollC = ScrollCol;
+                _selAnimLastSheet = ActiveSheetIndex;
+                _selAnimLastZoom = ZoomFactor;
+
+                double selElapsed = animNow - _selAnimStartMs;
+                if (selElapsed >= 0 && selElapsed < CalcFocusGlideDurationMs)
+                {
+                    float e = FluentMotion.EaseOutQuint((float)(selElapsed / CalcFocusGlideDurationMs));
+                    _selAnimCurX = FluentMotion.Lerp(_selAnimStartX, _selAnimTargetX, e);
+                    _selAnimCurY = FluentMotion.Lerp(_selAnimStartY, _selAnimTargetY, e);
+                    _selAnimCurW = FluentMotion.Lerp(_selAnimStartW, _selAnimTargetW, e);
+                    _selAnimCurH = FluentMotion.Lerp(_selAnimStartH, _selAnimTargetH, e);
+                }
+                else
+                {
+                    _selAnimCurX = selX1;
+                    _selAnimCurY = selY1;
+                    _selAnimCurW = selW;
+                    _selAnimCurH = selH;
+                }
+
+                float drawSelX = _selAnimCurX;
+                float drawSelY = _selAnimCurY;
+                float drawSelW = Math.Max(1f, _selAnimCurW);
+                float drawSelH = Math.Max(1f, _selAnimCurH);
+
                 // Range Soft Green Overlay
                 if (minSelR != maxSelR || minSelC != maxSelC)
                 {
                     using (SolidBrush rangeFill = new SolidBrush(Color.FromArgb(30, 16, 124, 65)))
                     {
-                        g.FillRectangle(rangeFill, selX1, selY1, selW, selH);
+                        g.FillRectangle(rangeFill, drawSelX, drawSelY, drawSelW, drawSelH);
                     }
                 }
 
-                // Excel Deep Green Border
+                // Excel Deep Green Border (Smooth 365 Glide)
                 using (Pen selPen = new Pen(Color.FromArgb(16, 124, 65), 2f))
                 {
-                    g.DrawRectangle(selPen, selX1, selY1, selW, selH);
+                    g.DrawRectangle(selPen, drawSelX, drawSelY, drawSelW, drawSelH);
                 }
 
                 // ==================== Excel 365 Dynamic Array Spill Border ====================
@@ -1944,11 +2178,13 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                // Excel Fill Handle (Square dot at bottom-right corner - larger in Touch Mode)
+                // Excel Fill Handle (Square dot at bottom-right corner - glides smoothly with focus box)
                 int handleSize = AppSettings.Instance.TouchModeEnabled ? 10 : 6;
-                Rectangle handleRect = new Rectangle(selX1 + selW - handleSize / 2, selY1 + selH - handleSize / 2, handleSize, handleSize);
+                RectangleF handleRect = new RectangleF(drawSelX + drawSelW - handleSize / 2f, drawSelY + drawSelH - handleSize / 2f, handleSize, handleSize);
                 g.FillRectangle(Color.FromArgb(16, 124, 65).ToBrush(), handleRect);
-                g.DrawRectangle(Pens.White, handleRect);
+                g.DrawRectangle(Pens.White, handleRect.X, handleRect.Y, handleRect.Width, handleRect.Height);
+
+                DrawRemoteCollabCellOverlays(g, headerW, startY, headerH);
 
                 // Dropdown Content Viewer Chevron Button [ ▾ ] (when active cell has long text or newlines, or Data Validation List)
                 CellData activeCell = CurrentSheet.GetCell(SelectedRow, SelectedCol);
@@ -2017,7 +2253,7 @@ namespace ZenQOffice.UI
                         string endRangeName = string.Format("{0}{1}", SparseMatrix.ColIndexToName(MoveTargetCol + spanC - 1), MoveTargetRow + spanR - 1);
                         targetRangeName = string.Format("{0}:{1}", targetRangeName, endRangeName);
                     }
-                    string badgeText = IsCopyMode ? string.Format("➕ Sao chép tới [{0}]", targetRangeName) : string.Format("✥ Dời tới [{0}]", targetRangeName);
+                    string badgeText = IsCopyMode ? string.Format(AppL10n.T("➕ Sao chép tới [{0}]", "➕ Copy to [{0}]"), targetRangeName) : string.Format(AppL10n.T("✥ Dời tới [{0}]", "✥ Move to [{0}]"), targetRangeName);
 
                     using (Font badgeFont = new Font("Segoe UI", 9f, FontStyle.Bold))
                     {
@@ -2039,7 +2275,20 @@ namespace ZenQOffice.UI
 
             // ==================== 3.1 In-Place Cell Editor ====================
             ActiveEditingCellRect = editingCellRect;
-            if (IsEditing && !editingCellRect.IsEmpty)
+            bool isFormulaOnOtherSheet = IsEditing && FormulaSourceSheetIndex >= 0 && FormulaSourceSheetIndex != ActiveSheetIndex;
+            if (isFormulaOnOtherSheet)
+            {
+                int tipY = fBarY + FormulaBarHeight + 4;
+                if (ActiveSuggestions.Count > 0)
+                {
+                    DrawFormulaSuggestions(g, _lastFormulaInputRect.X, tipY);
+                }
+                else
+                {
+                    DrawFormulaScreenTip(g, _lastFormulaInputRect.X, tipY, width);
+                }
+            }
+            else if (IsEditing && !editingCellRect.IsEmpty)
             {
                 g.FillRectangle(Brushes.White, editingCellRect);
                 using (Pen ep = new Pen(Color.FromArgb(16, 124, 65), 2f))
@@ -2096,10 +2345,17 @@ namespace ZenQOffice.UI
 
                 g.PopClip();
 
-                // Floating Formula Suggestions Popup
+                // Floating Formula Suggestions Popup & Live Parameter ScreenTip
                 if (EditText.StartsWith("="))
                 {
-                    DrawFormulaSuggestions(g, editingCellRect.X, editingCellRect.Bottom + 2);
+                    if (ActiveSuggestions.Count > 0)
+                    {
+                        DrawFormulaSuggestions(g, editingCellRect.X, editingCellRect.Bottom + 2);
+                    }
+                    else
+                    {
+                        DrawFormulaScreenTip(g, editingCellRect.X, editingCellRect.Bottom + 2, width);
+                    }
                 }
             }
 
@@ -2270,6 +2526,7 @@ namespace ZenQOffice.UI
             FluentIconRenderer.DrawGlyph(g, "\uE76C", new Rectangle(24, tabY + 4, 20, 20), Color.FromArgb(100, 116, 139), 8.5f);
 
             int tabX = 46;
+            Rectangle activeSheetTabRect = Rectangle.Empty;
             using (Font tabFont = new Font("Segoe UI", 9f, FontStyle.Regular))
             using (Font activeTabFont = new Font("Segoe UI", 9f, FontStyle.Bold))
             {
@@ -2283,16 +2540,12 @@ namespace ZenQOffice.UI
                     Rectangle tabRect = new Rectangle(tabX, tabY + 2, tabW, 25);
                     if (isActive)
                     {
+                        activeSheetTabRect = tabRect;
                         g.FillRectangle(Brushes.White, tabRect);
                         using (Pen p = new Pen(Color.FromArgb(209, 213, 219)))
                         {
                             g.DrawLine(p, tabRect.Left, tabRect.Top, tabRect.Left, tabRect.Bottom);
                             g.DrawLine(p, tabRect.Right, tabRect.Top, tabRect.Right, tabRect.Bottom);
-                        }
-                        // Active Green Underline Bar
-                        using (SolidBrush ab = new SolidBrush(Color.FromArgb(16, 124, 65)))
-                        {
-                            g.FillRectangle(ab, tabRect.Left, tabRect.Bottom - 3, tabRect.Width, 3);
                         }
                     }
 
@@ -2301,6 +2554,51 @@ namespace ZenQOffice.UI
                         g.DrawString(sName, isActive ? activeTabFont : tabFont, isActive ? Color.FromArgb(16, 124, 65).ToBrush() : inactTxtB, tabX + 12, tabY + 5);
                     }
                     tabX += tabW + 2;
+                }
+
+                if (!activeSheetTabRect.IsEmpty)
+                {
+                    double tabNow = FluentMotion.NowMs;
+                    if (!_sheetTabIndInit)
+                    {
+                        _sheetTabIndInit = true;
+                        _sheetTabLastIdx = ActiveSheetIndex;
+                        _sheetTabStartX = _sheetTabCurX = _sheetTabTargetX = activeSheetTabRect.Left;
+                        _sheetTabStartW = _sheetTabCurW = _sheetTabTargetW = activeSheetTabRect.Width;
+                        _sheetTabStartMs = -10000.0;
+                    }
+                    else if (_sheetTabLastIdx != ActiveSheetIndex)
+                    {
+                        _sheetTabLastIdx = ActiveSheetIndex;
+                        _sheetTabStartX = _sheetTabCurX;
+                        _sheetTabStartW = _sheetTabCurW;
+                        _sheetTabTargetX = activeSheetTabRect.Left;
+                        _sheetTabTargetW = activeSheetTabRect.Width;
+                        _sheetTabStartMs = tabNow;
+                    }
+                    else
+                    {
+                        _sheetTabTargetX = activeSheetTabRect.Left;
+                        _sheetTabTargetW = activeSheetTabRect.Width;
+                    }
+
+                    double tabElapsed = tabNow - _sheetTabStartMs;
+                    if (tabElapsed >= 0 && tabElapsed < CalcSheetTabDurationMs)
+                    {
+                        float e = FluentMotion.EaseOutQuint((float)(tabElapsed / CalcSheetTabDurationMs));
+                        _sheetTabCurX = FluentMotion.Lerp(_sheetTabStartX, _sheetTabTargetX, e);
+                        _sheetTabCurW = FluentMotion.Lerp(_sheetTabStartW, _sheetTabTargetW, e);
+                    }
+                    else
+                    {
+                        _sheetTabCurX = _sheetTabTargetX;
+                        _sheetTabCurW = _sheetTabTargetW;
+                    }
+
+                    using (SolidBrush ab = new SolidBrush(Color.FromArgb(16, 124, 65)))
+                    {
+                        g.FillRectangle(ab, _sheetTabCurX, activeSheetTabRect.Bottom - 3f, _sheetTabCurW, 3f);
+                    }
                 }
 
                 // Add Sheet Button (+)
@@ -2355,37 +2653,37 @@ namespace ZenQOffice.UI
             using (Font statFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
             using (Font statBold = new Font("Segoe UI", 8.5f, FontStyle.Bold))
             {
-                // Left: Ready / Edit
+                // Left: Ready / Point / Edit + Circular Reference + Manual Calc indicators
+                string modeLabel = IsEditingNameBox
+                    ? AppL10n.T("Nhập tên", "Enter Name")
+                    : (IsEditing ? (IsFormulaPointMode ? AppL10n.T("Chọn điểm (Point)", "Point") : AppL10n.T("Chỉnh sửa", "Edit")) : AppL10n.T("Sẵn sàng", "Ready"));
                 using (SolidBrush statB = new SolidBrush(Color.FromArgb(100, 116, 139)))
                 {
-                    g.DrawString(IsEditing ? "Chỉnh sửa" : "Sẵn sàng", statFont, statB, 12, statY + 6);
+                    g.DrawString(modeLabel, statFont, statB, 12, statY + 6);
+                }
+                int badgeX = 128;
+                if (!AutoCalculation)
+                {
+                    using (SolidBrush mBrush = new SolidBrush(Color.FromArgb(217, 119, 6)))
+                        g.DrawString(AppL10n.T("Tính thủ công (F9)", "Manual Calc (F9)"), statBold, mBrush, badgeX, statY + 6);
+                    badgeX += 130;
+                }
+                if (FormulaEngine.CircularReferenceDetected)
+                {
+                    string circMsg = AppL10n.T("Tham chiếu vòng: ", "Circular Ref: ") + (FormulaEngine.LastCircularReferenceCell ?? "");
+                    using (SolidBrush cBrush = new SolidBrush(Color.FromArgb(220, 38, 38)))
+                        g.DrawString(circMsg, statBold, cBrush, badgeX, statY + 6);
                 }
 
-                // Calculation Metrics (Average, Count, Sum for selected range)
+                // Calculation Metrics across all selected ranges (Average, Count, Sum)
                 double selSum = 0.0;
                 double selCount = 0;
                 double numCount = 0;
-
-                for (uint r = minSelR; r <= maxSelR; r++)
-                {
-                    for (uint c = minSelC; c <= maxSelC; c++)
-                    {
-                        CellData cd = CurrentSheet.GetCell(r, c);
-                        if (cd != null && (!string.IsNullOrEmpty(cd.RawValue) || !string.IsNullOrEmpty(cd.EvaluatedStr)))
-                        {
-                            selCount++;
-                            if (cd.Type == CellType.Number || (cd.Type == CellType.Formula && cd.NumericValue != 0))
-                            {
-                                selSum += cd.NumericValue;
-                                numCount++;
-                            }
-                        }
-                    }
-                }
+                ComputeSelectionStatusMetrics(out selSum, out selCount, out numCount);
 
                 if (selCount > 1)
                 {
-                    string statMetrics = string.Format("Trung bình: {0:N2}    Đếm: {1}    Tổng: {2:N2}", (numCount > 0 ? (selSum / numCount) : 0), selCount, selSum);
+                    string statMetrics = string.Format(AppL10n.T("Trung bình: {0:N2}    Đếm: {1}    Tổng: {2:N2}", "Average: {0:N2}    Count: {1}    Sum: {2:N2}"), (numCount > 0 ? (selSum / numCount) : 0), selCount, selSum);
                     SizeF mSz = g.MeasureString(statMetrics, statBold);
                     g.DrawString(statMetrics, statBold, Color.FromArgb(16, 124, 65).ToBrush(), width - mSz.Width - 160, statY + 6);
                 }
@@ -2398,18 +2696,102 @@ namespace ZenQOffice.UI
             }
         }
 
-        public void FilterFormulaSuggestions(string query)
+        public void FilterFormulaSuggestions(string query = null)
         {
-            if (string.IsNullOrEmpty(query))
-            {
-                ActiveSuggestions = new List<FormulaSuggestion>(AllFormulas);
-            }
-            else
-            {
-                string q = query.Trim().ToUpper();
-                ActiveSuggestions = AllFormulas.FindAll(f => f.Name.StartsWith(q));
-            }
+            ActiveSuggestions.Clear();
             SelectedSuggestionIndex = 0;
+            if (!IsEditing || string.IsNullOrEmpty(EditText) || !EditText.TrimStart().StartsWith("=")) return;
+
+            int tokenStart, tokenLen;
+            string prefix = GetFormulaTokenBeforeCursor(EditText, EditCursorPos, out tokenStart, out tokenLen);
+            if (string.IsNullOrEmpty(prefix)) return;
+
+            // Avoid suggesting functions inside sheet names ('Sheet1'!) or explicit cell-lock ($A1)
+            if (tokenStart > 0 && (EditText[tokenStart - 1] == '$' || EditText[tokenStart - 1] == '\'')) return;
+            // Pure digits (like =12) are numeric literals, not identifiers
+            if (char.IsDigit(prefix[0])) return;
+
+            if (AllFormulas != null)
+            {
+                foreach (var fs in AllFormulas)
+                {
+                    if (fs.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ActiveSuggestions.Add(fs);
+                    }
+                }
+            }
+
+            if (DefinedNames != null)
+            {
+                foreach (var dn in DefinedNames)
+                {
+                    if (dn != null && !string.IsNullOrWhiteSpace(dn.Name) &&
+                        dn.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ActiveSuggestions.Add(new FormulaSuggestion(dn.Name, dn.Name + " → " + dn.RefersTo, AppL10n.T("Tên vùng đã định nghĩa (Defined Name)", "Defined Name Range")));
+                    }
+                }
+            }
+
+            if (Tables != null)
+            {
+                foreach (var tbl in Tables)
+                {
+                    if (tbl != null && !string.IsNullOrWhiteSpace(tbl.Name) &&
+                        tbl.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ActiveSuggestions.Add(new FormulaSuggestion(tbl.Name, tbl.Name + AppL10n.T("[Cột]", "[Column]"), AppL10n.T("Bảng dữ liệu có cấu trúc (Structured Table)", "Structured Data Table")));
+                    }
+                }
+            }
+
+            if (ActiveSuggestions.Count > 12)
+            {
+                ActiveSuggestions.RemoveRange(12, ActiveSuggestions.Count - 12);
+            }
+        }
+
+        public void CommitFormulaSuggestion(FormulaSuggestion sug)
+        {
+            if (sug == null || string.IsNullOrEmpty(EditText)) return;
+            int tokenStart, tokenLen;
+            GetFormulaTokenBeforeCursor(EditText, EditCursorPos, out tokenStart, out tokenLen);
+            bool isNamedOrTable = false;
+            if (DefinedNames != null)
+            {
+                foreach (var dn in DefinedNames)
+                {
+                    if (dn != null && string.Equals(dn.Name, sug.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        isNamedOrTable = true;
+                        break;
+                    }
+                }
+            }
+            if (!isNamedOrTable && Tables != null)
+            {
+                foreach (var tbl in Tables)
+                {
+                    if (tbl != null && string.Equals(tbl.Name, sug.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        isNamedOrTable = true;
+                        break;
+                    }
+                }
+            }
+
+            string insertion = isNamedOrTable ? sug.Name : (sug.Name + "(");
+            string before = EditText.Substring(0, tokenStart);
+            string after = (tokenStart + tokenLen <= EditText.Length) ? EditText.Substring(tokenStart + tokenLen) : "";
+            EditText = before + insertion + after;
+            EditCursorPos = before.Length + insertion.Length;
+            EditSelStart = EditCursorPos;
+            EditSelLength = 0;
+            IsFormulaPointMode = !isNamedOrTable;
+            _pointInsertStart = -1;
+            _pointInsertLength = 0;
+            FilterFormulaSuggestions();
         }
 
         private void DrawFormulaSuggestions(D2DGraphics g, int x, int y)
@@ -2460,7 +2842,7 @@ namespace ZenQOffice.UI
                 if (SelectedSuggestionIndex >= 0 && SelectedSuggestionIndex < ActiveSuggestions.Count)
                 {
                     g.DrawLine(Pens.LightGray, x + 4, itemY + 1, x + popW - 4, itemY + 1);
-                    g.DrawString("💡 " + ActiveSuggestions[SelectedSuggestionIndex].Description, dFont, Brushes.DarkSlateGray, x + 6, itemY + 4);
+                    g.DrawString("💡 " + AppL10n.Tr(ActiveSuggestions[SelectedSuggestionIndex].Description), dFont, Brushes.DarkSlateGray, x + 6, itemY + 4);
                 }
             }
         }
@@ -2681,12 +3063,8 @@ namespace ZenQOffice.UI
                 if (clickedIdx >= 0 && clickedIdx < maxCount)
                 {
                     SelectedSuggestionIndex = clickedIdx;
-                    string funcName = ActiveSuggestions[clickedIdx].Name;
-                    EditText = "=" + funcName + "(";
-                    EditCursorPos = EditText.Length;
-                    EditSelStart = 0;
-                    EditSelLength = 0;
                     IsEditing = true;
+                    CommitFormulaSuggestion(ActiveSuggestions[clickedIdx]);
                     FormulaSuggestionsBounds = Rectangle.Empty;
                     return true;
                 }
@@ -2709,6 +3087,17 @@ namespace ZenQOffice.UI
             int headerH = ShowHeadings ? 26 : 0;
             int headerW = ShowHeadings ? 48 : 0;
             int startY = fBarY + FormulaBarHeight;
+
+            if (y >= fBarY && y < startY)
+            {
+                HandleFormulaBarButtonClick(x, y);
+                return true;
+            }
+            if (IsEditingNameBox)
+            {
+                ExecuteGoToTarget(NameBoxEditText);
+                IsEditingNameBox = false;
+            }
             int vScrollW = 16;
             int bottomBarH = 56;
             int maxGridY = height - bottomBarH;
@@ -2840,37 +3229,105 @@ namespace ZenQOffice.UI
                 }
             }
 
-            // 3b. Column Header Click (Select Entire Column)
+            bool shiftMod = (Control.ModifierKeys & Keys.Shift) == Keys.Shift;
+            bool ctrlMod = (Control.ModifierKeys & Keys.Control) == Keys.Control;
+
+            // 3b. Column Header Click (Select Entire Column / Point / Shift / Ctrl)
             if (ShowHeadings && y >= startY && y <= startY + headerH && x >= headerW)
             {
                 uint cIdx = GetColAtX(x, headerW);
+                if (IsEditing && !string.IsNullOrEmpty(EditText) && EditText.TrimStart().StartsWith("=") &&
+                    (CanAcceptFormulaReferenceBeforeCursor(EditText, EditCursorPos) || IsFormulaPointMode || ctrlMod))
+                {
+                    BeginOrUpdatePointRange(1, cIdx, CalcMaxRows, cIdx, ctrlMod);
+                    IsSelectingPointRange = false;
+                    return true;
+                }
+                if (IsEditing)
+                {
+                    if (!CommitCurrentEditCell(true)) { if (parentForm != null) parentForm.Invalidate(); return true; }
+                }
+
                 IsSelectingFullCols = true;
-                SelectedRow = 1;
-                SelEndRow = 1000;
-                SelectedCol = cIdx;
-                SelEndCol = cIdx;
+                if (shiftMod)
+                {
+                    SelEndCol = cIdx;
+                    SelectedRow = 1;
+                    SelEndRow = CalcMaxRows;
+                }
+                else if (ctrlMod)
+                {
+                    CommitPrimarySelectionToAdditional();
+                    SelectedCol = cIdx;
+                    SelEndCol = cIdx;
+                    SelectedRow = 1;
+                    SelEndRow = CalcMaxRows;
+                }
+                else
+                {
+                    ClearAdditionalSelections();
+                    SelectedRow = 1;
+                    SelEndRow = CalcMaxRows;
+                    SelectedCol = cIdx;
+                    SelEndCol = cIdx;
+                }
                 return true;
             }
 
-            // 4a. Row Header Click (Select Entire Row)
+            // 4a. Row Header Click (Select Entire Row / Point / Shift / Ctrl)
             if (ShowHeadings && x >= 0 && x <= headerW && y >= startY + headerH && y < maxGridY)
             {
                 uint rIdx = GetRowAtY(y, startY + headerH);
+                if (IsEditing && !string.IsNullOrEmpty(EditText) && EditText.TrimStart().StartsWith("=") &&
+                    (CanAcceptFormulaReferenceBeforeCursor(EditText, EditCursorPos) || IsFormulaPointMode || ctrlMod))
+                {
+                    BeginOrUpdatePointRange(rIdx, 1, rIdx, CalcMaxCols, ctrlMod);
+                    IsSelectingPointRange = false;
+                    return true;
+                }
+                if (IsEditing)
+                {
+                    if (!CommitCurrentEditCell(true)) { if (parentForm != null) parentForm.Invalidate(); return true; }
+                }
+
                 IsSelectingFullRows = true;
-                SelectedCol = 1;
-                SelEndCol = 250;
-                SelectedRow = rIdx;
-                SelEndRow = rIdx;
+                if (shiftMod)
+                {
+                    SelEndRow = rIdx;
+                    SelectedCol = 1;
+                    SelEndCol = CalcMaxCols;
+                }
+                else if (ctrlMod)
+                {
+                    CommitPrimarySelectionToAdditional();
+                    SelectedRow = rIdx;
+                    SelEndRow = rIdx;
+                    SelectedCol = 1;
+                    SelEndCol = CalcMaxCols;
+                }
+                else
+                {
+                    ClearAdditionalSelections();
+                    SelectedCol = 1;
+                    SelEndCol = CalcMaxCols;
+                    SelectedRow = rIdx;
+                    SelEndRow = rIdx;
+                }
                 return true;
             }
 
             // 4a0. Top-Left Select All Triangle Click
             if (ShowHeadings && x >= 0 && x <= headerW && y >= startY && y <= startY + headerH)
             {
+                if (IsEditing)
+                {
+                    if (!CommitCurrentEditCell(true)) { if (parentForm != null) parentForm.Invalidate(); return true; }
+                }
+                ClearAdditionalSelections();
                 SelectedCol = 1;
-                SelEndCol = 250;
+                SelEndCol = CalcMaxCols;
                 SelectedRow = 1;
-                SelEndRow = 1000;
+                SelEndRow = CalcMaxRows;
                 return true;
             }
 
@@ -3141,6 +3598,28 @@ namespace ZenQOffice.UI
                     return true;
                 }
 
+                // Point Mode: clicking cell during formula entry inserts/updates reference instead of closing edit
+                if (IsEditing && !string.IsNullOrEmpty(EditText) && EditText.TrimStart().StartsWith("=") &&
+                    (CanAcceptFormulaReferenceBeforeCursor(EditText, EditCursorPos) || IsFormulaPointMode || (ctrlMod && !shiftMod)))
+                {
+                    if (shiftMod && _pointInsertStart >= 0)
+                    {
+                        _pointCursorRow = rIdx;
+                        _pointCursorCol = cIdx;
+                        BeginOrUpdatePointRange(_pointAnchorRow, _pointAnchorCol, rIdx, cIdx, false);
+                    }
+                    else
+                    {
+                        _pointAnchorRow = rIdx;
+                        _pointAnchorCol = cIdx;
+                        _pointCursorRow = rIdx;
+                        _pointCursorCol = cIdx;
+                        BeginOrUpdatePointRange(rIdx, cIdx, rIdx, cIdx, ctrlMod);
+                    }
+                    IsSelectingPointRange = true;
+                    return true;
+                }
+
                 if (IsEditing)
                 {
                     if (!CommitCurrentEditCell(true))
@@ -3150,12 +3629,33 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                SelectedCol = cIdx;
-                SelectedRow = rIdx;
-                SelEndCol = cIdx;
-                SelEndRow = rIdx;
-                IsSelectingRange = true;
-                return false;
+                if (shiftMod)
+                {
+                    SelEndCol = cIdx;
+                    SelEndRow = rIdx;
+                    IsSelectingRange = true;
+                    return true;
+                }
+                else if (ctrlMod)
+                {
+                    CommitPrimarySelectionToAdditional();
+                    SelectedCol = cIdx;
+                    SelectedRow = rIdx;
+                    SelEndCol = cIdx;
+                    SelEndRow = rIdx;
+                    IsSelectingRange = true;
+                    return true;
+                }
+                else
+                {
+                    ClearAdditionalSelections();
+                    SelectedCol = cIdx;
+                    SelectedRow = rIdx;
+                    SelEndCol = cIdx;
+                    SelEndRow = rIdx;
+                    IsSelectingRange = true;
+                    return false;
+                }
             }
 
             return false;
@@ -3372,21 +3872,27 @@ namespace ZenQOffice.UI
                 return;
             }
 
-            // Handle Fill Handle Dragging
+            // Handle Fill Handle Dragging (all 4 directions: Down, Up, Right, Left)
             if (IsDraggingFillHandle && btn == MouseButtons.Left)
             {
+                AutoScrollDuringDrag(x, y, width, height, startY + headerH, headerW);
                 uint curC = GetColAtX(x, headerW);
                 uint curR = GetRowAtY(y, startY + headerH);
-                int deltaCol = (int)curC - (int)FillEndCol;
-                int deltaRow = (int)curR - (int)FillEndRow;
 
-                // Nắm góc ô: 1 là kéo ngang, 2 là kéo dọc
-                if (deltaCol > 0 && deltaCol > deltaRow)
+                int downDist = curR > FillEndRow ? (int)(curR - FillEndRow) : 0;
+                int upDist = curR < FillStartRow ? (int)(FillStartRow - curR) : 0;
+                int rightDist = curC > FillEndCol ? (int)(curC - FillEndCol) : 0;
+                int leftDist = curC < FillStartCol ? (int)(FillStartCol - curC) : 0;
+
+                int maxVert = Math.Max(downDist, upDist);
+                int maxHorz = Math.Max(rightDist, leftDist);
+
+                if (maxHorz > maxVert && maxHorz > 0)
                 {
                     FillDragTargetCol = curC;
                     FillDragTargetRow = FillEndRow;
                 }
-                else if (deltaRow > 0 && deltaRow >= deltaCol)
+                else if (maxVert > 0)
                 {
                     FillDragTargetRow = curR;
                     FillDragTargetCol = FillEndCol;
@@ -3399,9 +3905,24 @@ namespace ZenQOffice.UI
                 return;
             }
 
+            if (IsSelectingPointRange && btn == MouseButtons.Left)
+            {
+                AutoScrollDuringDrag(x, y, width, height, startY + headerH, headerW);
+                uint curR = GetRowAtY(y, startY + headerH);
+                uint curC = GetColAtX(x, headerW);
+                if (curR != _pointCursorRow || curC != _pointCursorCol)
+                {
+                    _pointCursorRow = curR;
+                    _pointCursorCol = curC;
+                    BeginOrUpdatePointRange(_pointAnchorRow, _pointAnchorCol, curR, curC, false);
+                }
+                return;
+            }
+
             // Handle Marquee Range Selection Dragging (Chỉ quét khối chọn ô, không tự tạo hay mở rộng bảng)
             if (IsSelectingRange && btn == MouseButtons.Left)
             {
+                AutoScrollDuringDrag(x, y, width, height, startY + headerH, headerW);
                 SelEndCol = GetColAtX(x, headerW);
                 SelEndRow = GetRowAtY(y, startY + headerH);
             }
@@ -3423,6 +3944,7 @@ namespace ZenQOffice.UI
                 }
             }
             if (IsSelectingRange) { IsSelectingRange = false; }
+            if (IsSelectingPointRange) { IsSelectingPointRange = false; }
             if (IsSelectingFullCols) { IsSelectingFullCols = false; }
             if (IsSelectingFullRows) { IsSelectingFullRows = false; }
 
@@ -3527,6 +4049,24 @@ namespace ZenQOffice.UI
 
             if (x > headerW && y > startY + headerH && y < height - 56)
             {
+                // Double-click Fill Handle -> auto-fill down matching adjacent column
+                uint minSelR = Math.Min(SelectedRow, SelEndRow);
+                uint maxSelR = Math.Max(SelectedRow, SelEndRow);
+                uint minSelC = Math.Min(SelectedCol, SelEndCol);
+                uint maxSelC = Math.Max(SelectedCol, SelEndCol);
+                if (maxSelC >= ScrollCol && maxSelR >= ScrollRow)
+                {
+                    int handleX = headerW;
+                    for (uint c = ScrollCol; c <= maxSelC; c++) handleX += GetColWidth(c);
+                    int handleY = startY + headerH;
+                    for (uint r = ScrollRow; r <= maxSelR; r++) handleY += GetRowHeight(r);
+                    if (Math.Abs(x - handleX) <= 7 && Math.Abs(y - handleY) <= 7)
+                    {
+                        DoubleClickFillHandle();
+                        return;
+                    }
+                }
+
                 if (IsSheetProtected)
                 {
                     ShowSheetProtectedWarning();
@@ -3548,6 +4088,9 @@ namespace ZenQOffice.UI
                 EditSelectionAnchor = 0;
                 EditSelStart = 0;
                 EditSelLength = EditText.Length;
+                FormulaSourceSheetIndex = -1;
+                IsFormulaPointMode = false;
+                FilterFormulaSuggestions();
             }
         }
 
@@ -3571,13 +4114,13 @@ namespace ZenQOffice.UI
             ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.Font = new Font("Segoe UI", 9f);
 
-            cms.Items.Add("📊 Chỉnh sửa số liệu biểu đồ...", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("📊 Chỉnh sửa số liệu biểu đồ...", "📊 Edit Chart Data..."), null, (s, e) =>
             {
                 OpenChartEditor(shape);
                 if (parentControl != null) parentControl.Invalidate();
             });
 
-            cms.Items.Add("🔄 Thay đổi loại biểu đồ (Change Chart Type)...", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("🔄 Thay đổi loại biểu đồ (Change Chart Type)...", "🔄 Change Chart Type..."), null, (s, e) =>
             {
                 DocChartData cd = shape.ChartData ?? DocChartData.CreateDefault(shape.TextContent);
                 using (InsertChartForm dlg = new InsertChartForm(cd))
@@ -3593,7 +4136,7 @@ namespace ZenQOffice.UI
             });
 
             cms.Items.Add(new ToolStripSeparator());
-            cms.Items.Add("🗑️ Xóa biểu đồ", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("🗑️ Xóa biểu đồ", "🗑️ Delete Chart"), null, (s, e) =>
             {
                 Shapes.Remove(shape);
                 if (SelectedShape == shape) SelectedShape = null;
@@ -3625,24 +4168,24 @@ namespace ZenQOffice.UI
             ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.Font = new Font("Segoe UI", 9f);
 
-            cms.Items.Add("✏️ Chỉnh sửa nội dung chữ SmartArt...", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("✏️ Chỉnh sửa nội dung chữ SmartArt...", "✏️ Edit SmartArt Text..."), null, (s, e) =>
             {
                 OpenSmartArtEditor(shape);
                 if (parentControl != null) parentControl.Invalidate();
             });
 
-            ToolStripMenuItem colorMenu = new ToolStripMenuItem("🎨 Đổi màu sắc SmartArt (Color Palette)");
-            colorMenu.DropDownItems.Add("🌈 Đa sắc màu (Colorful Accent)", null, (s, e) => { shape.StylePresetIndex = 0; if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🟠 Cam & Vàng (Office Warm)", null, (s, e) => { shape.StylePresetIndex = 1; if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🔵 Xanh Lam & Lục (Colorful Cool)", null, (s, e) => { shape.StylePresetIndex = 2; if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🔷 Xanh Lam Chuẩn (Office Blue)", null, (s, e) => { shape.StylePresetIndex = 3; if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🟢 Xanh Lục (Emerald Green)", null, (s, e) => { shape.StylePresetIndex = 4; if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🟣 Tím & Hồng (Purple & Magenta)", null, (s, e) => { shape.StylePresetIndex = 5; if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("⚫ Đơn sắc (Monochrome Gray)", null, (s, e) => { shape.StylePresetIndex = 6; if (parentControl != null) parentControl.Invalidate(); });
+            ToolStripMenuItem colorMenu = new ToolStripMenuItem(AppL10n.T("🎨 Đổi màu sắc SmartArt (Color Palette)", "🎨 Change SmartArt Colors"));
+            colorMenu.DropDownItems.Add(AppL10n.T("🌈 Đa sắc màu (Colorful Accent)", "🌈 Colorful Accent"), null, (s, e) => { shape.StylePresetIndex = 0; if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🟠 Cam & Vàng (Office Warm)", "🟠 Office Warm (Orange & Gold)"), null, (s, e) => { shape.StylePresetIndex = 1; if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🔵 Xanh Lam & Lục (Colorful Cool)", "🔵 Colorful Cool (Blue & Teal)"), null, (s, e) => { shape.StylePresetIndex = 2; if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🔷 Xanh Lam Chuẩn (Office Blue)", "🔷 Office Blue"), null, (s, e) => { shape.StylePresetIndex = 3; if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🟢 Xanh Lục (Emerald Green)", "🟢 Emerald Green"), null, (s, e) => { shape.StylePresetIndex = 4; if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🟣 Tím & Hồng (Purple & Magenta)", "🟣 Purple & Magenta"), null, (s, e) => { shape.StylePresetIndex = 5; if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("⚫ Đơn sắc (Monochrome Gray)", "⚫ Monochrome Gray"), null, (s, e) => { shape.StylePresetIndex = 6; if (parentControl != null) parentControl.Invalidate(); });
             cms.Items.Add(colorMenu);
 
             cms.Items.Add(new ToolStripSeparator());
-            cms.Items.Add("🗑️ Xóa sơ đồ SmartArt", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("🗑️ Xóa sơ đồ SmartArt", "🗑️ Delete SmartArt"), null, (s, e) =>
             {
                 Shapes.Remove(shape);
                 if (SelectedShape == shape) SelectedShape = null;
@@ -3655,13 +4198,109 @@ namespace ZenQOffice.UI
 
         public void HandleFormulaBarButtonClick(int x, int y)
         {
-            int fBarY = 155;
-            int btnStartX = 8 + 75 + 12;
-
-            if (y >= fBarY && y <= fBarY + 28)
+            // Name Box click (dropdown arrow vs inline GoTo input)
+            if (_lastNameBoxRect.Contains(x, y))
             {
-                if (x >= btnStartX && x <= btnStartX + 26) { CancelEdit(); return; }
-                if (x >= btnStartX + 28 && x <= btnStartX + 54) { CommitEditAndMove(0, 0); return; }
+                if (x >= _lastNameBoxRect.Right - 16)
+                {
+                    ShowNameBoxDropdownMenu();
+                }
+                else
+                {
+                    if (IsEditing) CommitCurrentEditCell(true);
+                    IsEditingNameBox = true;
+                    NameBoxEditText = GetDisplayNameBoxText();
+                    if (NameBoxEditText.Contains("R ×") || NameBoxEditText.Contains("R x"))
+                    {
+                        NameBoxEditText = string.Format("{0}{1}:{2}{3}",
+                            SparseMatrix.ColIndexToName(Math.Min(SelectedCol, SelEndCol)),
+                            Math.Min(SelectedRow, SelEndRow),
+                            SparseMatrix.ColIndexToName(Math.Max(SelectedCol, SelEndCol)),
+                            Math.Max(SelectedRow, SelEndRow));
+                    }
+                    NameBoxCursorPos = NameBoxEditText.Length;
+                }
+                return;
+            }
+
+            if (IsEditingNameBox)
+            {
+                ExecuteGoToTarget(NameBoxEditText);
+                IsEditingNameBox = false;
+            }
+
+            // Cancel (✕)
+            if (_lastCancelBtnRect.Contains(x, y))
+            {
+                CancelEdit();
+                return;
+            }
+
+            // Enter (✓)
+            if (_lastEnterBtnRect.Contains(x, y))
+            {
+                if (IsEditing) CommitCurrentEditCell(true);
+                return;
+            }
+
+            // Insert Function (fx)
+            if (_lastFxBtnRect.Contains(x, y))
+            {
+                if (IsEditing && !string.IsNullOrEmpty(EditText) && !EditText.TrimStart().StartsWith("="))
+                {
+                    CommitCurrentEditCell(false);
+                }
+                using (InsertFunctionDialog ifd = new InsertFunctionDialog(this))
+                {
+                    ifd.ShowDialog();
+                }
+                return;
+            }
+
+            // Click Formula Input Area -> enter/focus Edit Mode & position caret
+            if (!FormulaBarChevronBounds.IsEmpty && FormulaBarChevronBounds.Contains(x, y))
+            {
+                IsFormulaBarExpanded = !IsFormulaBarExpanded;
+                return;
+            }
+            if (_lastFormulaInputRect.Contains(x, y) || x >= _lastFxBtnRect.Right)
+            {
+                if (!IsEditing)
+                {
+                    CellData cur = CurrentSheet.GetCell(SelectedRow, SelectedCol);
+                    string raw = (cur != null) ? (cur.Type == CellType.Formula ? cur.FormulaStr : cur.RawValue) : "";
+                    StartEditingCell(raw ?? "");
+                }
+                IsFormulaPointMode = false;
+                _pointInsertStart = -1;
+                _pointInsertLength = 0;
+
+                // Estimate caret index from X coordinate inside formula input box
+                int relX = Math.Max(0, x - (_lastFormulaInputRect.X + 6));
+                int estPos = (EditText ?? "").Length;
+                using (Bitmap bmp = new Bitmap(1, 1))
+                using (Graphics gTmp = Graphics.FromImage(bmp))
+                using (Font fnt = new Font("Segoe UI", 9.5f))
+                {
+                    string s = EditText ?? "";
+                    int bestIdx = s.Length;
+                    float bestDiff = float.MaxValue;
+                    for (int i = 0; i <= s.Length; i++)
+                    {
+                        float w = gTmp.MeasureString(s.Substring(0, i), fnt, 4000, StringFormat.GenericTypographic).Width;
+                        float d = Math.Abs(w - relX);
+                        if (d < bestDiff)
+                        {
+                            bestDiff = d;
+                            bestIdx = i;
+                        }
+                    }
+                    estPos = bestIdx;
+                }
+                EditCursorPos = estPos;
+                EditSelStart = EditCursorPos;
+                EditSelLength = 0;
+                FilterFormulaSuggestions();
             }
         }
 
@@ -3822,117 +4461,248 @@ namespace ZenQOffice.UI
             uint srcMinC = FillStartCol;
             uint srcMaxC = FillEndCol;
 
-            uint tgtR = FillDragTargetRow;
-            uint tgtC = FillDragTargetCol;
+            uint srcRowCount = srcMaxR - srcMinR + 1;
+            uint srcColCount = srcMaxC - srcMinC + 1;
 
-            // Fill Downwards
-            if (tgtR > srcMaxR)
+            // Vertical Fill Down
+            if (FillDragTargetRow > srcMaxR)
             {
                 for (uint c = srcMinC; c <= srcMaxC; c++)
                 {
-                    List<CellData> srcList = new List<CellData>();
-                    for (uint r = srcMinR; r <= srcMaxR; r++) srcList.Add(CurrentSheet.GetCell(r, c));
-
-                    for (uint r = srcMaxR + 1; r <= tgtR; r++)
+                    var numericSeries = new List<double>();
+                    bool isNumericCol = true;
+                    for (uint r = srcMinR; r <= srcMaxR; r++)
                     {
-                        int srcOffset = (int)((r - srcMaxR - 1) % srcList.Count);
-                        CellData src = srcList[srcOffset];
-                        CellData tgt = CurrentSheet.GetOrCreateCell(r, c);
+                        CellData sc = CurrentSheet.GetCell(r, c);
+                        if (sc != null && sc.Type == CellType.Number) numericSeries.Add(sc.NumericValue);
+                        else { isNumericCol = false; break; }
+                    }
 
-                        if (src != null)
+                    double numStep = (numericSeries.Count >= 2) ? (numericSeries[1] - numericSeries[0]) : 1.0;
+
+                    for (uint tgtR = srcMaxR + 1; tgtR <= FillDragTargetRow; tgtR++)
+                    {
+                        uint relIdx = (tgtR - srcMinR) % srcRowCount;
+                        uint templateR = srcMinR + relIdx;
+                        int rowOffset = (int)(tgtR - templateR);
+
+                        CellData templateCell = CurrentSheet.GetCell(templateR, c);
+                        if (templateCell == null) continue;
+
+                        if (templateCell.Type == CellType.Formula && !string.IsNullOrEmpty(templateCell.FormulaStr))
                         {
-                            tgt.Format = src.Format.Clone();
-                            if (!string.IsNullOrEmpty(src.FormulaStr))
-                            {
-                                int rowDelta = (int)(r - (srcMinR + srcOffset));
-                                tgt.FormulaStr = ShiftFormulaReferences(src.FormulaStr, rowDelta, 0);
-                                tgt.Type = CellType.Formula;
-                            }
-                            else if (src.Type == CellType.Number)
-                            {
-                                double step = (srcList.Count > 1 && srcList[0] != null && srcList[srcList.Count - 1] != null && srcList[0].Type == CellType.Number && srcList[srcList.Count - 1].Type == CellType.Number)
-                                    ? (srcList[srcList.Count - 1].NumericValue - srcList[0].NumericValue) / (srcList.Count - 1)
-                                    : 1.0;
-                                double newVal = srcList[srcList.Count - 1].NumericValue + step * (r - srcMaxR);
-                                tgt.NumericValue = newVal;
-                                tgt.RawValue = newVal.ToString(CultureInfo.InvariantCulture);
-                                tgt.Type = CellType.Number;
-                            }
-                            else if (!string.IsNullOrEmpty(src.RawValue))
-                            {
-                                tgt.RawValue = ExtrapolateStringPattern(src.RawValue, (int)(r - srcMaxR));
-                                tgt.Type = CellType.String;
-                            }
+                            string shiftedFormula = ShiftFormulaReferences(templateCell.FormulaStr, rowOffset, 0);
+                            CurrentSheet.SetCellText(tgtR, c, shiftedFormula);
+                        }
+                        else if (isNumericCol && numericSeries.Count >= 1)
+                        {
+                            double nextVal = numericSeries[numericSeries.Count - 1] + numStep * (tgtR - srcMaxR);
+                            CurrentSheet.SetCellText(tgtR, c, nextVal.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            string srcText = templateCell.RawValue ?? "";
+                            string filledText = ExtrapolateStringPattern(srcText, (int)((tgtR - srcMinR) / srcRowCount));
+                            CurrentSheet.SetCellText(tgtR, c, filledText);
+                        }
+
+                        if (templateCell.Format != null)
+                        {
+                            CellData targetCell = CurrentSheet.GetOrCreateCell(tgtR, c);
+                            targetCell.Format = templateCell.Format.Clone();
                         }
                     }
                 }
-                SelEndRow = tgtR;
+                SelectedRow = srcMinR;
+                SelEndRow = FillDragTargetRow;
+                SelectedCol = srcMinC;
+                SelEndCol = srcMaxC;
             }
-            // Fill Rightwards
-            else if (tgtC > srcMaxC)
+            // Vertical Fill Up
+            else if (FillDragTargetRow < srcMinR && FillDragTargetRow >= 1)
+            {
+                for (uint c = srcMinC; c <= srcMaxC; c++)
+                {
+                    var numericSeries = new List<double>();
+                    bool isNumericCol = true;
+                    for (uint r = srcMinR; r <= srcMaxR; r++)
+                    {
+                        CellData sc = CurrentSheet.GetCell(r, c);
+                        if (sc != null && sc.Type == CellType.Number) numericSeries.Add(sc.NumericValue);
+                        else { isNumericCol = false; break; }
+                    }
+
+                    double numStep = (numericSeries.Count >= 2) ? (numericSeries[1] - numericSeries[0]) : 1.0;
+
+                    for (uint tgtR = srcMinR - 1; tgtR >= FillDragTargetRow; tgtR--)
+                    {
+                        uint dist = srcMinR - tgtR;
+                        uint relIdx = (srcRowCount - 1) - ((dist - 1) % srcRowCount);
+                        uint templateR = srcMinR + relIdx;
+                        int rowOffset = (int)tgtR - (int)templateR;
+
+                        CellData templateCell = CurrentSheet.GetCell(templateR, c);
+                        if (templateCell == null)
+                        {
+                            if (tgtR == FillDragTargetRow) break;
+                            continue;
+                        }
+
+                        if (templateCell.Type == CellType.Formula && !string.IsNullOrEmpty(templateCell.FormulaStr))
+                        {
+                            string shiftedFormula = ShiftFormulaReferences(templateCell.FormulaStr, rowOffset, 0);
+                            CurrentSheet.SetCellText(tgtR, c, shiftedFormula);
+                        }
+                        else if (isNumericCol && numericSeries.Count >= 1)
+                        {
+                            double prevVal = numericSeries[0] - numStep * dist;
+                            CurrentSheet.SetCellText(tgtR, c, prevVal.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            string srcText = templateCell.RawValue ?? "";
+                            int stepBack = -((int)((dist - 1) / srcRowCount) + 1);
+                            string filledText = ExtrapolateStringPattern(srcText, stepBack);
+                            CurrentSheet.SetCellText(tgtR, c, filledText);
+                        }
+
+                        if (templateCell.Format != null)
+                        {
+                            CellData targetCell = CurrentSheet.GetOrCreateCell(tgtR, c);
+                            targetCell.Format = templateCell.Format.Clone();
+                        }
+
+                        if (tgtR == FillDragTargetRow) break;
+                    }
+                }
+                SelectedRow = FillDragTargetRow;
+                SelEndRow = srcMaxR;
+                SelectedCol = srcMinC;
+                SelEndCol = srcMaxC;
+            }
+            // Horizontal Fill Right
+            else if (FillDragTargetCol > srcMaxC)
             {
                 for (uint r = srcMinR; r <= srcMaxR; r++)
                 {
-                    List<CellData> srcList = new List<CellData>();
-                    for (uint c = srcMinC; c <= srcMaxC; c++) srcList.Add(CurrentSheet.GetCell(r, c));
-
-                    for (uint c = srcMaxC + 1; c <= tgtC; c++)
+                    var numericSeries = new List<double>();
+                    bool isNumericRow = true;
+                    for (uint c = srcMinC; c <= srcMaxC; c++)
                     {
-                        int srcOffset = (int)((c - srcMaxC - 1) % srcList.Count);
-                        CellData src = srcList[srcOffset];
-                        CellData tgt = CurrentSheet.GetOrCreateCell(r, c);
+                        CellData sc = CurrentSheet.GetCell(r, c);
+                        if (sc != null && sc.Type == CellType.Number) numericSeries.Add(sc.NumericValue);
+                        else { isNumericRow = false; break; }
+                    }
 
-                        if (src != null)
+                    double numStep = (numericSeries.Count >= 2) ? (numericSeries[1] - numericSeries[0]) : 1.0;
+
+                    for (uint tgtC = srcMaxC + 1; tgtC <= FillDragTargetCol; tgtC++)
+                    {
+                        uint relIdx = (tgtC - srcMinC) % srcColCount;
+                        uint templateC = srcMinC + relIdx;
+                        int colOffset = (int)(tgtC - templateC);
+
+                        CellData templateCell = CurrentSheet.GetCell(r, templateC);
+                        if (templateCell == null) continue;
+
+                        if (templateCell.Type == CellType.Formula && !string.IsNullOrEmpty(templateCell.FormulaStr))
                         {
-                            tgt.Format = src.Format.Clone();
-                            if (!string.IsNullOrEmpty(src.FormulaStr))
-                            {
-                                int colDelta = (int)(c - (srcMinC + srcOffset));
-                                tgt.FormulaStr = ShiftFormulaReferences(src.FormulaStr, 0, colDelta);
-                                tgt.Type = CellType.Formula;
-                            }
-                            else if (src.Type == CellType.Number)
-                            {
-                                double step = (srcList.Count > 1 && srcList[0] != null && srcList[srcList.Count - 1] != null && srcList[0].Type == CellType.Number && srcList[srcList.Count - 1].Type == CellType.Number)
-                                    ? (srcList[srcList.Count - 1].NumericValue - srcList[0].NumericValue) / (srcList.Count - 1)
-                                    : 1.0;
-                                double newVal = srcList[srcList.Count - 1].NumericValue + step * (c - srcMaxC);
-                                tgt.NumericValue = newVal;
-                                tgt.RawValue = newVal.ToString(CultureInfo.InvariantCulture);
-                                tgt.Type = CellType.Number;
-                            }
-                            else if (!string.IsNullOrEmpty(src.RawValue))
-                            {
-                                tgt.RawValue = ExtrapolateStringPattern(src.RawValue, (int)(c - srcMaxC));
-                                tgt.Type = CellType.String;
-                            }
+                            string shiftedFormula = ShiftFormulaReferences(templateCell.FormulaStr, 0, colOffset);
+                            CurrentSheet.SetCellText(r, tgtC, shiftedFormula);
+                        }
+                        else if (isNumericRow && numericSeries.Count >= 1)
+                        {
+                            double nextVal = numericSeries[numericSeries.Count - 1] + numStep * (tgtC - srcMaxC);
+                            CurrentSheet.SetCellText(r, tgtC, nextVal.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            string srcText = templateCell.RawValue ?? "";
+                            string filledText = ExtrapolateStringPattern(srcText, (int)((tgtC - srcMinC) / srcColCount));
+                            CurrentSheet.SetCellText(r, tgtC, filledText);
+                        }
+
+                        if (templateCell.Format != null)
+                        {
+                            CellData targetCell = CurrentSheet.GetOrCreateCell(r, tgtC);
+                            targetCell.Format = templateCell.Format.Clone();
                         }
                     }
                 }
-                SelEndCol = tgtC;
+                SelectedRow = srcMinR;
+                SelEndRow = srcMaxR;
+                SelectedCol = srcMinC;
+                SelEndCol = FillDragTargetCol;
+            }
+            // Horizontal Fill Left
+            else if (FillDragTargetCol < srcMinC && FillDragTargetCol >= 1)
+            {
+                for (uint r = srcMinR; r <= srcMaxR; r++)
+                {
+                    var numericSeries = new List<double>();
+                    bool isNumericRow = true;
+                    for (uint c = srcMinC; c <= srcMaxC; c++)
+                    {
+                        CellData sc = CurrentSheet.GetCell(r, c);
+                        if (sc != null && sc.Type == CellType.Number) numericSeries.Add(sc.NumericValue);
+                        else { isNumericRow = false; break; }
+                    }
+
+                    double numStep = (numericSeries.Count >= 2) ? (numericSeries[1] - numericSeries[0]) : 1.0;
+
+                    for (uint tgtC = srcMinC - 1; tgtC >= FillDragTargetCol; tgtC--)
+                    {
+                        uint dist = srcMinC - tgtC;
+                        uint relIdx = (srcColCount - 1) - ((dist - 1) % srcColCount);
+                        uint templateC = srcMinC + relIdx;
+                        int colOffset = (int)tgtC - (int)templateC;
+
+                        CellData templateCell = CurrentSheet.GetCell(r, templateC);
+                        if (templateCell == null)
+                        {
+                            if (tgtC == FillDragTargetCol) break;
+                            continue;
+                        }
+
+                        if (templateCell.Type == CellType.Formula && !string.IsNullOrEmpty(templateCell.FormulaStr))
+                        {
+                            string shiftedFormula = ShiftFormulaReferences(templateCell.FormulaStr, 0, colOffset);
+                            CurrentSheet.SetCellText(r, tgtC, shiftedFormula);
+                        }
+                        else if (isNumericRow && numericSeries.Count >= 1)
+                        {
+                            double prevVal = numericSeries[0] - numStep * dist;
+                            CurrentSheet.SetCellText(r, tgtC, prevVal.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            string srcText = templateCell.RawValue ?? "";
+                            int stepBack = -((int)((dist - 1) / srcColCount) + 1);
+                            string filledText = ExtrapolateStringPattern(srcText, stepBack);
+                            CurrentSheet.SetCellText(r, tgtC, filledText);
+                        }
+
+                        if (templateCell.Format != null)
+                        {
+                            CellData targetCell = CurrentSheet.GetOrCreateCell(r, tgtC);
+                            targetCell.Format = templateCell.Format.Clone();
+                        }
+
+                        if (tgtC == FillDragTargetCol) break;
+                    }
+                }
+                SelectedRow = srcMinR;
+                SelEndRow = srcMaxR;
+                SelectedCol = FillDragTargetCol;
+                SelEndCol = srcMaxC;
             }
 
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
-        private string ShiftFormulaReferences(string formula, int rowDelta, int colDelta)
+        public string ShiftFormulaReferences(string formula, int rowOffset, int colOffset)
         {
-            if (string.IsNullOrEmpty(formula)) return "";
-            return Regex.Replace(formula, @"([A-Za-z]+)([0-9]+)", new MatchEvaluator(match =>
-            {
-                string colStr = match.Groups[1].Value.ToUpper();
-                string rowStr = match.Groups[2].Value;
-
-                uint colIdx = SparseMatrix.ColNameToIndex(colStr);
-                uint rowIdx = 1;
-                uint.TryParse(rowStr, out rowIdx);
-                if (rowIdx == 0) rowIdx = 1;
-
-                uint newCol = (uint)Math.Max(1, (int)colIdx + colDelta);
-                uint newRow = (uint)Math.Max(1, (int)rowIdx + rowDelta);
-
-                return SparseMatrix.ColIndexToName(newCol) + newRow;
-            }));
+            return AdjustFormulaOffset(formula, rowOffset, colOffset);
         }
 
         private string ExtrapolateStringPattern(string text, int step)
@@ -3952,6 +4722,33 @@ namespace ZenQOffice.UI
 
         public void HandleChar(char ch)
         {
+            if (IsEditingNameBox)
+            {
+                if (ch == '\r' || ch == '\n')
+                {
+                    ExecuteGoToTarget(NameBoxEditText);
+                    IsEditingNameBox = false;
+                }
+                else if (ch == 27) // Escape
+                {
+                    IsEditingNameBox = false;
+                }
+                else if (ch == '\b' && NameBoxCursorPos > 0 && !string.IsNullOrEmpty(NameBoxEditText))
+                {
+                    int p = Math.Min(NameBoxCursorPos, NameBoxEditText.Length);
+                    NameBoxEditText = NameBoxEditText.Remove(p - 1, 1);
+                    NameBoxCursorPos = p - 1;
+                }
+                else if (!char.IsControl(ch))
+                {
+                    string nb = NameBoxEditText ?? "";
+                    int pos = Math.Max(0, Math.Min(nb.Length, NameBoxCursorPos));
+                    NameBoxEditText = nb.Insert(pos, ch.ToString());
+                    NameBoxCursorPos = pos + 1;
+                }
+                return;
+            }
+
             if (IsSheetProtected && ch != '\r' && ch != '\t')
             {
                 ShowSheetProtectedWarning();
@@ -3975,12 +4772,9 @@ namespace ZenQOffice.UI
             }
             else if (ch == '\t')
             {
-                if (IsEditing && EditText.StartsWith("=") && !EditText.Contains("(") && ActiveSuggestions != null && ActiveSuggestions.Count > 0)
+                if (IsEditing && !string.IsNullOrEmpty(EditText) && EditText.TrimStart().StartsWith("=") && ActiveSuggestions != null && ActiveSuggestions.Count > 0)
                 {
-                    EditText = "=" + ActiveSuggestions[SelectedSuggestionIndex].Name + "(";
-                    EditCursorPos = EditText.Length;
-                    EditSelStart = 0;
-                    EditSelLength = 0;
+                    CommitFormulaSuggestion(ActiveSuggestions[Math.Max(0, Math.Min(ActiveSuggestions.Count - 1, SelectedSuggestionIndex))]);
                 }
                 else
                 {
@@ -4013,6 +4807,9 @@ namespace ZenQOffice.UI
                     EditText = EditText.Remove(EditCursorPos - 1, 1);
                     EditCursorPos--;
                 }
+                _pointInsertStart = -1;
+                _pointInsertLength = 0;
+                FilterFormulaSuggestions(EditText);
             }
             else if (ch >= 32)
             {
@@ -4062,6 +4859,21 @@ namespace ZenQOffice.UI
 
                 EditText = EditText.Insert(EditCursorPos, ch.ToString());
                 EditCursorPos++;
+
+                if (!string.IsNullOrEmpty(EditText) && EditText.TrimStart().StartsWith("=") &&
+                    ("+-*/^&=<>(),;:".IndexOf(ch) >= 0))
+                {
+                    IsFormulaPointMode = true;
+                    _pointInsertStart = -1;
+                    _pointInsertLength = 0;
+                }
+                else
+                {
+                    _pointInsertStart = -1;
+                    _pointInsertLength = 0;
+                    IsFormulaPointMode = false;
+                }
+                FilterFormulaSuggestions(EditText);
             }
         }
 
@@ -4144,8 +4956,7 @@ namespace ZenQOffice.UI
                         CurrentSheet.SetCellText(existingRow, SelectedCol + 1, (curQty + 1).ToString());
                         CurrentSheet.SetCellText(existingRow, SelectedCol + 2, nowStamp);
                         CurrentSheet.SetCellText(SelectedRow, SelectedCol, "");
-                        FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-                        FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+                        RecalcAfterEdit(true);
                         IsEditing = false;
                         EditText = "";
                         EditSelLength = 0;
@@ -4176,59 +4987,90 @@ namespace ZenQOffice.UI
 
         public void CancelEdit()
         {
+            if (FormulaSourceSheetIndex >= 0 && FormulaSourceSheetIndex != ActiveSheetIndex && FormulaSourceSheetIndex < Sheets.Count)
+            {
+                SaveCurrentSheetState();
+                _activeSheetIndex = FormulaSourceSheetIndex;
+                LoadSheetState(FormulaSourceSheetIndex);
+                SelectedRow = FormulaSourceRow;
+                SelectedCol = FormulaSourceCol;
+                SelEndRow = FormulaSourceRow;
+                SelEndCol = FormulaSourceCol;
+            }
+            FormulaSourceSheetIndex = -1;
+            IsFormulaPointMode = false;
+            IsSelectingPointRange = false;
+            _pointInsertStart = -1;
+            _pointInsertLength = 0;
             IsEditing = false;
             EditText = "";
             EditSelLength = 0;
         }
 
-        private void CycleFormulaRefAtCursor()
+        public void CycleFormulaRefAtCursor()
         {
-            if (string.IsNullOrEmpty(EditText) || !EditText.StartsWith("=")) return;
+            if (string.IsNullOrEmpty(EditText) || !EditText.TrimStart().StartsWith("=")) return;
             int pos = Math.Min(EditCursorPos, EditText.Length);
 
-            int start = pos;
-            while (start > 1)
+            var matches = System.Text.RegularExpressions.Regex.Matches(
+                EditText,
+                @"(?<![A-Za-z0-9_.])(\$?[A-Za-z]{1,3}\$?[0-9]{1,7}(?::\$?[A-Za-z]{1,3}\$?[0-9]{1,7})?)(?![A-Za-z0-9_(])");
+            foreach (System.Text.RegularExpressions.Match m in matches)
             {
-                char ch = EditText[start - 1];
-                if (char.IsLetterOrDigit(ch) || ch == '$') start--;
-                else break;
+                if (pos >= m.Index && pos <= m.Index + m.Length)
+                {
+                    string[] parts = m.Value.Split(':');
+                    string cycledFirst = ToggleSingleRefAnchor(parts[0]);
+                    int mode = DetectRefAnchorMode(cycledFirst);
+                    string replacement = cycledFirst;
+                    if (parts.Length == 2)
+                    {
+                        replacement += ":" + ApplyRefAnchorMode(parts[1], mode);
+                    }
+
+                    EditText = EditText.Substring(0, m.Index) + replacement + EditText.Substring(m.Index + m.Length);
+                    EditCursorPos = m.Index + replacement.Length;
+                    EditSelStart = EditCursorPos;
+                    EditSelLength = 0;
+                    _pointInsertStart = m.Index;
+                    _pointInsertLength = replacement.Length;
+                    break;
+                }
             }
-            int end = pos;
-            while (end < EditText.Length)
+        }
+
+        private static int DetectRefAnchorMode(string refToken)
+        {
+            var rm = System.Text.RegularExpressions.Regex.Match(refToken, @"^(\$?)([A-Za-z]+)(\$?)([0-9]+)$");
+            if (!rm.Success) return 0;
+            bool c = !string.IsNullOrEmpty(rm.Groups[1].Value);
+            bool r = !string.IsNullOrEmpty(rm.Groups[3].Value);
+            if (c && r) return 1;
+            if (!c && r) return 2;
+            if (c && !r) return 3;
+            return 0;
+        }
+
+        private static string ApplyRefAnchorMode(string refToken, int mode)
+        {
+            var rm = System.Text.RegularExpressions.Regex.Match(refToken, @"^\$?([A-Za-z]+)\$?([0-9]+)$");
+            if (!rm.Success) return refToken;
+            string col = rm.Groups[1].Value;
+            string row = rm.Groups[2].Value;
+            switch (mode)
             {
-                char ch = EditText[end];
-                if (char.IsLetterOrDigit(ch) || ch == '$') end++;
-                else break;
+                case 1: return "$" + col + "$" + row;
+                case 2: return col + "$" + row;
+                case 3: return "$" + col + row;
+                default: return col + row;
             }
+        }
 
-            if (end <= start) return;
-            string token = EditText.Substring(start, end - start);
-
-            int idx = 0;
-            bool colAbs = false;
-            if (idx < token.Length && token[idx] == '$') { colAbs = true; idx++; }
-            int colStart = idx;
-            while (idx < token.Length && char.IsLetter(token[idx])) idx++;
-            string colPart = token.Substring(colStart, idx - colStart);
-            if (string.IsNullOrEmpty(colPart) || colPart.Length > 3) return;
-
-            bool rowAbs = false;
-            if (idx < token.Length && token[idx] == '$') { rowAbs = true; idx++; }
-            int rowStart = idx;
-            while (idx < token.Length && char.IsDigit(token[idx])) idx++;
-            string rowPart = token.Substring(rowStart, idx - rowStart);
-            if (string.IsNullOrEmpty(rowPart) || idx < token.Length) return;
-
-            // Excel F4 cycle: A1 -> $A$1 -> A$1 -> $A1 -> A1
-            string newRef;
-            if (!colAbs && !rowAbs) newRef = "$" + colPart.ToUpperInvariant() + "$" + rowPart;
-            else if (colAbs && rowAbs) newRef = colPart.ToUpperInvariant() + "$" + rowPart;
-            else if (!colAbs && rowAbs) newRef = "$" + colPart.ToUpperInvariant() + rowPart;
-            else newRef = colPart.ToUpperInvariant() + rowPart;
-
-            EditText = EditText.Substring(0, start) + newRef + EditText.Substring(end);
-            EditCursorPos = start + newRef.Length;
-            EditSelLength = 0;
+        private static string ToggleSingleRefAnchor(string refToken)
+        {
+            int curMode = DetectRefAnchorMode(refToken);
+            int nextMode = (curMode + 1) % 4;
+            return ApplyRefAnchorMode(refToken, nextMode);
         }
 
         private void JumpToDataEdge(uint curR, uint curC, int dRow, int dCol, out uint targetR, out uint targetC)
@@ -4300,6 +5142,36 @@ namespace ZenQOffice.UI
             bool ctrl = ((Control.ModifierKeys & Keys.Control) == Keys.Control) || ((key & Keys.Control) == Keys.Control);
             bool alt = ((Control.ModifierKeys & Keys.Alt) == Keys.Alt) || ((key & Keys.Alt) == Keys.Alt);
 
+            if (IsEditingNameBox)
+            {
+                if (rawKey == Keys.Enter)
+                {
+                    ExecuteGoToTarget(NameBoxEditText);
+                    IsEditingNameBox = false;
+                }
+                else if (rawKey == Keys.Escape)
+                {
+                    IsEditingNameBox = false;
+                }
+                else if (rawKey == Keys.Back && NameBoxCursorPos > 0 && !string.IsNullOrEmpty(NameBoxEditText))
+                {
+                    int p = Math.Min(NameBoxCursorPos, NameBoxEditText.Length);
+                    NameBoxEditText = NameBoxEditText.Remove(p - 1, 1);
+                    NameBoxCursorPos = p - 1;
+                }
+                else if (rawKey == Keys.Left && NameBoxCursorPos > 0) NameBoxCursorPos--;
+                else if (rawKey == Keys.Right && NameBoxCursorPos < (NameBoxEditText ?? "").Length) NameBoxCursorPos++;
+                return;
+            }
+
+            // F5 or Ctrl + G : Go To / Go To Special
+            if (rawKey == Keys.F5 || (ctrl && rawKey == Keys.G))
+            {
+                if (IsEditing) CommitCurrentEditCell(true);
+                ShowGoToDialog(Form.ActiveForm);
+                return;
+            }
+
             // Shift + F3: Insert Function Dialog (fx)
             if (shift && rawKey == Keys.F3)
             {
@@ -4320,8 +5192,6 @@ namespace ZenQOffice.UI
             // F9: Calculate Now
             if (rawKey == Keys.F9)
             {
-                FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-                FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
                 CalculateNow(true);
                 return;
             }
@@ -4394,19 +5264,35 @@ namespace ZenQOffice.UI
                             CurrentSheet.SetCellText(r, c, finalVal);
                         }
                     }
-                    FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-                    FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+                    RecalcAfterEdit(true);
                     IsEditing = false;
                     EditSelLength = 0;
                     return;
                 }
                 if (ctrl && rawKey == Keys.A)
+            {
+                ClearAdditionalSelections();
+                uint regMinR, regMaxR, regMinC, regMaxC;
+                GetContiguousDataRange(SelectedRow, SelectedCol, out regMinR, out regMaxR, out regMinC, out regMaxC);
+                bool hasRegion = (regMaxR > regMinR || regMaxC > regMinC) ||
+                                 (CurrentSheet.GetCell(SelectedRow, SelectedCol) != null &&
+                                  !string.IsNullOrEmpty(CurrentSheet.GetCell(SelectedRow, SelectedCol).RawValue));
+                bool alreadyRegion = (Math.Min(SelectedRow, SelEndRow) == regMinR &&
+                                      Math.Max(SelectedRow, SelEndRow) == regMaxR &&
+                                      Math.Min(SelectedCol, SelEndCol) == regMinC &&
+                                      Math.Max(SelectedCol, SelEndCol) == regMaxC);
+                if (hasRegion && !alreadyRegion)
                 {
-                    EditSelStart = 0;
-                    EditSelLength = EditText.Length;
-                    EditCursorPos = EditText.Length;
-                    return;
+                    SelectedRow = regMinR; SelEndRow = regMaxR;
+                    SelectedCol = regMinC; SelEndCol = regMaxC;
                 }
+                else
+                {
+                    SelectedCol = 1; SelectedRow = 1;
+                    SelEndCol = CalcMaxCols; SelEndRow = CalcMaxRows;
+                }
+                return;
+            }
                 if (ctrl && rawKey == Keys.C)
                 {
                     if (EditSelLength > 0 && EditSelStart >= 0 && EditSelStart + EditSelLength <= EditText.Length)
@@ -4442,6 +5328,38 @@ namespace ZenQOffice.UI
                     }
                     return;
                 }
+                // Point Mode Keyboard Navigation (Left/Right/Up/Down arrows insert/move ref when at operator)
+                if ((rawKey == Keys.Left || rawKey == Keys.Right || rawKey == Keys.Up || rawKey == Keys.Down) &&
+                    !string.IsNullOrEmpty(EditText) && EditText.TrimStart().StartsWith("=") &&
+                    (IsFormulaPointMode || CanAcceptFormulaReferenceBeforeCursor(EditText, EditCursorPos)))
+                {
+                    IsFormulaPointMode = true;
+                    uint baseR = _pointInsertStart >= 0 ? _pointCursorRow : SelectedRow;
+                    uint baseC = _pointInsertStart >= 0 ? _pointCursorCol : SelectedCol;
+                    uint nextR = baseR;
+                    uint nextC = baseC;
+                    if (rawKey == Keys.Up && nextR > 1) nextR--;
+                    else if (rawKey == Keys.Down && nextR < CalcMaxRows) nextR++;
+                    else if (rawKey == Keys.Left && nextC > 1) nextC--;
+                    else if (rawKey == Keys.Right && nextC < CalcMaxCols) nextC++;
+
+                    if (shift && _pointInsertStart >= 0)
+                    {
+                        _pointCursorRow = nextR;
+                        _pointCursorCol = nextC;
+                        BeginOrUpdatePointRange(_pointAnchorRow, _pointAnchorCol, nextR, nextC, false);
+                    }
+                    else
+                    {
+                        _pointAnchorRow = nextR;
+                        _pointAnchorCol = nextC;
+                        _pointCursorRow = nextR;
+                        _pointCursorCol = nextC;
+                        BeginOrUpdatePointRange(nextR, nextC, nextR, nextC, false);
+                    }
+                    return;
+                }
+
                 if (rawKey == Keys.Left)
                 {
                     if (shift)
@@ -4646,8 +5564,7 @@ namespace ZenQOffice.UI
                     SaveUndoState();
                     string stamp = shift ? DateTime.Now.ToString("HH:mm:ss") : DateTime.Today.ToString("dd/MM/yyyy");
                     CurrentSheet.SetCellText(SelectedRow, SelectedCol, stamp);
-                    FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-                    FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+                    RecalcAfterEdit(true);
                     return;
                 }
 
@@ -4836,8 +5753,7 @@ namespace ZenQOffice.UI
                         return;
                     }
                     ClearSelectedCells();
-                    FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-                    FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+                    RecalcAfterEdit(true);
                     return;
                 }
                 else if (rawKey == Keys.Enter)
@@ -5282,7 +6198,7 @@ namespace ZenQOffice.UI
         {
             SaveUndoState();
             CurrentSheet.SetCellText(row, col, text);
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public void OpenCellDropdownViewer(Form parentForm)
@@ -5648,7 +6564,7 @@ namespace ZenQOffice.UI
             SaveUndoState();
             uint minR = Math.Min(SelectedRow, SelEndRow);
             CurrentSheet.InsertRows(minR, count);
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public void DeleteRows(uint count = 1)
@@ -5658,7 +6574,7 @@ namespace ZenQOffice.UI
             uint maxR = Math.Max(SelectedRow, SelEndRow);
             uint delCount = Math.Max(count, maxR - minR + 1);
             CurrentSheet.DeleteRows(minR, delCount);
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public void InsertCols(uint count = 1)
@@ -5666,7 +6582,7 @@ namespace ZenQOffice.UI
             SaveUndoState();
             uint minC = Math.Min(SelectedCol, SelEndCol);
             CurrentSheet.InsertCols(minC, count);
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public void DeleteCols(uint count = 1)
@@ -5676,7 +6592,7 @@ namespace ZenQOffice.UI
             uint maxC = Math.Max(SelectedCol, SelEndCol);
             uint delCount = Math.Max(count, maxC - minC + 1);
             CurrentSheet.DeleteCols(minC, delCount);
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         // ==================== Clear Actions ====================
@@ -5689,7 +6605,7 @@ namespace ZenQOffice.UI
             uint minC = Math.Min(SelectedCol, SelEndCol);
             uint maxC = Math.Max(SelectedCol, SelEndCol);
             CurrentSheet.ClearRange(minR, minC, maxR, maxC);
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public void ClearFormats()
@@ -5710,7 +6626,7 @@ namespace ZenQOffice.UI
                 cell.NumericValue = 0;
                 cell.EvaluatedStr = "";
             });
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         // ==================== Indent Operations ====================
@@ -6034,7 +6950,7 @@ namespace ZenQOffice.UI
 
             if (count > 0)
             {
-                FormulaEngine.EvaluateSheet(CurrentSheet);
+                RecalcAfterEdit();
             }
             return count;
         }
@@ -6058,7 +6974,7 @@ namespace ZenQOffice.UI
         {
             if (string.IsNullOrEmpty(query) || CurrentSheet == null)
             {
-                statusMsg = "Vui lòng nhập nội dung cần tìm.";
+                statusMsg = AppL10n.T("Vui lòng nhập nội dung cần tìm.", "Please enter text to find.");
                 return false;
             }
 
@@ -6105,7 +7021,7 @@ namespace ZenQOffice.UI
 
             if (matches.Count == 0)
             {
-                statusMsg = "Không tìm thấy nội dung yêu cầu.";
+                statusMsg = AppL10n.T("Không tìm thấy nội dung yêu cầu.", "No matching entries were found.");
                 return false;
             }
 
@@ -6193,7 +7109,7 @@ namespace ZenQOffice.UI
             SelEndCol = chosen.Item2;
 
             EnsureCellVisible(SelectedRow, SelectedCol);
-            statusMsg = string.Format("Đã tìm thấy tại {0} ({1} kết quả)", SparseMatrix.GetCellReference(SelectedRow, SelectedCol), matches.Count);
+            statusMsg = AppL10n.T(string.Format("Đã tìm thấy tại {0} ({1} kết quả)", SparseMatrix.GetCellReference(SelectedRow, SelectedCol), matches.Count), string.Format("Found at {0} ({1} match(es))", SparseMatrix.GetCellReference(SelectedRow, SelectedCol), matches.Count));
             return true;
         }
 
@@ -6276,7 +7192,7 @@ namespace ZenQOffice.UI
                 }
             }
 
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
             return 1;
         }
 
@@ -6368,7 +7284,7 @@ namespace ZenQOffice.UI
 
             if (count > 0)
             {
-                FormulaEngine.EvaluateSheet(CurrentSheet);
+                RecalcAfterEdit();
             }
             return count;
         }
@@ -6481,7 +7397,7 @@ namespace ZenQOffice.UI
                     }
                     else if (dvRule.ErrorStyle == DataValidationErrorStyle.Warning)
                     {
-                        var dr = ZenQOffice.UI.FluentMessageBox.Show(valRes.ErrorMessage + "\n\nBạn có muốn tiếp tục áp dụng không?", dvRule.ErrorTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                        var dr = ZenQOffice.UI.FluentMessageBox.Show(valRes.ErrorMessage + AppL10n.T("\n\nBạn có muốn tiếp tục áp dụng không?", "\n\nDo you want to continue?"), dvRule.ErrorTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                         if (dr == DialogResult.No)
                         {
                             if (preventOnStop) return false;
@@ -6494,10 +7410,25 @@ namespace ZenQOffice.UI
                 }
             }
 
+            if (FormulaSourceSheetIndex >= 0 && FormulaSourceSheetIndex != ActiveSheetIndex && FormulaSourceSheetIndex < Sheets.Count)
+            {
+                SaveCurrentSheetState();
+                _activeSheetIndex = FormulaSourceSheetIndex;
+                LoadSheetState(FormulaSourceSheetIndex);
+                SelectedRow = FormulaSourceRow;
+                SelectedCol = FormulaSourceCol;
+                SelEndRow = FormulaSourceRow;
+                SelEndCol = FormulaSourceCol;
+            }
+            FormulaSourceSheetIndex = -1;
+            IsFormulaPointMode = false;
+            IsSelectingPointRange = false;
+            _pointInsertStart = -1;
+            _pointInsertLength = 0;
+
             SaveUndoState();
             CurrentSheet.SetCellText(SelectedRow, SelectedCol, finalVal);
-            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-            FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+            RecalcAfterEdit(true);
             IsEditing = false;
             EditSelLength = 0;
             return true;
@@ -6614,8 +7545,7 @@ namespace ZenQOffice.UI
                 var cell = sc.ChangingCells[i];
                 CurrentSheet.SetCellText(cell.Item1, cell.Item2, sc.Values[i]);
             }
-            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-            FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+            RecalcAfterEdit(true);
         }
 
         public void GenerateScenarioSummaryReport()
@@ -6679,8 +7609,7 @@ namespace ZenQOffice.UI
                 curRow++;
             }
 
-            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
-            FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+            RecalcAfterEdit(true);
         }
 
         public void ShowScenarioManagerDialog(Form parentForm)
@@ -6787,7 +7716,7 @@ namespace ZenQOffice.UI
             }
             SelEndRow = currentMaxR;
 
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public void ExecuteTextToColumns(uint srcCol, uint startRow, uint endRow, uint destCol, uint destRow, List<char> delimiters, bool consecutiveAsOne, char textQualifier, List<int> fixedWidths, bool isFixedWidth)
@@ -6841,7 +7770,7 @@ namespace ZenQOffice.UI
                 }
             }
 
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         // ==================== Table Styling & Design Operations ====================
@@ -7095,27 +8024,28 @@ namespace ZenQOffice.UI
         public void ClearSelectedCells()
         {
             SaveUndoState();
-            uint minR = Math.Min(SelectedRow, SelEndRow);
-            uint maxR = Math.Max(SelectedRow, SelEndRow);
-            uint minC = Math.Min(SelectedCol, SelEndCol);
-            uint maxC = Math.Max(SelectedCol, SelEndCol);
-
-            for (uint r = minR; r <= maxR; r++)
+            foreach (var rng in GetAllSelectedRanges())
             {
-                for (uint c = minC; c <= maxC; c++)
+                uint maxR = Math.Min(rng.MaxRow, Math.Max(rng.MinRow, CurrentSheet.GetMaxRow()));
+                uint maxC = Math.Min(rng.MaxCol, Math.Max(rng.MinCol, CurrentSheet.GetMaxCol()));
+                for (uint r = rng.MinRow; r <= maxR; r++)
                 {
-                    CellData cell = CurrentSheet.GetCell(r, c);
-                    if (cell != null)
+                    for (uint c = rng.MinCol; c <= maxC; c++)
                     {
-                        cell.RawValue = "";
-                        cell.NumericValue = 0;
-                        cell.EvaluatedStr = "";
-                        cell.FormulaStr = "";
-                        cell.Type = CellType.Empty;
+                        CellData cell = CurrentSheet.GetCell(r, c);
+                        if (cell != null)
+                        {
+                            cell.RawValue = "";
+                            cell.NumericValue = 0;
+                            cell.EvaluatedStr = "";
+                            cell.FormulaStr = "";
+                            cell.Type = CellType.Empty;
+                        }
                     }
                 }
             }
             RecomputeHiddenRows();
+            RecalcAfterEdit();
         }
 
         // ==================== Conditional Formatting ====================
@@ -7300,7 +8230,7 @@ namespace ZenQOffice.UI
                     }
                 }
             }
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public void AutoSum(string func = "SUM")
@@ -7380,12 +8310,177 @@ namespace ZenQOffice.UI
                 }
             }
 
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
+        }
+
+        public void SyncFormulaEngineMetadata()
+        {
+            Dictionary<string, string> namedMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (DefinedNames != null)
+            {
+                foreach (var dn in DefinedNames)
+                {
+                    if (dn != null && !string.IsNullOrWhiteSpace(dn.Name) && !string.IsNullOrWhiteSpace(dn.RefersTo))
+                    {
+                        namedMap[dn.Name.Trim()] = dn.RefersTo.Trim();
+                    }
+                }
+            }
+            FormulaEngine.IsManualCalculation = !AutoCalculation;
+            FormulaEngine.SetWorkbookContext(Sheets, SheetNames);
+            FormulaEngine.SetWorkbookFormulaMetadata(namedMap, TryResolveStructuredReference);
+        }
+
+        public List<Tuple<uint, uint>> TryResolveStructuredReference(string expr, SparseMatrix targetSheet, uint currentRow)
+        {
+            if (string.IsNullOrWhiteSpace(expr) || Tables == null) return null;
+            SparseMatrix sh = targetSheet ?? CurrentSheet;
+            if (sh == null) return null;
+            string s = expr.Trim();
+
+            var m = System.Text.RegularExpressions.Regex.Match(s, @"^([A-Za-z_][A-Za-z0-9_.]*)?\[(.*)\]$");
+            if (!m.Success) return null;
+
+            string tblName = m.Groups[1].Value;
+            string spec = m.Groups[2].Value.Trim();
+
+            ExcelTableInfo targetTable = null;
+            if (!string.IsNullOrEmpty(tblName))
+            {
+                foreach (var t in Tables)
+                {
+                    if (t != null && string.Equals(t.Name, tblName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetTable = t;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                uint evalR = currentRow > 0 ? currentRow : SelectedRow;
+                uint evalC = FormulaEngine.CurrentEvaluatingCol > 0 ? FormulaEngine.CurrentEvaluatingCol : SelectedCol;
+                foreach (var t in Tables)
+                {
+                    if (t != null && evalR >= t.StartRow && evalR <= t.EndRow && evalC >= t.StartCol && evalC <= t.EndCol)
+                    {
+                        targetTable = t;
+                        break;
+                    }
+                }
+                if (targetTable == null)
+                {
+                    foreach (var t in Tables)
+                    {
+                        if (t != null && evalR >= t.StartRow && evalR <= t.EndRow)
+                        {
+                            targetTable = t;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (targetTable == null) return null;
+
+            uint dataStartR = targetTable.HasHeaders ? (targetTable.StartRow + 1) : targetTable.StartRow;
+            uint dataEndR = targetTable.HasTotalRow && targetTable.EndRow > dataStartR ? (targetTable.EndRow - 1) : targetTable.EndRow;
+            var coords = new List<Tuple<uint, uint>>();
+
+            if (spec.Equals("#All", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(spec))
+            {
+                for (uint r = targetTable.StartRow; r <= targetTable.EndRow; r++)
+                    for (uint c = targetTable.StartCol; c <= targetTable.EndCol; c++)
+                        coords.Add(Tuple.Create(r, c));
+                return coords;
+            }
+            if (spec.Equals("#Data", StringComparison.OrdinalIgnoreCase))
+            {
+                for (uint r = dataStartR; r <= dataEndR; r++)
+                    for (uint c = targetTable.StartCol; c <= targetTable.EndCol; c++)
+                        coords.Add(Tuple.Create(r, c));
+                return coords;
+            }
+            if (spec.Equals("#Headers", StringComparison.OrdinalIgnoreCase) && targetTable.HasHeaders)
+            {
+                for (uint c = targetTable.StartCol; c <= targetTable.EndCol; c++)
+                    coords.Add(Tuple.Create(targetTable.StartRow, c));
+                return coords;
+            }
+            if (spec.Equals("#Totals", StringComparison.OrdinalIgnoreCase) && targetTable.HasTotalRow)
+            {
+                for (uint c = targetTable.StartCol; c <= targetTable.EndCol; c++)
+                    coords.Add(Tuple.Create(targetTable.EndRow, c));
+                return coords;
+            }
+
+            bool currentRowOnly = spec.StartsWith("@");
+            string colHeader = currentRowOnly ? spec.Substring(1).Trim() : spec;
+            if (colHeader.StartsWith("[") && colHeader.EndsWith("]"))
+                colHeader = colHeader.Substring(1, colHeader.Length - 2).Trim();
+
+            for (uint c = targetTable.StartCol; c <= targetTable.EndCol; c++)
+            {
+                CellData hCell = sh.GetCell(targetTable.StartRow, c);
+                string hText = hCell != null ? (hCell.EvaluatedStr ?? hCell.RawValue ?? "").Trim() : "";
+                if (string.Equals(hText, colHeader, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (currentRowOnly)
+                    {
+                        uint evalR = currentRow > 0 ? currentRow : SelectedRow;
+                        coords.Add(Tuple.Create(evalR, c));
+                    }
+                    else
+                    {
+                        for (uint r = dataStartR; r <= dataEndR; r++)
+                            coords.Add(Tuple.Create(r, c));
+                    }
+                    return coords;
+                }
+            }
+            return null;
+        }
+
+        private void RecalcAfterEdit(bool singleCellChanged = false)
+        {
+            SyncFormulaEngineMetadata();
+            if (AutoCalculation)
+            {
+                FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+            }
+            else if (singleCellChanged && CurrentSheet != null)
+            {
+                CellData c = CurrentSheet.GetCell(SelectedRow, SelectedCol);
+                if (c != null && c.Type == CellType.Formula && !string.IsNullOrEmpty(c.FormulaStr))
+                {
+                    FormulaEngine.CurrentEvaluatingRow = SelectedRow;
+                    FormulaEngine.CurrentEvaluatingCol = SelectedCol;
+                    try
+                    {
+                        CellData res = FormulaEngine.EvaluateFormula(c.FormulaStr, CurrentSheet);
+                        c.EvaluatedStr = res.EvaluatedStr;
+                        c.NumericValue = res.NumericValue;
+                    }
+                    finally
+                    {
+                        FormulaEngine.CurrentEvaluatingRow = 0;
+                        FormulaEngine.CurrentEvaluatingCol = 0;
+                    }
+                }
+            }
         }
 
         public void CalculateNow(bool fullForce = false)
         {
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            SyncFormulaEngineMetadata();
+            if (Sheets != null && Sheets.Count > 0)
+            {
+                FormulaEngine.EvaluateWorkbook(Sheets, SheetNames);
+            }
+            else if (CurrentSheet != null)
+            {
+                RecalcAfterEdit();
+            }
         }
 
         public void GetContiguousDataRange(uint inRow, uint inCol, out uint minR, out uint maxR, out uint minC, out uint maxC)
@@ -7438,7 +8533,7 @@ namespace ZenQOffice.UI
                     {
                         IsSheetProtected = true;
                         ProtectPassword = dlg.EnteredPassword;
-                        ZenQOffice.UI.FluentMessageBox.Show("Đã bật chế độ Bảo vệ Sheet thành công!\nCác ô tính hiện đang ở chế độ chỉ đọc để tránh vô tình chỉnh sửa.", "Bảo Vệ Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã bật chế độ Bảo vệ Sheet thành công!\nCác ô tính hiện đang ở chế độ chỉ đọc để tránh vô tình chỉnh sửa.", "Sheet protection enabled!\nCells are now read-only to prevent accidental changes."), AppL10n.T("Bảo Vệ Trang Tính", "Protect Sheet"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
@@ -7454,11 +8549,11 @@ namespace ZenQOffice.UI
                             {
                                 IsSheetProtected = false;
                                 ProtectPassword = "";
-                                ZenQOffice.UI.FluentMessageBox.Show("Mở khóa trang tính thành công! Bạn có thể tự do chỉnh sửa lại các ô.", "Mở Khóa Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Mở khóa trang tính thành công! Bạn có thể tự do chỉnh sửa lại các ô.", "Sheet unprotected! You can now freely edit cells."), AppL10n.T("Mở Khóa Trang Tính", "Unprotect Sheet"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                             }
                             else
                             {
-                                ZenQOffice.UI.FluentMessageBox.Show("Mật khẩu không chính xác! Không thể mở khóa trang tính.", "Lỗi Mật Khẩu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Mật khẩu không chính xác! Không thể mở khóa trang tính.", "Incorrect password! Could not unprotect sheet."), AppL10n.T("Lỗi Mật Khẩu", "Password Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
                     }
@@ -7466,7 +8561,7 @@ namespace ZenQOffice.UI
                 else
                 {
                     IsSheetProtected = false;
-                    ZenQOffice.UI.FluentMessageBox.Show("Đã mở khóa trang tính thành công! Bạn có thể tự do chỉnh sửa lại các ô.", "Mở Khóa Trang Tính", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã mở khóa trang tính thành công! Bạn có thể tự do chỉnh sửa lại các ô.", "Sheet unprotected! You can now freely edit cells."), AppL10n.T("Mở Khóa Trang Tính", "Unprotect Sheet"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             if (parentForm != null) parentForm.Invalidate();
@@ -7515,7 +8610,7 @@ namespace ZenQOffice.UI
 
                 uint r = (uint)(kvp.Key >> 32);
                 uint c = (uint)(kvp.Key & 0xFFFFFFFF);
-                string cellCoord = string.Format("Ô {0}{1}", SparseMatrix.ColIndexToName(c), r);
+                string cellCoord = string.Format(AppL10n.T("Ô {0}{1}", "Cell {0}{1}"), SparseMatrix.ColIndexToName(c), r);
 
                 foreach (var dk in dict.Keys)
                 {
@@ -7526,7 +8621,7 @@ namespace ZenQOffice.UI
                             Location = cellCoord,
                             OriginalText = text,
                             ProblemWord = text,
-                            Reason = "Từ chưa có dấu chuẩn tiếng Việt",
+                            Reason = AppL10n.T("Từ chưa có dấu chuẩn tiếng Việt", "Missing Vietnamese diacritics"),
                             ApplyCorrection = (newVal) =>
                             {
                                 cell.RawValue = newVal;
@@ -7552,7 +8647,7 @@ namespace ZenQOffice.UI
                             Location = cellCoord,
                             OriginalText = text,
                             ProblemWord = repWord,
-                            Reason = "Phát hiện từ lặp lại hai lần liên tiếp",
+                            Reason = AppL10n.T("Phát hiện từ lặp lại hai lần liên tiếp", "Repeated consecutive word"),
                             ApplyCorrection = (newVal) =>
                             {
                                 cell.RawValue = newVal;
@@ -7575,7 +8670,7 @@ namespace ZenQOffice.UI
                             Location = cellCoord,
                             OriginalText = text,
                             ProblemWord = wStr,
-                            Reason = "Lỗi viết hoa bất thường (Caps Lock)",
+                            Reason = AppL10n.T("Lỗi viết hoa bất thường (Caps Lock)", "Irregular capitalization (Caps Lock)"),
                             ApplyCorrection = (newVal) =>
                             {
                                 cell.RawValue = newVal;
@@ -7602,7 +8697,7 @@ namespace ZenQOffice.UI
                                 Location = cellCoord,
                                 OriginalText = text,
                                 ProblemWord = cleanW,
-                                Reason = "Lỗi gõ chính tả tiếng Việt (Telex / VNI)",
+                                Reason = AppL10n.T("Lỗi gõ chính tả tiếng Việt (Telex / VNI)", "Vietnamese typing spelling error (Telex / VNI)"),
                                 ApplyCorrection = (newVal) =>
                                 {
                                     string updatedCell = (cell.RawValue ?? "").Replace(wordToFix, newVal);
@@ -7626,7 +8721,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Kiểm tra chính tả hoàn tất: Tất cả các ô văn bản trên trang tính đều hợp lệ!", "ZenQ Spelling", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Kiểm tra chính tả hoàn tất: Tất cả các ô văn bản trên trang tính đều hợp lệ!", "Spelling check complete: all cells are valid!"), "ZenQ Spelling", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -7781,22 +8876,32 @@ namespace ZenQOffice.UI
                     }
                 }
             }
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public void ForEachSelectedCell(Action<CellData> action)
         {
-            uint minR = Math.Min(SelectedRow, SelEndRow);
-            uint maxR = Math.Max(SelectedRow, SelEndRow);
-            uint minC = Math.Min(SelectedCol, SelEndCol);
-            uint maxC = Math.Max(SelectedCol, SelEndCol);
-
-            for (uint r = minR; r <= maxR; r++)
+            SaveUndoState();
+            HashSet<ulong> visited = new HashSet<ulong>();
+            foreach (var rng in GetAllSelectedRanges())
             {
-                for (uint c = minC; c <= maxC; c++)
+                uint capR = rng.MaxRow;
+                uint capC = rng.MaxCol;
+                // Cap full-sheet/col/row formatting safely to used range or 100 rows/cols around data so formatting never hangs
+                if (capR >= CalcMaxRows && CurrentSheet.GetMaxRow() < CalcMaxRows)
+                    capR = Math.Max(rng.MinRow, Math.Max(50u, CurrentSheet.GetMaxRow()));
+                if (capC >= CalcMaxCols && CurrentSheet.GetMaxCol() < CalcMaxCols)
+                    capC = Math.Max(rng.MinCol, Math.Max(26u, CurrentSheet.GetMaxCol()));
+
+                for (uint r = rng.MinRow; r <= capR; r++)
                 {
-                    CellData cell = CurrentSheet.GetOrCreateCell(r, c);
-                    action(cell);
+                    for (uint c = rng.MinCol; c <= capC; c++)
+                    {
+                        ulong key = ((ulong)r << 32) | c;
+                        if (!visited.Add(key)) continue;
+                        CellData cell = CurrentSheet.GetOrCreateCell(r, c);
+                        action(cell);
+                    }
                 }
             }
         }
@@ -8917,30 +10022,32 @@ namespace ZenQOffice.UI
             SelEndCol = (uint)(dstStartC + colSpan - 1);
 
             // 5. Evaluate and refresh
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
         }
 
         public static string AdjustFormulaOffset(string formula, int dRow, int dCol)
         {
             if (string.IsNullOrEmpty(formula) || !formula.StartsWith("=")) return formula;
-            if (dRow == 0 && dCol == 0) return formula;
-
-            return Regex.Replace(formula, @"(\$?)([A-Za-z]+)(\$?)([0-9]+)", m =>
-            {
-                string colAbs = m.Groups[1].Value;
-                string colLetters = m.Groups[2].Value.ToUpperInvariant();
-                string rowAbs = m.Groups[3].Value;
-                string rowDigits = m.Groups[4].Value;
-
-                uint r, c;
-                if (SparseMatrix.TryParseCellReference(colLetters + rowDigits, out r, out c))
+            // Skip quoted string literals "..." and sheet names '...'!, respect $ anchors and skip LOG10 / ATAN2
+            return System.Text.RegularExpressions.Regex.Replace(
+                formula,
+                @"""(?:[^""]|"""")*""|'(?:[^']|'')*'!|(?<![A-Za-z0-9_.])(\$?)([A-Za-z]{1,3})(\$?)([0-9]{1,7})(?![A-Za-z0-9_(])",
+                m =>
                 {
-                    uint newR = (rowAbs == "$") ? r : (uint)Math.Max(1, (int)r + dRow);
-                    uint newC = (colAbs == "$") ? c : (uint)Math.Max(1, (int)c + dCol);
-                    return string.Format("{0}{1}{2}{3}", colAbs, SparseMatrix.ColIndexToName(newC), rowAbs, newR);
-                }
-                return m.Value;
-            });
+                    if (string.IsNullOrEmpty(m.Groups[2].Value)) return m.Value;
+                    string cLock = m.Groups[1].Value;
+                    string colName = m.Groups[2].Value;
+                    string rLock = m.Groups[3].Value;
+                    uint rowNum;
+                    if (!uint.TryParse(m.Groups[4].Value, out rowNum) || rowNum == 0) return m.Value;
+
+                    uint colIdx = SparseMatrix.ColNameToIndex(colName);
+                    if (colIdx == 0 || colIdx > 16384 || rowNum > 1048576) return m.Value;
+
+                    int newCol = string.IsNullOrEmpty(cLock) ? Math.Max(1, (int)colIdx + dCol) : (int)colIdx;
+                    int newRow = string.IsNullOrEmpty(rLock) ? Math.Max(1, (int)rowNum + dRow) : (int)rowNum;
+                    return cLock + SparseMatrix.ColIndexToName((uint)newCol) + rLock + newRow;
+                });
         }
 
         /// <summary>
@@ -9083,7 +10190,7 @@ namespace ZenQOffice.UI
                 catch { }
             }
 
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
             Invalidate();
             if (ParentForm != null) ParentForm.Invalidate();
         }
@@ -9232,7 +10339,7 @@ namespace ZenQOffice.UI
                 }
             }
 
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
             Invalidate();
             if (ParentForm != null) ParentForm.Invalidate();
         }
@@ -9359,7 +10466,7 @@ namespace ZenQOffice.UI
                 CurrentSheet.SetCellText(r, targetCol, generated);
             }
 
-            FormulaEngine.EvaluateSheet(CurrentSheet);
+            RecalcAfterEdit();
             Invalidate();
             if (ParentForm != null) ParentForm.Invalidate();
         }
@@ -9367,7 +10474,759 @@ namespace ZenQOffice.UI
         #endregion
 
         #endregion
+
+        // ==================== Multi-Range, Point Mode, ScreenTip & GoTo Helpers ====================
+
+        public List<CalcSelRange> GetAllSelectedRanges()
+        {
+            var res = new List<CalcSelRange>();
+            if (AdditionalSelections != null && AdditionalSelections.Count > 0)
+            {
+                res.AddRange(AdditionalSelections);
+            }
+            res.Add(new CalcSelRange(SelectedRow, SelectedCol, SelEndRow, SelEndCol));
+            return res;
+        }
+
+        public void ClearAdditionalSelections()
+        {
+            if (AdditionalSelections != null) AdditionalSelections.Clear();
+        }
+
+        public void CommitPrimarySelectionToAdditional()
+        {
+            AdditionalSelections.Add(new CalcSelRange(SelectedRow, SelectedCol, SelEndRow, SelEndCol));
+        }
+
+        public bool IsColSelected(uint c)
+        {
+            foreach (var rng in GetAllSelectedRanges())
+            {
+                if (c >= rng.MinCol && c <= rng.MaxCol) return true;
+            }
+            return false;
+        }
+
+        public bool IsRowSelected(uint r)
+        {
+            foreach (var rng in GetAllSelectedRanges())
+            {
+                if (r >= rng.MinRow && r <= rng.MaxRow) return true;
+            }
+            return false;
+        }
+
+        private string GetDisplayNameBoxText()
+        {
+            uint minR = Math.Min(SelectedRow, SelEndRow);
+            uint maxR = Math.Max(SelectedRow, SelEndRow);
+            uint minC = Math.Min(SelectedCol, SelEndCol);
+            uint maxC = Math.Max(SelectedCol, SelEndCol);
+
+            if (DefinedNames != null)
+            {
+                string curRangeRef = (minR == maxR && minC == maxC)
+                    ? (SparseMatrix.ColIndexToName(minC) + minR)
+                    : string.Format("{0}{1}:{2}{3}", SparseMatrix.ColIndexToName(minC), minR, SparseMatrix.ColIndexToName(maxC), maxR);
+                foreach (var dn in DefinedNames)
+                {
+                    if (dn == null || string.IsNullOrWhiteSpace(dn.RefersTo)) continue;
+                    string rt = dn.RefersTo.Trim().TrimStart('=').Replace("$", "");
+                    if (string.Equals(rt, curRangeRef, StringComparison.OrdinalIgnoreCase))
+                        return dn.Name;
+                }
+            }
+
+            if (minR != maxR || minC != maxC)
+            {
+                return string.Format("{0}R x {1}C", (maxR - minR + 1), (maxC - minC + 1));
+            }
+            return SparseMatrix.ColIndexToName(SelectedCol) + SelectedRow;
+        }
+
+        private void ComputeSelectionStatusMetrics(out double selSum, out double selCount, out double numCount)
+        {
+            selSum = 0.0;
+            selCount = 0;
+            numCount = 0;
+            if (CurrentSheet == null) return;
+            HashSet<ulong> seen = new HashSet<ulong>();
+
+            foreach (var rng in GetAllSelectedRanges())
+            {
+                uint capR = Math.Min(rng.MaxRow, Math.Max(rng.MinRow, CurrentSheet.GetMaxRow()));
+                uint capC = Math.Min(rng.MaxCol, Math.Max(rng.MinCol, CurrentSheet.GetMaxCol()));
+                for (uint r = rng.MinRow; r <= capR; r++)
+                {
+                    for (uint c = rng.MinCol; c <= capC; c++)
+                    {
+                        ulong key = ((ulong)r << 32) | c;
+                        if (!seen.Add(key)) continue;
+                        CellData cd = CurrentSheet.GetCell(r, c);
+                        if (cd != null && (!string.IsNullOrEmpty(cd.RawValue) || !string.IsNullOrEmpty(cd.EvaluatedStr)))
+                        {
+                            selCount++;
+                            double parsed;
+                            if (cd.Type == CellType.Number)
+                            {
+                                selSum += cd.NumericValue;
+                                numCount++;
+                            }
+                            else if (cd.Type == CellType.Formula && !FormulaEngine.IsExcelError(cd.EvaluatedStr))
+                            {
+                                if (cd.NumericValue != 0 || double.TryParse(cd.EvaluatedStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out parsed))
+                                {
+                                    selSum += cd.NumericValue;
+                                    numCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void AutoScrollDuringDrag(int x, int y, int width, int height, int gridTop, int gridLeft)
+        {
+            if (x > width - 20 && ScrollCol < CalcMaxCols) ScrollCol++;
+            else if (x < gridLeft + 10 && ScrollCol > 1) ScrollCol--;
+            if (y > height - 70 && ScrollRow < CalcMaxRows) ScrollRow++;
+            else if (y < gridTop + 10 && ScrollRow > 1) ScrollRow--;
+        }
+
+        public static bool CanAcceptFormulaReferenceBeforeCursor(string text, int cursorPos)
+        {
+            if (string.IsNullOrEmpty(text) || !text.TrimStart().StartsWith("=")) return false;
+            int idx = Math.Min(cursorPos, text.Length) - 1;
+            while (idx >= 0 && text[idx] == ' ') idx--;
+            if (idx < 0) return false;
+            char ch = text[idx];
+            return ch == '=' || ch == '(' || ch == ',' || ch == ';' || ch == '+' || ch == '-' ||
+                   ch == '*' || ch == '/' || ch == '^' || ch == '&' || ch == '<' || ch == '>' ||
+                   ch == ':' || ch == '{';
+        }
+
+        public static string FormatSheetPrefix(string sheetName)
+        {
+            if (string.IsNullOrEmpty(sheetName)) return "";
+            bool needsQuote = false;
+            for (int i = 0; i < sheetName.Length; i++)
+            {
+                char ch = sheetName[i];
+                if (!char.IsLetterOrDigit(ch) && ch != '_')
+                {
+                    needsQuote = true;
+                    break;
+                }
+            }
+            if (needsQuote || char.IsDigit(sheetName[0]))
+            {
+                return "'" + sheetName.Replace("'", "''") + "'!";
+            }
+            return sheetName + "!";
+        }
+
+        public void BeginOrUpdatePointRange(uint r1, uint c1, uint r2, uint c2, bool insertCommaSeparator)
+        {
+            if (FormulaSourceSheetIndex < 0)
+            {
+                FormulaSourceSheetIndex = ActiveSheetIndex;
+                FormulaSourceRow = SelectedRow;
+                FormulaSourceCol = SelectedCol;
+            }
+
+            uint minR = Math.Min(r1, r2);
+            uint maxR = Math.Max(r1, r2);
+            uint minC = Math.Min(c1, c2);
+            uint maxC = Math.Max(c1, c2);
+
+            string refStr = (minR == maxR && minC == maxC)
+                ? (SparseMatrix.ColIndexToName(minC) + minR)
+                : string.Format("{0}{1}:{2}{3}", SparseMatrix.ColIndexToName(minC), minR, SparseMatrix.ColIndexToName(maxC), maxR);
+
+            if (ActiveSheetIndex != FormulaSourceSheetIndex && ActiveSheetIndex >= 0 && ActiveSheetIndex < SheetNames.Count)
+            {
+                refStr = FormatSheetPrefix(SheetNames[ActiveSheetIndex]) + refStr;
+            }
+
+            string cur = EditText ?? "=";
+            int pos = Math.Max(0, Math.Min(cur.Length, EditCursorPos));
+
+            if (insertCommaSeparator)
+            {
+                // Ctrl+Click starts a separate comma-separated argument in formula
+                if (!CanAcceptFormulaReferenceBeforeCursor(cur, pos) && !cur.EndsWith(","))
+                {
+                    cur = cur.Insert(pos, ",");
+                    pos++;
+                }
+                _pointInsertStart = -1;
+                _pointInsertLength = 0;
+            }
+
+            if (_pointInsertStart >= 0 && _pointInsertStart + _pointInsertLength <= cur.Length)
+            {
+                cur = cur.Substring(0, _pointInsertStart) + refStr + cur.Substring(_pointInsertStart + _pointInsertLength);
+                _pointInsertLength = refStr.Length;
+                EditText = cur;
+                EditCursorPos = _pointInsertStart + refStr.Length;
+            }
+            else
+            {
+                EditText = cur.Insert(pos, refStr);
+                _pointInsertStart = pos;
+                _pointInsertLength = refStr.Length;
+                EditCursorPos = pos + refStr.Length;
+            }
+
+            EditSelStart = EditCursorPos;
+            EditSelLength = 0;
+            IsFormulaPointMode = true;
+            FilterFormulaSuggestions();
+        }
+
+        public static string GetFormulaTokenBeforeCursor(string text, int cursorPos, out int tokenStart, out int tokenLen)
+        {
+            tokenStart = 0;
+            tokenLen = 0;
+            if (string.IsNullOrEmpty(text)) return "";
+            int pos = Math.Max(0, Math.Min(text.Length, cursorPos));
+            int start = pos;
+            while (start > 0)
+            {
+                char ch = text[start - 1];
+                if (char.IsLetterOrDigit(ch) || ch == '_' || ch == '.') start--;
+                else break;
+            }
+            tokenStart = start;
+            tokenLen = pos - start;
+            return text.Substring(start, tokenLen);
+        }
+
+        private void GetActiveFunctionParameterContext(string formula, int cursorPos, out FormulaSuggestion meta, out int activeArgIndex)
+        {
+            meta = null;
+            activeArgIndex = 0;
+            if (string.IsNullOrEmpty(formula) || !formula.TrimStart().StartsWith("=") || AllFormulas == null) return;
+
+            int pos = Math.Max(0, Math.Min(formula.Length, cursorPos));
+            bool inStr = false;
+            int depth = 0;
+            int commasAtDepth0 = 0;
+            var stack = new Stack<int>();
+            int[] commasByOpenIdx = new int[pos + 1];
+
+            for (int i = 0; i < pos; i++)
+            {
+                char ch = formula[i];
+                if (ch == '"') { inStr = !inStr; continue; }
+                if (inStr) continue;
+                if (ch == '(')
+                {
+                    stack.Push(i);
+                    commasByOpenIdx[i] = 0;
+                    depth++;
+                }
+                else if (ch == ')')
+                {
+                    if (stack.Count > 0) stack.Pop();
+                    if (depth > 0) depth--;
+                }
+                else if (ch == ',' && stack.Count > 0)
+                {
+                    commasByOpenIdx[stack.Peek()]++;
+                }
+            }
+
+            if (stack.Count == 0) return;
+            int openParenIdx = stack.Peek();
+            commasAtDepth0 = commasByOpenIdx[openParenIdx];
+
+            int fnEnd = openParenIdx;
+            int fnStart = fnEnd;
+            while (fnStart > 0 && (char.IsLetterOrDigit(formula[fnStart - 1]) || formula[fnStart - 1] == '_' || formula[fnStart - 1] == '.'))
+            {
+                fnStart--;
+            }
+            if (fnStart == fnEnd) return;
+            string fnName = formula.Substring(fnStart, fnEnd - fnStart);
+
+            foreach (var fs in AllFormulas)
+            {
+                if (string.Equals(fs.Name, fnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    meta = fs;
+                    activeArgIndex = commasAtDepth0;
+                    return;
+                }
+            }
+        }
+
+        private void DrawFormulaScreenTip(D2DGraphics g, int x, int y, int maxWidth)
+        {
+            FormulaSuggestion meta;
+            int activeArg;
+            GetActiveFunctionParameterContext(EditText, EditCursorPos, out meta, out activeArg);
+            if (meta == null || string.IsNullOrEmpty(meta.Syntax)) return;
+
+            string syntax = meta.Syntax.TrimStart('=');
+            int openIdx = syntax.IndexOf('(');
+            int closeIdx = syntax.LastIndexOf(')');
+            if (openIdx < 0 || closeIdx <= openIdx) return;
+
+            string head = syntax.Substring(0, openIdx + 1);
+            string inner = syntax.Substring(openIdx + 1, closeIdx - openIdx - 1);
+            string[] args = inner.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+            int clampedArg = Math.Min(activeArg, Math.Max(0, args.Length - 1));
+            if (args.Length > 0 && args[args.Length - 1].Trim() == "..." && activeArg >= args.Length - 1)
+            {
+                clampedArg = args.Length - 1;
+            }
+
+            using (Font regFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+            using (Font boldFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (Font descFont = new Font("Segoe UI", 7.8f, FontStyle.Regular))
+            {
+                float curW = g.MeasureString(head, regFont, 2000, StringFormat.GenericTypographic).Width;
+                for (int i = 0; i < args.Length; i++)
+                {
+                    string part = (i > 0 ? ", " : "") + args[i].Trim();
+                    Font f = (i == clampedArg) ? boldFont : regFont;
+                    curW += g.MeasureString(part, f, 2000, StringFormat.GenericTypographic).Width;
+                }
+                curW += g.MeasureString(")", regFont, 2000, StringFormat.GenericTypographic).Width;
+
+                int boxW = Math.Max(220, Math.Min(maxWidth - x - 16, (int)curW + 24));
+                int boxH = 42;
+                int boxX = Math.Max(8, Math.Min(maxWidth - boxW - 10, x));
+                Rectangle tipRect = new Rectangle(boxX, y, boxW, boxH);
+
+                using (SolidBrush shadowB = new SolidBrush(Color.FromArgb(24, 0, 0, 0)))
+                    g.FillRectangle(shadowB, tipRect.X + 2, tipRect.Y + 2, tipRect.Width, tipRect.Height);
+                using (SolidBrush bg = new SolidBrush(Color.FromArgb(255, 255, 250)))
+                    g.FillRectangle(bg, tipRect);
+                using (Pen borderP = new Pen(Color.FromArgb(203, 213, 225)))
+                    g.DrawRectangle(borderP, tipRect);
+
+                float drawX = tipRect.X + 10;
+                float drawY = tipRect.Y + 5;
+                g.DrawString(head, boldFont, Brushes.DimGray, drawX, drawY, StringFormat.GenericTypographic);
+                drawX += g.MeasureString(head, boldFont, 2000, StringFormat.GenericTypographic).Width;
+
+                for (int i = 0; i < args.Length; i++)
+                {
+                    string commaPrefix = (i > 0 ? ", " : "");
+                    if (!string.IsNullOrEmpty(commaPrefix))
+                    {
+                        g.DrawString(commaPrefix, regFont, Brushes.Gray, drawX, drawY, StringFormat.GenericTypographic);
+                        drawX += g.MeasureString(commaPrefix, regFont, 2000, StringFormat.GenericTypographic).Width;
+                    }
+                    string argTxt = args[i].Trim();
+                    bool isCur = (i == clampedArg);
+                    Font af = isCur ? boldFont : regFont;
+                    using (SolidBrush ab = new SolidBrush(isCur ? Color.FromArgb(16, 124, 65) : Color.FromArgb(51, 65, 85)))
+                    {
+                        g.DrawString(argTxt, af, ab, drawX, drawY, StringFormat.GenericTypographic);
+                    }
+                    drawX += g.MeasureString(argTxt, af, 2000, StringFormat.GenericTypographic).Width;
+                }
+                g.DrawString(")", boldFont, Brushes.DimGray, drawX, drawY, StringFormat.GenericTypographic);
+
+                using (SolidBrush db = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    Region oldClip = g.Clip;
+                    g.SetClip(tipRect);
+                    g.DrawString(AppL10n.Tr(meta.Description ?? ""), descFont, db, tipRect.X + 10, tipRect.Y + 23);
+                    g.Clip = oldClip;
+                }
+            }
+        }
+
+        private List<FormulaRefHighlight> ParseFormulaHighlightRefs(string formula)
+        {
+            var result = new List<FormulaRefHighlight>();
+            if (string.IsNullOrEmpty(formula) || !formula.TrimStart().StartsWith("=")) return result;
+
+            string activeSheetName = (SheetNames != null && ActiveSheetIndex >= 0 && ActiveSheetIndex < SheetNames.Count)
+                ? SheetNames[ActiveSheetIndex]
+                : "";
+            bool onSourceSheet = (FormulaSourceSheetIndex < 0 || ActiveSheetIndex == FormulaSourceSheetIndex);
+
+            var matches = System.Text.RegularExpressions.Regex.Matches(
+                formula,
+                @"""(?:[^""]|"""")*""|(?:(?:'([^']+)'|([A-Za-z0-9_]+))!)?(?<![A-Za-z0-9_.])(\$?[A-Za-z]{1,3}\$?[0-9]{1,7}(?::\$?[A-Za-z]{1,3}\$?[0-9]{1,7})?)(?![A-Za-z0-9_(])");
+
+            int colorIdx = 0;
+            foreach (System.Text.RegularExpressions.Match m in matches)
+            {
+                if (m.Value.StartsWith("\"")) continue;
+                string sheetTarget = !string.IsNullOrEmpty(m.Groups[1].Value) ? m.Groups[1].Value : m.Groups[2].Value;
+                if (!string.IsNullOrEmpty(sheetTarget))
+                {
+                    if (!string.Equals(sheetTarget, activeSheetName, StringComparison.OrdinalIgnoreCase)) continue;
+                }
+                else if (!onSourceSheet)
+                {
+                    continue;
+                }
+
+                string rawRef = m.Groups[3].Value.Replace("$", "");
+                string[] parts = rawRef.Split(':');
+                uint r1, c1, r2, c2;
+                if (!ParseCellAddressParts(parts[0], out r1, out c1)) continue;
+                if (parts.Length == 2)
+                {
+                    if (!ParseCellAddressParts(parts[1], out r2, out c2)) continue;
+                }
+                else
+                {
+                    r2 = r1;
+                    c2 = c1;
+                }
+
+                result.Add(new FormulaRefHighlight
+                {
+                    MinRow = Math.Min(r1, r2),
+                    MaxRow = Math.Max(r1, r2),
+                    MinCol = Math.Min(c1, c2),
+                    MaxCol = Math.Max(c1, c2),
+                    RefColor = FormulaRefPalette[colorIdx % FormulaRefPalette.Length]
+                });
+                colorIdx++;
+            }
+            return result;
+        }
+
+        private static bool ParseCellAddressParts(string addr, out uint row, out uint col)
+        {
+            row = 0;
+            col = 0;
+            if (string.IsNullOrEmpty(addr)) return false;
+            var m = System.Text.RegularExpressions.Regex.Match(addr.Trim(), @"^([A-Za-z]{1,3})([0-9]{1,7})$");
+            if (!m.Success) return false;
+            col = SparseMatrix.ColNameToIndex(m.Groups[1].Value);
+            return uint.TryParse(m.Groups[2].Value, out row) && row >= 1 && col >= 1 && col <= 16384;
+        }
+
+        private void DrawAdditionalSelectionRanges(D2DGraphics g, int headerW, int startY, int headerH, int width, int height)
+        {
+            if (AdditionalSelections == null || AdditionalSelections.Count == 0) return;
+            foreach (var rng in AdditionalSelections)
+            {
+                if (rng.MaxCol < ScrollCol || rng.MaxRow < ScrollRow) continue;
+                Rectangle rect = ComputeRangeScreenRect(rng.MinRow, rng.MaxRow, rng.MinCol, rng.MaxCol, headerW, startY + headerH);
+                if (rect.Width <= 0 || rect.Height <= 0) continue;
+                using (SolidBrush fill = new SolidBrush(Color.FromArgb(26, 16, 124, 65)))
+                    g.FillRectangle(fill, rect);
+                using (Pen border = new Pen(Color.FromArgb(16, 124, 65), 1.5f))
+                    g.DrawRectangle(border, rect);
+            }
+        }
+
+        private void DrawFormulaReferenceHighlights(D2DGraphics g, int headerW, int startY, int headerH, int width, int height)
+        {
+            if (!IsEditing || string.IsNullOrEmpty(EditText) || !EditText.TrimStart().StartsWith("=")) return;
+            var refs = ParseFormulaHighlightRefs(EditText);
+            foreach (var hr in refs)
+            {
+                if (hr.MaxCol < ScrollCol || hr.MaxRow < ScrollRow) continue;
+                Rectangle rect = ComputeRangeScreenRect(hr.MinRow, hr.MaxRow, hr.MinCol, hr.MaxCol, headerW, startY + headerH);
+                if (rect.Width <= 0 || rect.Height <= 0) continue;
+                using (SolidBrush fill = new SolidBrush(Color.FromArgb(22, hr.RefColor.R, hr.RefColor.G, hr.RefColor.B)))
+                    g.FillRectangle(fill, rect);
+                using (Pen border = new Pen(hr.RefColor, 1.8f))
+                    g.DrawRectangle(border, rect);
+                using (SolidBrush cornerB = new SolidBrush(hr.RefColor))
+                {
+                    g.FillRectangle(cornerB, rect.Left - 2, rect.Top - 2, 5, 5);
+                    g.FillRectangle(cornerB, rect.Right - 3, rect.Top - 2, 5, 5);
+                    g.FillRectangle(cornerB, rect.Left - 2, rect.Bottom - 3, 5, 5);
+                    g.FillRectangle(cornerB, rect.Right - 3, rect.Bottom - 3, 5, 5);
+                }
+            }
+        }
+
+        private Rectangle ComputeRangeScreenRect(uint minR, uint maxR, uint minC, uint maxC, int gridLeft, int gridTop)
+        {
+            int x1 = gridLeft;
+            for (uint c = ScrollCol; c < minC; c++) x1 += GetColWidth(c);
+            int x2 = x1;
+            uint startC = Math.Max(minC, ScrollCol);
+            for (uint c = startC; c <= Math.Min(maxC, ScrollCol + 60); c++) x2 += GetColWidth(c);
+
+            int y1 = gridTop;
+            for (uint r = ScrollRow; r < minR; r++) y1 += GetRowHeight(r);
+            int y2 = y1;
+            uint startR = Math.Max(minR, ScrollRow);
+            for (uint r = startR; r <= Math.Min(maxR, ScrollRow + 120); r++) y2 += GetRowHeight(r);
+
+            return new Rectangle(x1, y1, Math.Max(1, x2 - x1), Math.Max(1, y2 - y1));
+        }
+
+        public void DoubleClickFillHandle()
+        {
+            if (CurrentSheet == null) return;
+            uint minR = Math.Min(SelectedRow, SelEndRow);
+            uint maxR = Math.Max(SelectedRow, SelEndRow);
+            uint minC = Math.Min(SelectedCol, SelEndCol);
+            uint maxC = Math.Max(SelectedCol, SelEndCol);
+
+            uint refCol = 0;
+            if (minC > 1)
+            {
+                CellData leftProbe = CurrentSheet.GetCell(maxR, minC - 1);
+                CellData leftBelow = CurrentSheet.GetCell(maxR + 1, minC - 1);
+                if ((leftProbe != null && !string.IsNullOrEmpty(leftProbe.RawValue)) ||
+                    (leftBelow != null && !string.IsNullOrEmpty(leftBelow.RawValue)))
+                {
+                    refCol = minC - 1;
+                }
+            }
+            if (refCol == 0 && maxC < CalcMaxCols)
+            {
+                CellData rightProbe = CurrentSheet.GetCell(maxR, maxC + 1);
+                CellData rightBelow = CurrentSheet.GetCell(maxR + 1, maxC + 1);
+                if ((rightProbe != null && !string.IsNullOrEmpty(rightProbe.RawValue)) ||
+                    (rightBelow != null && !string.IsNullOrEmpty(rightBelow.RawValue)))
+                {
+                    refCol = maxC + 1;
+                }
+            }
+            if (refCol == 0) return;
+
+            uint endR = maxR;
+            while (endR < CalcMaxRows)
+            {
+                CellData nextC = CurrentSheet.GetCell(endR + 1, refCol);
+                if (nextC != null && (!string.IsNullOrEmpty(nextC.RawValue) || !string.IsNullOrEmpty(nextC.EvaluatedStr)))
+                {
+                    endR++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (endR > maxR)
+            {
+                FillStartRow = minR;
+                FillEndRow = maxR;
+                FillStartCol = minC;
+                FillEndCol = maxC;
+                FillDragTargetRow = endR;
+                FillDragTargetCol = maxC;
+                ExecuteAutoFill();
+            }
+        }
+
+        private void ShowNameBoxDropdownMenu()
+        {
+            ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
+            if (DefinedNames != null && DefinedNames.Count > 0)
+            {
+                foreach (var dn in DefinedNames)
+                {
+                    if (dn == null || string.IsNullOrWhiteSpace(dn.Name)) continue;
+                    string nm = dn.Name;
+                    menu.Items.Add(nm + " (" + dn.RefersTo + ")", null, (s, e) => ExecuteGoToTarget(nm));
+                }
+            }
+            if (Tables != null && Tables.Count > 0)
+            {
+                if (menu.Items.Count > 0) menu.Items.Add(new ToolStripSeparator());
+                foreach (var tbl in Tables)
+                {
+                    if (tbl == null || string.IsNullOrWhiteSpace(tbl.Name)) continue;
+                    string tn = tbl.Name;
+                    menu.Items.Add(AppL10n.T("Bảng: ", "Table: ") + tn, null, (s, e) => ExecuteGoToTarget(tn));
+                }
+            }
+            if (menu.Items.Count > 0) menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(AppL10n.T("Đi tới / Chọn đặc biệt (F5)...", "Go To / Go To Special (F5)..."), null, (s, e) => ShowGoToDialog(Form.ActiveForm));
+            menu.Show(Cursor.Position);
+        }
+
+        public void ShowGoToDialog(IWin32Window owner = null)
+        {
+            using (CalcGoToDialog dlg = new CalcGoToDialog(this))
+            {
+                DialogResult dr = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
+                if (dr == DialogResult.OK)
+                {
+                    if (dlg.SpecialMode != CalcGoToSpecialMode.None)
+                    {
+                        ExecuteGoToSpecial(dlg.SpecialMode);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(dlg.TargetReference))
+                    {
+                        ExecuteGoToTarget(dlg.TargetReference);
+                    }
+                }
+            }
+        }
+
+        public bool ExecuteGoToTarget(string rawTarget)
+        {
+            if (string.IsNullOrWhiteSpace(rawTarget)) return false;
+            string target = rawTarget.Trim();
+
+            // Check DefinedNames
+            if (DefinedNames != null)
+            {
+                foreach (var dn in DefinedNames)
+                {
+                    if (dn != null && string.Equals(dn.Name, target, StringComparison.OrdinalIgnoreCase))
+                    {
+                        target = (dn.RefersTo ?? "").Trim().TrimStart('=');
+                        break;
+                    }
+                }
+            }
+
+            // Check Tables
+            if (Tables != null)
+            {
+                foreach (var tbl in Tables)
+                {
+                    if (tbl != null && string.Equals(tbl.Name, target, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ClearAdditionalSelections();
+                        SelectedRow = tbl.StartRow;
+                        SelectedCol = tbl.StartCol;
+                        SelEndRow = tbl.EndRow;
+                        SelEndCol = tbl.EndCol;
+                        EnsureCellVisible(SelectedRow, SelectedCol);
+                        return true;
+                    }
+                }
+            }
+
+            // Sheet!Ref
+            int bangIdx = target.IndexOf('!');
+            if (bangIdx > 0)
+            {
+                string shName = target.Substring(0, bangIdx).Trim().Trim('\'');
+                target = target.Substring(bangIdx + 1).Trim();
+                if (SheetNames != null)
+                {
+                    for (int i = 0; i < SheetNames.Count; i++)
+                    {
+                        if (string.Equals(SheetNames[i], shName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            SwitchToSheet(i);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            target = target.Replace("$", "");
+            string[] parts = target.Split(':');
+            uint r1, c1, r2, c2;
+            if (!ParseCellAddressParts(parts[0], out r1, out c1)) return false;
+            if (parts.Length == 2)
+            {
+                if (!ParseCellAddressParts(parts[1], out r2, out c2)) return false;
+            }
+            else
+            {
+                r2 = r1;
+                c2 = c1;
+            }
+
+            ClearAdditionalSelections();
+            SelectedRow = r1;
+            SelectedCol = c1;
+            SelEndRow = r2;
+            SelEndCol = c2;
+            EnsureCellVisible(SelectedRow, SelectedCol);
+            return true;
+        }
+
+        public bool ExecuteGoToSpecial(CalcGoToSpecialMode mode)
+        {
+            if (CurrentSheet == null || mode == CalcGoToSpecialMode.None) return false;
+            ClearAdditionalSelections();
+
+            if (mode == CalcGoToSpecialMode.CurrentRegion)
+            {
+                uint minR, maxR, minC, maxC;
+                GetContiguousDataRange(SelectedRow, SelectedCol, out minR, out maxR, out minC, out maxC);
+                SelectedRow = minR; SelectedCol = minC;
+                SelEndRow = maxR; SelEndCol = maxC;
+                EnsureCellVisible(SelectedRow, SelectedCol);
+                return true;
+            }
+
+            if (mode == CalcGoToSpecialMode.LastCell)
+            {
+                uint lr = Math.Max(1u, CurrentSheet.GetMaxRow());
+                uint lc = Math.Max(1u, CurrentSheet.GetMaxCol());
+                SelectedRow = lr; SelectedCol = lc;
+                SelEndRow = lr; SelEndCol = lc;
+                EnsureCellVisible(SelectedRow, SelectedCol);
+                return true;
+            }
+
+            // Scan either current selection range (if >1 cell) or used range
+            uint scanMinR = Math.Min(SelectedRow, SelEndRow);
+            uint scanMaxR = Math.Max(SelectedRow, SelEndRow);
+            uint scanMinC = Math.Min(SelectedCol, SelEndCol);
+            uint scanMaxC = Math.Max(SelectedCol, SelEndCol);
+            if (scanMinR == scanMaxR && scanMinC == scanMaxC)
+            {
+                scanMinR = 1; scanMinC = 1;
+                scanMaxR = Math.Max(1u, CurrentSheet.GetMaxRow());
+                scanMaxC = Math.Max(1u, CurrentSheet.GetMaxCol());
+            }
+            else
+            {
+                scanMaxR = Math.Min(scanMaxR, Math.Max(scanMinR, CurrentSheet.GetMaxRow() + 10));
+                scanMaxC = Math.Min(scanMaxC, Math.Max(scanMinC, CurrentSheet.GetMaxCol() + 10));
+            }
+
+            var matched = new List<Tuple<uint, uint>>();
+            for (uint r = scanMinR; r <= scanMaxR; r++)
+            {
+                for (uint c = scanMinC; c <= scanMaxC; c++)
+                {
+                    CellData cd = CurrentSheet.GetCell(r, c);
+                    bool isMatch = false;
+                    switch (mode)
+                    {
+                        case CalcGoToSpecialMode.Formulas:
+                            isMatch = cd != null && cd.Type == CellType.Formula && !string.IsNullOrEmpty(cd.FormulaStr);
+                            break;
+                        case CalcGoToSpecialMode.Constants:
+                            isMatch = cd != null && cd.Type != CellType.Empty && cd.Type != CellType.Formula && !string.IsNullOrEmpty(cd.RawValue);
+                            break;
+                        case CalcGoToSpecialMode.Blanks:
+                            isMatch = cd == null || cd.Type == CellType.Empty || (string.IsNullOrEmpty(cd.RawValue) && string.IsNullOrEmpty(cd.EvaluatedStr));
+                            break;
+                        case CalcGoToSpecialMode.Errors:
+                            isMatch = cd != null && FormulaEngine.IsExcelError(cd.EvaluatedStr);
+                            break;
+                    }
+                    if (isMatch) matched.Add(Tuple.Create(r, c));
+                }
+            }
+
+            if (matched.Count == 0) return false;
+            SelectedRow = matched[0].Item1;
+            SelectedCol = matched[0].Item2;
+            SelEndRow = SelectedRow;
+            SelEndCol = SelectedCol;
+            for (int i = 1; i < matched.Count; i++)
+            {
+                AdditionalSelections.Add(new CalcSelRange(matched[i].Item1, matched[i].Item2, matched[i].Item1, matched[i].Item2));
+            }
+            EnsureCellVisible(SelectedRow, SelectedCol);
+            return true;
+        }
     }
+
 
     internal static class ColorExtensions
     {
@@ -9375,7 +11234,5 @@ namespace ZenQOffice.UI
         {
             return new SolidBrush(color);
         }
-
-
     }
 }

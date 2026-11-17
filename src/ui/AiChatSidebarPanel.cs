@@ -90,16 +90,16 @@ namespace ZenQOffice.UI
         private bool _isSendPressed = false;
 
         private bool _isBinding = false;
-        private string _placeholderText = "Hỏi AI hoặc gõ / để ra lệnh... (Enter)";
+        private string _placeholderText => AppL10n.T("Hỏi AI hoặc gõ / để ra lệnh... (Enter)", "Ask AI or type / for commands... (Enter)");
         private bool _isPlaceholderActive = true;
 
                 private static readonly string[] _greetings = new string[]
         {
-            "✦ Xin chào! Tôi là Trợ lý AI — hãy cho tôi biết bạn cần gì nhé!",
-            "✦ Chào bạn! Tôi sẵn sàng hỗ trợ — hãy gõ yêu cầu của bạn!",
-            "✦ Hi! Bạn cần thiết kế slide, viết văn bản hay phân tích dữ liệu?",
-            "✦ Xin chào! Hãy mô tả yêu cầu và tôi sẽ thực hiện ngay!",
-            "✦ Chào! Tôi có thể giúp gì cho bạn hôm nay?"
+            AppL10n.T("✦ Xin chào! Tôi là Trợ lý AI — hãy cho tôi biết bạn cần gì nhé!", "✦ Hello! I'm ZenQ AI Assistant — how can I help today?"),
+            AppL10n.T("✦ Chào bạn! Tôi sẵn sàng hỗ trợ — hãy gõ yêu cầu của bạn!", "✦ Hi there! I'm ready to help — type your request!"),
+            AppL10n.T("✦ Hi! Bạn cần thiết kế slide, viết văn bản hay phân tích dữ liệu?", "✦ Hi! Need help with slides, documents, or data?"),
+            AppL10n.T("✦ Xin chào! Hãy mô tả yêu cầu và tôi sẽ thực hiện ngay!", "✦ Hello! Describe what you need and I'll do it right away!"),
+            AppL10n.T("✦ Chào! Tôi có thể giúp gì cho bạn hôm nay?", "✦ Hi! What can I help you with today?")
         };
 
         public AiChatSidebarPanel(AppForm appForm)
@@ -173,7 +173,7 @@ namespace ZenQOffice.UI
             Image aiIconImg = AppIconRenderer.GetScaledAiBitmap(26);
             lblTitle = new Label
             {
-                Text = "Trợ lý AI",
+                Text = AppL10n.T("Trợ lý AI", "AI Assistant"),
                 Font = new Font("Segoe UI", 11.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(aiIconImg != null ? 36 : 12, 10),
@@ -291,8 +291,8 @@ namespace ZenQOffice.UI
                 this.IsIslandMode = !this.IsIslandMode;
                 btnIslandToggle.Invalidate();
                 SafeSetToolTip(btnIslandToggle, _isIslandMode
-                    ? "Chuyển sang Gắn cạnh (Docked - Đẩy khổ slide/tài liệu)"
-                    : "Chuyển sang Chế độ Nổi (Floating Island - Không đẩy khổ slide/tài liệu)");
+                    ? AppL10n.T("Chuyển sang Gắn cạnh (Docked - Đẩy khổ slide/tài liệu)", "Switch to Docked Sidebar Mode")
+                    : AppL10n.T("Chuyển sang Chế độ Nổi (Floating Island - Không đẩy khổ slide/tài liệu)", "Switch to Floating Island Mode"));
             };
             pnlHeader.Controls.Add(btnIslandToggle);
 
@@ -412,12 +412,12 @@ namespace ZenQOffice.UI
 
             _headerToolTip = new ToolTip { AutoPopDelay = 4000, InitialDelay = 300, ReshowDelay = 200 };
             SafeSetToolTip(btnIslandToggle, _isIslandMode
-                ? "Chuyển sang Gắn cạnh (Docked - Đẩy khổ slide/tài liệu)"
-                : "Chuyển sang Chế độ Nổi (Floating Island - Không đẩy khổ slide/tài liệu)");
-            SafeSetToolTip(btnSettings, "Cấu hình AI & API Key");
-            SafeSetToolTip(btnHistory, "Lịch sử trò chuyện");
-            SafeSetToolTip(btnNewChat, "Cuộc trò chuyện mới");
-            SafeSetToolTip(btnClose, "Đóng Trợ lý AI");
+                ? AppL10n.T("Chuyển sang Gắn cạnh (Docked - Đẩy khổ slide/tài liệu)", "Switch to Docked Sidebar Mode")
+                : AppL10n.T("Chuyển sang Chế độ Nổi (Floating Island - Không đẩy khổ slide/tài liệu)", "Switch to Floating Island Mode"));
+            SafeSetToolTip(btnSettings, AppL10n.T("Cấu hình AI & API Key", "AI & API Key Settings"));
+            SafeSetToolTip(btnHistory, AppL10n.T("Lịch sử trò chuyện", "Chat History"));
+            SafeSetToolTip(btnNewChat, AppL10n.T("Cuộc trò chuyện mới", "New Chat"));
+            SafeSetToolTip(btnClose, AppL10n.T("Đóng Trợ lý AI", "Close AI Assistant"));
 
             cboKey = new ModernPillComboBox();
             cboKey.SelectedIndexChanged += (s, e) => OnKeySelectionChanged();
@@ -645,9 +645,9 @@ namespace ZenQOffice.UI
             {
                 using (var ofd = new OpenFileDialog())
                 {
-                    ofd.Title = "Chọn một hoặc nhiều tệp để AI đọc và phân tích";
+                    ofd.Title = AppL10n.T("Chọn một hoặc nhiều tệp để AI đọc và phân tích", "Select file(s) for AI to read and analyze");
                     ofd.Multiselect = true;
-                    ofd.Filter = "Tất cả tệp văn phòng (*.docx;*.pdf;*.xlsx;*.pptx;*.txt;*.md;*.csv)|*.docx;*.pdf;*.xlsx;*.pptx;*.txt;*.md;*.csv|Tệp Word (*.docx)|*.docx|Tệp PDF (*.pdf)|*.pdf|Bảng tính Excel (*.xlsx;*.csv)|*.xlsx;*.csv|Bài trình chiếu PowerPoint (*.pptx)|*.pptx|Tất cả tệp (*.*)|*.*";
+                    ofd.Filter = AppL10n.T("Tất cả tệp văn phòng (*.docx;*.pdf;*.xlsx;*.pptx;*.txt;*.md;*.csv)|*.docx;*.pdf;*.xlsx;*.pptx;*.txt;*.md;*.csv|Tất cả tệp (*.*)|*.*", "All Office Files (*.docx;*.pdf;*.xlsx;*.pptx;*.txt;*.md;*.csv)|*.docx;*.pdf;*.xlsx;*.pptx;*.txt;*.md;*.csv|All Files (*.*)|*.*");
                     if (ofd.ShowDialog(this.FindForm()) == DialogResult.OK && ofd.FileNames != null && ofd.FileNames.Length > 0)
                     {
                         var quotedList = new List<string>();
@@ -829,8 +829,8 @@ namespace ZenQOffice.UI
                 _appForm.WriterView.Invalidate();
                 _appForm.Invalidate();
                 ZenQOffice.UI.FluentMessageBox.Show(
-                    string.Format("Đã nhập thành công {0} câu hỏi và đáp án chi tiết sang tài liệu Writer!", quiz.Questions.Count),
-                    "Xuất Đề Thi - ZenQ Writer",
+                    AppL10n.T(string.Format("Đã nhập thành công {0} câu hỏi và đáp án chi tiết sang tài liệu Writer!", quiz.Questions.Count), string.Format("Exported {0} question(s) and answers to Writer!", quiz.Questions.Count)),
+                    AppL10n.T("Xuất Đề Thi - ZenQ Writer", "Export Quiz - ZenQ Writer"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
@@ -1017,7 +1017,7 @@ namespace ZenQOffice.UI
             for (int i = 0; i < _config.Profiles.Count; i++)
             {
                 var p = _config.Profiles[i];
-                string displayName = !string.IsNullOrEmpty(p.Name) ? p.Name : "(Chưa đặt tên)";
+                string displayName = !string.IsNullOrEmpty(p.Name) ? p.Name : AppL10n.T("(Chưa đặt tên)", "(Untitled)");
                 cboKey.Items.Add(displayName);
                 if (p.Id == _config.ActiveProfileId) selIdx = i;
             }
@@ -1235,7 +1235,7 @@ namespace ZenQOffice.UI
         /// Hiện giao diện chào mừng phong cách Google Gemini / GPT:
         /// - Hiệu ứng ánh sáng Radiant Aura Glow huyền ảo
         /// - Biểu tượng ngôi sao 4 cánh Google Gemini lấp lánh đa sắc
-        /// - Câu chào ngẫu nhiên truyền cảm hứng ("Chúng ta nên bắt đầu từ đâu nhỉ?", "Bắt đầu làm việc thôi!",...)
+        /// - Câu chào ngẫu nhiên truyền cảm hứng (AppL10n.T("Chúng ta nên bắt đầu từ đâu nhỉ?", "Where should we start?"), AppL10n.T("Bắt đầu làm việc thôi!", "Let's get to work!"),...)
         /// - 4 gợi ý câu hỏi mẫu thông minh (Chips)
         /// </summary>
         private void AddGeminiWelcomeView()
@@ -1527,13 +1527,13 @@ namespace ZenQOffice.UI
             {
                 OfficeAppMode curMode = _appForm != null && _appForm.Ribbon != null ? _appForm.Ribbon.CurrentMode : OfficeAppMode.Home;
                 if (curMode == OfficeAppMode.Calc)
-                    displayText = "✦ Đang xử lý và ghi dữ liệu bảng tính...";
+                    displayText = AppL10n.T("✦ Đang xử lý và ghi dữ liệu bảng tính...", "✦ Updating spreadsheet data...");
                 else if (curMode == OfficeAppMode.Writer)
-                    displayText = "✦ Đang soạn thảo văn bản...";
+                    displayText = AppL10n.T("✦ Đang soạn thảo văn bản...", "✦ Writing document content...");
                 else if (curMode == OfficeAppMode.Pdf)
-                    displayText = "✦ Đang phân tích tài liệu PDF...";
+                    displayText = AppL10n.T("✦ Đang phân tích tài liệu PDF...", "✦ Analyzing PDF document...");
                 else
-                    displayText = "✦ Đang thiết kế slide cho bạn...";
+                    displayText = AppL10n.T("✦ Đang thiết kế slide cho bạn...", "✦ Designing slides for you...");
             }
 
             int feedW = pnlChatFeed.ClientSize.Width - 46;
@@ -1567,7 +1567,7 @@ namespace ZenQOffice.UI
                 string textToInsert = _streamingAiLabel.Text;
                 
                 OfficeAppMode curMode = _appForm != null ? _appForm.Ribbon.CurrentMode : OfficeAppMode.Home;
-                string actionBtnText = (curMode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((curMode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : ((curMode == OfficeAppMode.Pdf) ? "Sao chép phản hồi" : (_appForm != null && _appForm.WriterView != null && !string.IsNullOrEmpty(_appForm.WriterView.GetSelectedText()) ? "Thay thế vùng quét khối" : "Chèn vào văn bản")));
+                string actionBtnText = (curMode == OfficeAppMode.Slides) ? AppL10n.T("Chèn vào Slide", "Insert to Slide") : ((curMode == OfficeAppMode.Calc) ? AppL10n.T("Chèn vào Bảng tính", "Insert to Sheet") : ((curMode == OfficeAppMode.Pdf) ? AppL10n.T("Sao chép phản hồi", "Copy Response") : (_appForm != null && _appForm.WriterView != null && !string.IsNullOrEmpty(_appForm.WriterView.GetSelectedText()) ? AppL10n.T("Thay thế vùng quét khối", "Replace Selection") : AppL10n.T("Chèn vào văn bản", "Insert into Document"))));
                 char glyph = (curMode == OfficeAppMode.Slides) ? '\uE714' : ((curMode == OfficeAppMode.Calc) ? '\uE80A' : ((curMode == OfficeAppMode.Pdf) ? '\uE8C8' : '\uE70F'));
 
                 AiInsertActionButton btnAction = new AiInsertActionButton
@@ -1613,10 +1613,10 @@ namespace ZenQOffice.UI
                         else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Pdf && _appForm.PdfView != null)
                         {
                             Clipboard.SetText(textSnapshot);
-                            ZenQOffice.UI.FluentMessageBox.Show("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "Copied AI response to Clipboard."), "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                     } catch (Exception ex) {
-                        ZenQOffice.UI.FluentMessageBox.Show(ex.ToString(), "ZENQ AI - Lỗi Chèn Text");
+                        ZenQOffice.UI.FluentMessageBox.Show(ex.ToString(), AppL10n.T("ZENQ AI - Lỗi Chèn Text", "ZENQ AI - Insert Error"));
                     }
                 };
                 
@@ -1652,7 +1652,7 @@ namespace ZenQOffice.UI
 
                     AiInsertActionButton btnConfirm = new AiInsertActionButton
                     {
-                        Text = string.Format("✓ Đồng ý áp dụng ({0})", detectedCorrs.Count),
+                        Text = AppL10n.T(string.Format("✓ Đồng ý áp dụng ({0})", detectedCorrs.Count), string.Format("✓ Apply ({0})", detectedCorrs.Count)),
                         Image = FluentIconRenderer.GetGlyphBitmap('\uE73E', 12, 12, Color.FromArgb(22, 163, 74)),
                         ImageAlign = ContentAlignment.MiddleLeft,
                         TextAlign = ContentAlignment.MiddleCenter,
@@ -1672,7 +1672,7 @@ namespace ZenQOffice.UI
 
                     AiInsertActionButton btnCancel = new AiInsertActionButton
                     {
-                        Text = "✕ Từ chối",
+                        Text = AppL10n.T("✕ Từ chối", "✕ Decline"),
                         Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 11, 11, Color.FromArgb(220, 38, 38)),
                         ImageAlign = ContentAlignment.MiddleLeft,
                         TextAlign = ContentAlignment.MiddleCenter,
@@ -1695,7 +1695,7 @@ namespace ZenQOffice.UI
                         if (_appForm != null && _appForm.WriterView != null)
                         {
                             _appForm.WriterView.ApplyPendingAiCorrections();
-                            btnConfirm.Text = "Đã áp dụng!";
+                            btnConfirm.Text = AppL10n.T("Đã áp dụng!", "Applied!");
                             btnConfirm.Image = FluentIconRenderer.GetGlyphBitmap('\uE73E', 12, 12, Color.FromArgb(22, 163, 74));
                             btnConfirm.Enabled = false;
                             btnCancel.Visible = false;
@@ -1706,7 +1706,7 @@ namespace ZenQOffice.UI
                         if (_appForm != null && _appForm.WriterView != null)
                         {
                             _appForm.WriterView.CancelPendingAiCorrections();
-                            btnCancel.Text = "Đã hủy";
+                            btnCancel.Text = AppL10n.T("Đã hủy", "Declined");
                             btnCancel.Image = null;
                             btnCancel.Enabled = false;
                             btnConfirm.Visible = false;
@@ -1785,7 +1785,7 @@ namespace ZenQOffice.UI
                 if (IsUserAgreement(query))
                 {
                     _appForm.WriterView.ApplyPendingAiCorrections();
-                    string acceptReply = "✅ Tôi đã áp dụng các thay đổi đề xuất vào tài liệu của bạn rồi nhé!";
+                    string acceptReply = AppL10n.T("✅ Tôi đã áp dụng các thay đổi đề xuất vào tài liệu của bạn rồi nhé!", "✅ Applied the suggested changes to your document!");
                     var aiReplyMsg = new AiChatMessage { Role = "model", Content = acceptReply, Timestamp = DateTime.Now };
                     if (targetTab != null && targetTab.AiChatHistory != null)
                     {
@@ -1798,7 +1798,7 @@ namespace ZenQOffice.UI
                 else if (IsUserRejection(query))
                 {
                     _appForm.WriterView.CancelPendingAiCorrections();
-                    string rejectReply = "❌ Tôi đã hủy bỏ đề xuất sửa đổi và giữ nguyên nội dung gốc của tài liệu.";
+                    string rejectReply = AppL10n.T("❌ Tôi đã hủy bỏ đề xuất sửa đổi và giữ nguyên nội dung gốc của tài liệu.", "❌ Declined the suggested edits and kept the original content.");
                     var aiReplyMsg = new AiChatMessage { Role = "model", Content = rejectReply, Timestamp = DateTime.Now };
                     if (targetTab != null && targetTab.AiChatHistory != null)
                     {
@@ -1835,7 +1835,7 @@ namespace ZenQOffice.UI
 
             if (_currentProfile == null)
             {
-                string noConfigMsg = "⚠️ Chưa có cấu hình AI nào. Vui lòng vào Cài đặt để thiết lập API Key hoặc Ollama trước khi sử dụng.";
+                string noConfigMsg = AppL10n.T("⚠️ Chưa có cấu hình AI nào. Vui lòng vào Cài đặt để thiết lập API Key hoặc Ollama trước khi sử dụng.", "⚠️ No AI profile configured yet. Please open Settings to configure an API key or Ollama.");
                 AddAiBubble(noConfigMsg);
                 var warnMsg = new AiChatMessage { Role = "model", Content = noConfigMsg, Timestamp = DateTime.Now };
                 if (targetTab != null)
@@ -1855,7 +1855,7 @@ namespace ZenQOffice.UI
             // Khởi tạo hoạt họa tìm kiếm / suy nghĩ phong cách Google Gemini
             bool needWebSearch = AiWebSearchService.ShouldSearchWeb(query);
             string searchKw = needWebSearch ? AiWebSearchService.ExtractSearchQuery(query) : "";
-            string initStatus = needWebSearch ? ("🔍 Đang tra cứu internet: " + searchKw + "...") : "✦ Đang suy nghĩ...";
+            string initStatus = needWebSearch ? (AppL10n.T("🔍 Đang tra cứu internet: ", "🔍 Searching web: ") + searchKw + "...") : AppL10n.T("✦ Đang suy nghĩ...", "✦ Thinking...");
             ShowThinkingBubble(initStatus, needWebSearch);
 
             ActiveAiGeneration gen = new ActiveAiGeneration
@@ -1926,7 +1926,7 @@ namespace ZenQOffice.UI
                         {
                             this.BeginInvoke(new Action(() =>
                             {
-                                UpdateThinkingBubbleStatus("✦ Đang phân tích ngữ liệu & khởi tạo Canvas...", false);
+                                UpdateThinkingBubbleStatus(AppL10n.T("✦ Đang phân tích ngữ liệu & khởi tạo Canvas...", "✦ Analyzing content & building Canvas..."), false);
                             }));
                         }
                         catch { }
@@ -1983,7 +1983,7 @@ namespace ZenQOffice.UI
 
                 if (!response.Success && string.IsNullOrEmpty(fullRaw))
                 {
-                    finalSummaryMsg = !string.IsNullOrWhiteSpace(response.ErrorMessage) ? response.ErrorMessage : "❌ Không nhận được phản hồi hợp lệ từ máy chủ AI.";
+                    finalSummaryMsg = !string.IsNullOrWhiteSpace(response.ErrorMessage) ? response.ErrorMessage : AppL10n.T("❌ Không nhận được phản hồi hợp lệ từ máy chủ AI.", "❌ No valid response received from the AI server.");
                 }
                 else if (actionResult != null && actionResult.HasAction)
                 {
@@ -2002,7 +2002,7 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    finalSummaryMsg = "✦ Đã xử lý xong yêu cầu của bạn.";
+                    finalSummaryMsg = AppL10n.T("✦ Đã xử lý xong yêu cầu của bạn.", "✦ Completed your request.");
                 }
 
                 // Báº¢O Ä áº¢M LÆ¯U Bá»€N Vá»®NG VÃ€O TAB & Lá»ŠCH Sá»¬ Ká»‚ Cáº¢ KHI PANEL Ä Ãƒ Ä Ã“NG HOáº¶C Ä Ãƒ CHUYá»‚N TAB
@@ -2159,7 +2159,7 @@ namespace ZenQOffice.UI
         /// <summary>
         /// Hiện animation "AI đang suy nghĩ..." chuẩn Breathing Light 100% KHÔNG giật/flicker.
         /// </summary>
-        private void ShowThinkingBubble(string statusText = "Đang suy nghĩ...", bool isSearch = false)
+        private void ShowThinkingBubble(string statusText = null, bool isSearch = false)
         {
             HideThinkingBubble();
 
@@ -2235,17 +2235,17 @@ namespace ZenQOffice.UI
                 if (!string.IsNullOrEmpty(text))
                 {
                     if (text.IndexOf("CALC", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("cells", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("spreadsheet", StringComparison.OrdinalIgnoreCase) >= 0)
-                        displayText = "✦ Đã cập nhật và ghi dữ liệu thành công vào Bảng tính.";
+                        displayText = AppL10n.T("✦ Đã cập nhật và ghi dữ liệu thành công vào Bảng tính.", "✦ Updated spreadsheet data successfully.");
                     else if (text.IndexOf("GENERATE_SLIDE", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("slides", StringComparison.OrdinalIgnoreCase) >= 0)
-                        displayText = "✦ Đã kiến tạo thành công bộ Slide theo yêu cầu của bạn.";
+                        displayText = AppL10n.T("✦ Đã kiến tạo thành công bộ Slide theo yêu cầu của bạn.", "✦ Created presentation slides successfully.");
                     else if (text.IndexOf("MODIFY_SLIDE", StringComparison.OrdinalIgnoreCase) >= 0)
-                        displayText = "✦ Đã sửa đổi cấu hình và hiệu ứng trên Slide.";
+                        displayText = AppL10n.T("✦ Đã sửa đổi cấu hình và hiệu ứng trên Slide.", "✦ Updated slide layout and effects.");
                     else
                         displayText = text.Trim();
                 }
                 else
                 {
-                    displayText = "✦ Đã xử lý xong yêu cầu của bạn.";
+                    displayText = AppL10n.T("✦ Đã xử lý xong yêu cầu của bạn.", "✦ Done.");
                 }
             }
 
@@ -2270,19 +2270,19 @@ namespace ZenQOffice.UI
                         else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Pdf && _appForm.PdfView != null)
                         {
                             Clipboard.SetText(insertText);
-                            ZenQOffice.UI.FluentMessageBox.Show("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "Copied AI response to Clipboard."), "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         else if (_appForm.Ribbon.CurrentMode == OfficeAppMode.Calc && _appForm.CalcView != null)
                         {
                             Clipboard.SetText(insertText);
-                            ZenQOffice.UI.FluentMessageBox.Show("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã sao chép nội dung phản hồi từ AI vào bộ nhớ tạm (Clipboard).", "Copied AI response to Clipboard."), "ZENQ AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         _appForm.Invalidate();
                     }
                 }
                 catch (Exception ex)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(ex.ToString(), "ZENQ AI - Lỗi Chèn Text");
+                    ZenQOffice.UI.FluentMessageBox.Show(ex.ToString(), AppL10n.T("ZENQ AI - Lỗi Chèn Text", "ZENQ AI - Insert Error"));
                 }
             }, _appForm, canvasQuiz, () => {
                 var targetQuiz = canvasQuiz ?? _lastCanvasQuiz;
@@ -2764,7 +2764,7 @@ namespace ZenQOffice.UI
     /// Giao diện mở đầu đoạn chat phong cách Google Gemini / GPT:
     /// - Quầng sáng Radiant Aura Glow huyền ảo
     /// - Biểu tượng ngôi sao 4 cánh Google Gemini lấp lánh đa sắc
-    /// - Câu chào ngẫu nhiên truyền cảm hứng ("Chúng ta nên bắt đầu từ đâu nhỉ?", "Bắt đầu làm việc thôi!", "Xin chào!...")
+    /// - Câu chào ngẫu nhiên truyền cảm hứng (AppL10n.T("Chúng ta nên bắt đầu từ đâu nhỉ?", "Where should we start?"), AppL10n.T("Bắt đầu làm việc thôi!", "Let's get to work!"), "Xin chào!...")
     /// - 4 gợi ý câu hỏi thông minh (Suggestion Chips) thích ứng theo tài liệu hiện tại (Calc, Slides, Writer)
     /// </summary>
     public class GeminiWelcomeControl : AiGpuControl
@@ -2780,11 +2780,11 @@ namespace ZenQOffice.UI
 
         private static readonly string[] _geminiHeadings = new string[]
         {
-            "Chúng ta nên bắt đầu từ đâu nhỉ?",
-            "Bắt đầu làm việc thôi!",
-            "Xin chào! Bạn cứ hỏi tôi bất cứ điều gì...",
-            "Hôm nay bạn cần tôi hỗ trợ gì nào?",
-            "Cùng tạo nên những điều tuyệt vời nhé!"
+            AppL10n.T("Chúng ta nên bắt đầu từ đâu nhỉ?", "Where should we start?"),
+            AppL10n.T("Bắt đầu làm việc thôi!", "Let's get to work!"),
+            AppL10n.T("Xin chào! Bạn cứ hỏi tôi bất cứ điều gì...", "Hello! Ask me anything..."),
+            AppL10n.T("Hôm nay bạn cần tôi hỗ trợ gì nào?", "How can I help today?"),
+            AppL10n.T("Cùng tạo nên những điều tuyệt vời nhé!", "Let's build something awesome!")
         };
 
         public GeminiWelcomeControl(int width, OfficeAppMode mode, Action<string> onSelectPrompt)
@@ -2819,31 +2819,31 @@ namespace ZenQOffice.UI
             _chips.Clear();
             if (mode == OfficeAppMode.Calc)
             {
-                _chips.Add("Tính tổng cột dữ liệu (=SUM)");
-                _chips.Add("Tô màu highlight A1:A10 vàng nhạt");
-                _chips.Add("Tạo sheet mới và ghi bản tóm tắt");
-                _chips.Add("Tối ưu hóa bảng tính và công thức");
+                _chips.Add(AppL10n.T("Tính tổng cột dữ liệu (=SUM)", "Sum this data column (=SUM)"));
+                _chips.Add(AppL10n.T("Tô màu highlight A1:A10 vàng nhạt", "Highlight A1:A10 in light yellow"));
+                _chips.Add(AppL10n.T("Tạo sheet mới và ghi bản tóm tắt", "Create a new sheet with summary"));
+                _chips.Add(AppL10n.T("Tối ưu hóa bảng tính và công thức", "Optimize sheet & formulas"));
             }
             else if (mode == OfficeAppMode.Slides)
             {
-                _chips.Add("Tạo slide trình chiếu theo mô tả");
-                _chips.Add("Đổi màu nền gradient sang trọng");
-                _chips.Add("Viết dàn ý và nội dung thuyết trình");
-                _chips.Add("Thêm các thẻ phân tích số liệu");
+                _chips.Add(AppL10n.T("Tạo slide trình chiếu theo mô tả", "Create presentation slides from prompt"));
+                _chips.Add(AppL10n.T("Đổi màu nền gradient sang trọng", "Apply an elegant gradient background"));
+                _chips.Add(AppL10n.T("Viết dàn ý và nội dung thuyết trình", "Draft slide outline & speaker content"));
+                _chips.Add(AppL10n.T("Thêm các thẻ phân tích số liệu", "Add KPI & data insight cards"));
             }
             else if (mode == OfficeAppMode.Pdf)
             {
-                _chips.Add("Tóm tắt nội dung tài liệu PDF này");
-                _chips.Add("Tóm tắt trang hiện tại đang xem");
-                _chips.Add("Trích xuất các luận điểm và từ khóa chính");
-                _chips.Add("Dịch nội dung trang này sang tiếng Anh");
+                _chips.Add(AppL10n.T("Tóm tắt nội dung tài liệu PDF này", "Summarize this PDF document"));
+                _chips.Add(AppL10n.T("Tóm tắt trang hiện tại đang xem", "Summarize the current page"));
+                _chips.Add(AppL10n.T("Trích xuất các luận điểm và từ khóa chính", "Extract key points & keywords"));
+                _chips.Add(AppL10n.T("Dịch nội dung trang này sang tiếng Anh", "Translate this page"));
             }
             else
             {
-                _chips.Add("Tóm tắt nội dung tài liệu này");
-                _chips.Add("Sửa lỗi chính tả & câu từ tự động");
-                _chips.Add("Viết tiếp đoạn văn theo ý tưởng");
-                _chips.Add("Lập dàn ý bài viết chi tiết");
+                _chips.Add(AppL10n.T("Tóm tắt nội dung tài liệu này", "Summarize this document"));
+                _chips.Add(AppL10n.T("Sửa lỗi chính tả & câu từ tự động", "Proofread & fix spelling/grammar"));
+                _chips.Add(AppL10n.T("Viết tiếp đoạn văn theo ý tưởng", "Continue writing from this draft"));
+                _chips.Add(AppL10n.T("Lập dàn ý bài viết chi tiết", "Create a detailed document outline"));
             }
         }
 
@@ -3103,12 +3103,12 @@ namespace ZenQOffice.UI
     {
         private float _phase = 0f;
         private System.Windows.Forms.Timer _timer;
-        private string _statusText = "Đang suy nghĩ...";
+        private string _statusText = AppL10n.T("Đang suy nghĩ...", "Thinking...");
         private bool _isSearch = false;
 
-        public ThinkingBubbleControl(string initialStatus = "Đang suy nghĩ...", bool isSearch = false)
+        public ThinkingBubbleControl(string initialStatus = null, bool isSearch = false)
         {
-            _statusText = initialStatus ?? "Đang suy nghĩ...";
+            _statusText = initialStatus ?? AppL10n.T("Đang suy nghĩ...", "Thinking...");
             _isSearch = isSearch;
             this.DoubleBuffered = false;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.SupportsTransparentBackColor, true);
@@ -3129,7 +3129,7 @@ namespace ZenQOffice.UI
 
         public void SetStatus(string statusText, bool isSearch = false)
         {
-            _statusText = statusText ?? "Đang suy nghĩ...";
+            _statusText = statusText ?? AppL10n.T("Đang suy nghĩ...", "Thinking...");
             _isSearch = isSearch;
             UpdateBubbleWidth();
             this.Invalidate();
@@ -3949,7 +3949,7 @@ namespace ZenQOffice.UI
             using (Font bf = new Font("Segoe UI", 8.2f))
             {
                 Rectangle textR = new Rectangle(_replyBtnRect.X + 22, _replyBtnRect.Y, _replyBtnRect.Width - 24, _replyBtnRect.Height);
-                AiGpuPaint.DrawText(g, "Chỉnh sửa", bf, textR, _isReplyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                AiGpuPaint.DrawText(g, AppL10n.T("Chỉnh sửa", "Edit"), bf, textR, _isReplyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             }
 
             // Nút "📋 Sao chép"
@@ -3965,7 +3965,7 @@ namespace ZenQOffice.UI
                 using (Font bf = new Font("Segoe UI", 8.2f, FontStyle.Bold))
                 {
                     Rectangle textR = new Rectangle(_copyBtnRect.X + 22, _copyBtnRect.Y, _copyBtnRect.Width - 24, _copyBtnRect.Height);
-                    AiGpuPaint.DrawText(g, "Đã chép", bf, textR, Color.FromArgb(22, 163, 74), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                    AiGpuPaint.DrawText(g, AppL10n.T("Đã chép", "Copied"), bf, textR, Color.FromArgb(22, 163, 74), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
                 }
             }
             else
@@ -3974,7 +3974,7 @@ namespace ZenQOffice.UI
                 using (Font bf = new Font("Segoe UI", 8.2f))
                 {
                     Rectangle textR = new Rectangle(_copyBtnRect.X + 22, _copyBtnRect.Y, _copyBtnRect.Width - 24, _copyBtnRect.Height);
-                    AiGpuPaint.DrawText(g, "Sao chép", bf, textR, _isCopyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                    AiGpuPaint.DrawText(g, AppL10n.T("Sao chép", "Copy"), bf, textR, _isCopyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(100, 116, 139), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
                 }
             }
         }
@@ -4130,7 +4130,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                _actionText = (mode == OfficeAppMode.Slides) ? "Chèn vào Slide" : ((mode == OfficeAppMode.Calc) ? "Chèn vào Bảng tính" : ((mode == OfficeAppMode.Pdf) ? "Sao chép phản hồi" : (appForm != null && appForm.WriterView != null && !string.IsNullOrEmpty(appForm.WriterView.GetSelectedText()) ? "Thay thế vùng chọn" : "Chèn vào văn bản")));
+                _actionText = (mode == OfficeAppMode.Slides) ? AppL10n.T("Chèn vào Slide", "Insert to Slide") : ((mode == OfficeAppMode.Calc) ? AppL10n.T("Chèn vào Bảng tính", "Insert to Sheet") : ((mode == OfficeAppMode.Pdf) ? "Sao chép phản hồi" : (appForm != null && appForm.WriterView != null && !string.IsNullOrEmpty(appForm.WriterView.GetSelectedText()) ? "Thay thế vùng chọn" : "Chèn vào văn bản")));
                 _actionBtnRect = new Rectangle(8, _bubbleH + 6, 140, 24);
                 _copyBtnRect = new Rectangle(8 + 140 + 6, _bubbleH + 6, 85, 24);
                 this.Size = new Size(feedW, _bubbleH + 36);
@@ -4423,7 +4423,7 @@ namespace ZenQOffice.UI
                 using (Font bFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
                 {
                     g.FillPath(wBg, wPath);
-                    AiGpuPaint.DrawText(g, "📄 Tạo file sang Writer", bFont, _btnWriterQuizRect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    AiGpuPaint.DrawText(g, AppL10n.T("📄 Tạo file sang Writer", "📄 Export to Writer"), bFont, _btnWriterQuizRect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 }
 
                 // Nút "🎨 Mở Canvas"
@@ -4435,7 +4435,7 @@ namespace ZenQOffice.UI
                 {
                     g.FillPath(cBg, cPath);
                     g.DrawPath(cPen, cPath);
-                    AiGpuPaint.DrawText(g, "🎨 Mở Canvas", bFont, _btnOpenCanvasRect, Color.FromArgb(67, 56, 202), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    AiGpuPaint.DrawText(g, AppL10n.T("🎨 Mở Canvas", "🎨 Open Canvas"), bFont, _btnOpenCanvasRect, Color.FromArgb(67, 56, 202), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 }
             }
 
@@ -4471,7 +4471,7 @@ namespace ZenQOffice.UI
                 using (Font bf = new Font("Segoe UI", 8.2f, FontStyle.Bold))
                 {
                     Rectangle textR = new Rectangle(_copyBtnRect.X + 24, _copyBtnRect.Y, _copyBtnRect.Width - 26, _copyBtnRect.Height);
-                    AiGpuPaint.DrawText(g, "Đã chép", bf, textR, Color.FromArgb(22, 163, 74), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                    AiGpuPaint.DrawText(g, AppL10n.T("Đã chép", "Copied"), bf, textR, Color.FromArgb(22, 163, 74), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
                 }
             }
             else
@@ -4480,7 +4480,7 @@ namespace ZenQOffice.UI
                 using (Font bf = new Font("Segoe UI", 8.2f))
                 {
                     Rectangle textR = new Rectangle(_copyBtnRect.X + 24, _copyBtnRect.Y, _copyBtnRect.Width - 26, _copyBtnRect.Height);
-                    AiGpuPaint.DrawText(g, "Sao chép", bf, textR, _isCopyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(71, 85, 105), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                    AiGpuPaint.DrawText(g, AppL10n.T("Sao chép", "Copy"), bf, textR, _isCopyHover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(71, 85, 105), TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
                 }
             }
         }
@@ -4603,7 +4603,7 @@ namespace ZenQOffice.UI
         public AiChatSession()
         {
             Id = Guid.NewGuid().ToString("N");
-            Title = "Äoáº¡n chat má»›i";
+            Title = AppL10n.T("Đoạn chat mới", "New Chat");
             CreatedAt = DateTime.Now;
             UpdatedAt = DateTime.Now;
             Messages = new List<AiChatMessage>();
@@ -4624,7 +4624,7 @@ namespace ZenQOffice.UI
 
         public AiChatHistoryDialog(Form parent)
         {
-            this.Text = "Lịch sử đoạn chat AI";
+            this.Text = AppL10n.T("Lịch sử đoạn chat AI", "AI Chat History");
             this.Size = new Size(440, 560);
             this.MinimumSize = new Size(400, 480);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -4669,7 +4669,7 @@ namespace ZenQOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "Lịch sử hội thoại",
+                Text = AppL10n.T("Lịch sử hội thoại", "Chat History"),
                 Font = new Font("Segoe UI", 12f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(42, 14),
@@ -4679,7 +4679,7 @@ namespace ZenQOffice.UI
 
             Button btnClearAll = new AiGpuButton
             {
-                Text = "      Xóa tất cả",
+                Text = AppL10n.T("      Xóa tất cả", "      Clear All"),
                 Font = new Font("Segoe UI", 9.25f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(239, 68, 68),
                 BackColor = Color.FromArgb(254, 242, 242),
@@ -4701,8 +4701,8 @@ namespace ZenQOffice.UI
             btnClearAll.Click += (s, e) =>
             {
                 var res = ZenQOffice.UI.FluentMessageBox.Show(
-                    "Bạn có chắc chắn muốn xóa toàn bộ lịch sử các đoạn chat?",
-                    "Xác nhận xóa tất cả",
+                    AppL10n.T("Bạn có chắc chắn muốn xóa toàn bộ lịch sử các đoạn chat?", "Are you sure you want to delete all chat history?"),
+                    AppL10n.T("Xác nhận xóa tất cả", "Confirm Clear All"),
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
                 );
@@ -4735,7 +4735,7 @@ namespace ZenQOffice.UI
 
             Button btnNew = new AiGpuButton
             {
-                Text = "+ Bắt đầu đoạn chat mới",
+                Text = AppL10n.T("+ Bắt đầu đoạn chat mới", "+ Start New Chat"),
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(79, 70, 229),
@@ -4794,7 +4794,7 @@ namespace ZenQOffice.UI
                 };
                 Label lblEmpty = new Label
                 {
-                    Text = "Chưa có đoạn chat nào trong lịch sử.\nHãy trò chuyện với AI để lưu lại các cuộc hội thoại!",
+                    Text = AppL10n.T("Chưa có đoạn chat nào trong lịch sử.\nHãy trò chuyện với AI để lưu lại các cuộc hội thoại!", "No saved chats yet.\nStart a conversation with AI to save your history!"),
                     Font = new Font("Segoe UI", 9.5f),
                     ForeColor = Color.FromArgb(148, 163, 184),
                     TextAlign = ContentAlignment.MiddleCenter,
@@ -4892,7 +4892,7 @@ namespace ZenQOffice.UI
             // Title
             Label lblCardTitle = new Label
             {
-                Text = !string.IsNullOrEmpty(sess.Title) ? sess.Title : "Đoạn chat không tên",
+                Text = !string.IsNullOrEmpty(sess.Title) ? AppL10n.T(sess.Title == "Ä oáº¡n chat má»›i" ? "Đoạn chat mới" : sess.Title, (sess.Title == "Ä oáº¡n chat má»›i" || sess.Title == "Đoạn chat mới") ? "New Chat" : sess.Title) : AppL10n.T("Đoạn chat không tên", "Untitled Chat"),
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(58, 13),
@@ -4914,7 +4914,7 @@ namespace ZenQOffice.UI
             int msgCount = (sess.Messages != null) ? sess.Messages.Count : 0;
             Label lblSub = new Label
             {
-                Text = string.Format("{0} tin nhắn • {1}", msgCount, timeStr),
+                Text = AppL10n.T(string.Format("{0} tin nhắn • {1}", msgCount, timeStr), string.Format("{0} message(s) • {1}", msgCount, timeStr)),
                 Font = new Font("Segoe UI", 8.5f),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(58, 38),
@@ -4941,7 +4941,7 @@ namespace ZenQOffice.UI
                 Cursor = Cursors.Hand
             };
             btnDel.FlatAppearance.BorderSize = 0;
-            toolTip.SetToolTip(btnDel, "Xóa đoạn chat này");
+            toolTip.SetToolTip(btnDel, AppL10n.T("Xóa đoạn chat này", "Delete chat"));
 
             bool isDelHover = false;
             btnDel.MouseEnter += (s, e) => { isDelHover = true; btnDel.Invalidate(); };
@@ -4969,8 +4969,8 @@ namespace ZenQOffice.UI
             btnDel.Click += (s, e) =>
             {
                 var res = ZenQOffice.UI.FluentMessageBox.Show(
-                    string.Format("Bạn có chắc chắn muốn xóa đoạn chat \"{0}\"?", !string.IsNullOrEmpty(sess.Title) ? sess.Title : "Đoạn chat"),
-                    "Xác nhận xóa đoạn chat",
+                    AppL10n.T(string.Format("Bạn có chắc chắn muốn xóa đoạn chat \"{0}\"?", !string.IsNullOrEmpty(sess.Title) ? sess.Title : "Đoạn chat"), string.Format("Delete chat \"{0}\"?", !string.IsNullOrEmpty(sess.Title) ? sess.Title : "Chat")),
+                    AppL10n.T("Xác nhận xóa đoạn chat", "Confirm Delete"),
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
                 );
@@ -5293,7 +5293,7 @@ namespace ZenQOffice.UI
 
         private static string ExtractTitleFromMessages(List<AiChatMessage> messages)
         {
-            if (messages == null || messages.Count == 0) return "Äoáº¡n chat má»›i";
+            if (messages == null || messages.Count == 0) return AppL10n.T("Đoạn chat mới", "New Chat");
             foreach (var m in messages)
             {
                 if (m.Role == "user" && !string.IsNullOrWhiteSpace(m.Content))
@@ -5303,7 +5303,7 @@ namespace ZenQOffice.UI
                     return clean;
                 }
             }
-            return "Äoáº¡n chat má»›i";
+            return AppL10n.T("Đoạn chat mới", "New Chat");
         }
 
         private static string EscapeJson(string s)

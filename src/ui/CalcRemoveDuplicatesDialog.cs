@@ -50,7 +50,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Xóa Trùng Lặp (Remove Duplicates)";
+            this.Text = AppL10n.T("Xóa Trùng Lặp (Remove Duplicates)", "Remove Duplicates");
             this.Size = new Size(380, 420);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -61,7 +61,7 @@ namespace ZenQOffice.UI
             this.BackColor = Color.FromArgb(243, 242, 241);
 
             Label lblPrompt = new Label();
-            lblPrompt.Text = "Để xóa các dòng trùng lặp, hãy chọn một hoặc nhiều cột:";
+            lblPrompt.Text = AppL10n.T("Để xóa các dòng trùng lặp, hãy chọn một hoặc nhiều cột:", "To delete duplicate values, select one or more columns that contain duplicates:");
             lblPrompt.Location = new Point(15, 12);
             lblPrompt.Size = new Size(340, 32);
             this.Controls.Add(lblPrompt);
@@ -69,14 +69,14 @@ namespace ZenQOffice.UI
             lblRange = new Label();
             string refStart = SparseMatrix.GetCellReference(_minR, _minC);
             string refEnd = SparseMatrix.GetCellReference(_maxR, _maxC);
-            lblRange.Text = "Vùng dữ liệu: " + refStart + ":" + refEnd;
+            lblRange.Text = AppL10n.T("Vùng dữ liệu: ", "Range: ") + refStart + ":" + refEnd;
             lblRange.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
             lblRange.Location = new Point(15, 45);
             lblRange.AutoSize = true;
             this.Controls.Add(lblRange);
 
             chkHasHeaders = new CheckBox();
-            chkHasHeaders.Text = "Dữ liệu có hàng tiêu đề (My data has headers)";
+            chkHasHeaders.Text = AppL10n.T("Dữ liệu có hàng tiêu đề (My data has headers)", "My data has headers");
             chkHasHeaders.Location = new Point(15, 72);
             chkHasHeaders.AutoSize = true;
             chkHasHeaders.Checked = DetectHeaderHeuristic();
@@ -84,14 +84,14 @@ namespace ZenQOffice.UI
             this.Controls.Add(chkHasHeaders);
 
             btnSelectAll = new Button();
-            btnSelectAll.Text = "Chọn tất cả";
+            btnSelectAll.Text = AppL10n.T("Chọn tất cả", "Select All");
             btnSelectAll.Location = new Point(15, 100);
             btnSelectAll.Size = new Size(95, 26);
             btnSelectAll.Click += delegate(object sender, EventArgs e) { SetAllColumnsChecked(true); };
             this.Controls.Add(btnSelectAll);
 
             btnUnselectAll = new Button();
-            btnUnselectAll.Text = "Bỏ chọn tất cả";
+            btnUnselectAll.Text = AppL10n.T("Bỏ chọn tất cả", "Unselect All");
             btnUnselectAll.Location = new Point(115, 100);
             btnUnselectAll.Size = new Size(105, 26);
             btnUnselectAll.Click += delegate(object sender, EventArgs e) { SetAllColumnsChecked(false); };
@@ -104,14 +104,14 @@ namespace ZenQOffice.UI
             this.Controls.Add(clbColumns);
 
             btnOK = new Button();
-            btnOK.Text = "Xóa trùng lặp";
+            btnOK.Text = AppL10n.T("Xóa trùng lặp", "OK");
             btnOK.Location = new Point(145, 335);
             btnOK.Size = new Size(110, 32);
             btnOK.Click += BtnOK_Click;
             this.Controls.Add(btnOK);
 
             btnCancel = new Button();
-            btnCancel.Text = "Hủy";
+            btnCancel.Text = AppL10n.T("Hủy", "Cancel");
             btnCancel.Location = new Point(265, 335);
             btnCancel.Size = new Size(85, 32);
             btnCancel.Click += delegate(object sender, EventArgs e) { this.Close(); };
@@ -150,7 +150,7 @@ namespace ZenQOffice.UI
             for (uint c = _minC; c <= _maxC; c++)
             {
                 string colLetter = SparseMatrix.ColIndexToName(c);
-                string text = "Cột " + colLetter;
+                string text = AppL10n.T("Cột ", "Column ") + colLetter;
                 if (chkHasHeaders.Checked && sheet != null)
                 {
                     CellData headerCell = sheet.GetCell(_minR, c);
@@ -183,8 +183,8 @@ namespace ZenQOffice.UI
 
             if (checkedCols.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn ít nhất một cột để kiểm tra trùng lặp!",
-                    "Xóa Trùng Lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Vui lòng chọn ít nhất một cột để kiểm tra trùng lặp!", "Please select at least one column to check for duplicates!"),
+                    AppL10n.T("Xóa Trùng Lặp", "Remove Duplicates"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -193,8 +193,8 @@ namespace ZenQOffice.UI
             _calcView.ExecuteRemoveDuplicates(_minR, _maxR, _minC, _maxC, checkedCols,
                 chkHasHeaders.Checked, out dupCount, out uniqueCount);
 
-            ZenQOffice.UI.FluentMessageBox.Show(this, string.Format("Đã tìm thấy và xóa {0} dòng trùng lặp!\nGiữ lại {1} dòng dữ liệu duy nhất.",
-                dupCount, uniqueCount), "Xóa Trùng Lặp Hoàn Tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show(this, string.Format(AppL10n.T("Đã tìm thấy và xóa {0} dòng trùng lặp!\nGiữ lại {1} dòng dữ liệu duy nhất.", "{0} duplicate values found and removed; {1} unique values remain."),
+                dupCount, uniqueCount), AppL10n.T("Xóa Trùng Lặp Hoàn Tất", "Remove Duplicates"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             if (_parentForm != null) _parentForm.Invalidate();
             this.Close();

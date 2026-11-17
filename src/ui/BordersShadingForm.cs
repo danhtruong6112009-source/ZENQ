@@ -12,7 +12,12 @@ namespace ZenQOffice.UI
         private WriterView writerView;
         private TabControl tabControl;
         private TabPage tabBorders;
+        private TabPage tabPageBorder;
         private TabPage tabShading;
+        private int pageBorderSetting = 0; // 0=None, 1=Box, 2=Shadow, 3=3D
+        private Color pageBorderColor = Color.FromArgb(43, 87, 154);
+        private float pageBorderWidthPt = 1.5f;
+        public Action<bool, Color, float, int> OnPageBorderApplied;
 
         // Border settings
         private int currentSetting = 1; // 0=None, 1=Box, 2=Shadow, 3=3D, 4=Custom
@@ -39,7 +44,7 @@ namespace ZenQOffice.UI
 
         private void InitializeUI()
         {
-            Text = "Borders and Shading (Viền và Đổ màu nền)";
+            Text = AppL10n.T("Borders and Shading (Viền và Đổ màu nền)", "Borders and Shading");
             Size = new Size(540, 480);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -55,13 +60,16 @@ namespace ZenQOffice.UI
                 Font = new Font("Segoe UI", 9.0f)
             };
 
-            tabBorders = new TabPage("Borders (Viền)");
-            tabShading = new TabPage("Shading (Tô nền)");
+            tabBorders = new TabPage(AppL10n.T("Borders (Viền)", "Borders"));
+            tabPageBorder = new TabPage(AppL10n.T("Page Border (Viền trang)", "Page Border"));
+            tabShading = new TabPage(AppL10n.T("Shading (Tô nền)", "Shading"));
 
             SetupBordersTab();
+            SetupPageBorderTab();
             SetupShadingTab();
 
             tabControl.TabPages.Add(tabBorders);
+            tabControl.TabPages.Add(tabPageBorder);
             tabControl.TabPages.Add(tabShading);
             Controls.Add(tabControl);
 
@@ -81,7 +89,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Cancel (Hủy)",
+                Text = AppL10n.T("Cancel (Hủy)", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(430, 402),
                 Size = new Size(82, 28),
@@ -104,12 +112,12 @@ namespace ZenQOffice.UI
             // 1. Setting Group (None, Box, Shadow, 3-D, Custom)
             GroupBox grpSetting = new GroupBox
             {
-                Text = "Setting (Kiểu viền)",
+                Text = AppL10n.T("Setting (Kiểu viền)", "Setting"),
                 Location = new Point(10, 10),
                 Size = new Size(110, 320)
             };
 
-            string[] settings = new string[] { "None (Không)", "Box (Hộp)", "Shadow (Bóng)", "3-D (Nổi)", "Custom (Tự chọn)" };
+            string[] settings = new string[] { AppL10n.T("None (Không)", "None"), AppL10n.T("Box (Hộp)", "Box"), AppL10n.T("Shadow (Bóng)", "Shadow"), AppL10n.T("3-D (Nổi)", "3-D"), AppL10n.T("Custom (Tự chọn)", "Custom") };
             int sy = 25;
             for (int i = 0; i < settings.Length; i++)
             {
@@ -139,7 +147,7 @@ namespace ZenQOffice.UI
             // 2. Style, Color, Width
             GroupBox grpStyle = new GroupBox
             {
-                Text = "Style (Nét & Màu)",
+                Text = AppL10n.T("Style (Nét & Màu)", "Style"),
                 Location = new Point(130, 10),
                 Size = new Size(150, 320)
             };
@@ -152,9 +160,9 @@ namespace ZenQOffice.UI
                 DrawMode = DrawMode.OwnerDrawFixed,
                 ItemHeight = 22
             };
-            lstStyle.Items.Add("Solid (Liền nét)");
-            lstStyle.Items.Add("Dashed (Nét đứt)");
-            lstStyle.Items.Add("Dotted (Nét chấm)");
+            lstStyle.Items.Add(AppL10n.T("Solid (Liền nét)", "Solid"));
+            lstStyle.Items.Add(AppL10n.T("Dashed (Nét đứt)", "Dashed"));
+            lstStyle.Items.Add(AppL10n.T("Dotted (Nét chấm)", "Dotted"));
             lstStyle.SelectedIndex = 0;
             lstStyle.DrawItem += (s, e) =>
             {
@@ -176,13 +184,13 @@ namespace ZenQOffice.UI
                 previewPanel.Invalidate();
             };
 
-            Label lblColor = new Label { Text = "Color (Màu):", Location = new Point(10, 145), AutoSize = true };
+            Label lblColor = new Label { Text = AppL10n.T("Color (Màu):", "Color:"), Location = new Point(10, 145), AutoSize = true };
             btnColor = new Button
             {
                 Location = new Point(10, 165),
                 Size = new Size(130, 25),
                 BackColor = Color.Black,
-                Text = "■ Đen",
+                Text = AppL10n.T("■ Đen", "■ Black"),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
             };
@@ -196,13 +204,13 @@ namespace ZenQOffice.UI
                         selectedColor = cd.Color;
                         btnColor.BackColor = selectedColor;
                         btnColor.ForeColor = (selectedColor.R * 0.3 + selectedColor.G * 0.59 + selectedColor.B * 0.11 > 128) ? Color.Black : Color.White;
-                        btnColor.Text = "■ Chọn";
+                        btnColor.Text = AppL10n.T("■ Chọn", "■ Custom");
                         previewPanel.Invalidate();
                     }
                 }
             };
 
-            Label lblWidth = new Label { Text = "Width (Độ dày):", Location = new Point(10, 200), AutoSize = true };
+            Label lblWidth = new Label { Text = AppL10n.T("Width (Độ dày):", "Width:"), Location = new Point(10, 200), AutoSize = true };
             cboWidth = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(10, 220),
@@ -227,7 +235,7 @@ namespace ZenQOffice.UI
             // 3. Preview Group & Interactive Buttons
             GroupBox grpPreview = new GroupBox
             {
-                Text = "Preview (Xem trước)",
+                Text = AppL10n.T("Preview (Xem trước)", "Preview"),
                 Location = new Point(290, 10),
                 Size = new Size(195, 320)
             };
@@ -270,14 +278,14 @@ namespace ZenQOffice.UI
             Button btnLeft = CreateBorderToggleBtn("◄", new Point(15, 85), () => { leftBorder = !leftBorder; currentSetting = 4; previewPanel.Invalidate(); });
             Button btnRight = CreateBorderToggleBtn("►", new Point(160, 85), () => { rightBorder = !rightBorder; currentSetting = 4; previewPanel.Invalidate(); });
 
-            Label lblApply = new Label { Text = "Apply to (Áp dụng cho):", Location = new Point(15, 215), AutoSize = true };
+            Label lblApply = new Label { Text = AppL10n.T("Apply to (Áp dụng cho):", "Apply to:"), Location = new Point(15, 215), AutoSize = true };
             cboApplyTo = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(15, 235),
                 Size = new Size(165, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cboApplyTo.Items.AddRange(new object[] { "Paragraph (Đoạn văn)", "Text (Văn bản chọn)" });
+            cboApplyTo.Items.AddRange(new object[] { AppL10n.T("Paragraph (Đoạn văn)", "Paragraph"), AppL10n.T("Text (Văn bản chọn)", "Text") });
             bool hasSel = (writerView != null && writerView.SelectionStart != writerView.SelectionEnd);
             cboApplyTo.SelectedIndex = hasSel ? 1 : 0;
 
@@ -305,7 +313,7 @@ namespace ZenQOffice.UI
         {
             tabShading.BackColor = Color.White;
 
-            Label lblFill = new Label { Text = "Fill (Màu nền đoạn văn):", Location = new Point(20, 20), AutoSize = true };
+            Label lblFill = new Label { Text = AppL10n.T("Fill (Màu nền đoạn văn):", "Fill:"), Location = new Point(20, 20), AutoSize = true };
             Panel pnlColorPalette = new Panel
             {
                 Location = new Point(20, 50),
@@ -353,6 +361,87 @@ namespace ZenQOffice.UI
             }
 
             tabShading.Controls.AddRange(new Control[] { lblFill, pnlColorPalette });
+        }
+
+        private void SetupPageBorderTab()
+        {
+            tabPageBorder.BackColor = Color.White;
+            Label lblSet = new Label { Text = AppL10n.T("Kiểu viền trang (Setting):", "Setting:"), Location = new Point(14, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            tabPageBorder.Controls.Add(lblSet);
+
+            Panel pnlPrev = new Panel { Location = new Point(268, 40), Size = new Size(212, 240), BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
+            pnlPrev.Paint += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                Rectangle b = new Rectangle(18, 16, pnlPrev.Width - 36, pnlPrev.Height - 32);
+                g.DrawRectangle(Pens.LightGray, b);
+                if (pageBorderSetting > 0)
+                {
+                    if (pageBorderSetting == 2)
+                    {
+                        using (SolidBrush sb = new SolidBrush(Color.FromArgb(110, 110, 110)))
+                        {
+                            g.FillRectangle(sb, b.X + 4, b.Bottom + 1, b.Width, 3);
+                            g.FillRectangle(sb, b.Right + 1, b.Y + 4, 3, b.Height);
+                        }
+                    }
+                    using (Pen bp = new Pen(pageBorderColor, pageBorderWidthPt))
+                    {
+                        g.DrawRectangle(bp, b);
+                        if (pageBorderSetting == 3) g.DrawRectangle(bp, new Rectangle(b.X + 3, b.Y + 3, b.Width - 6, b.Height - 6));
+                    }
+                }
+            };
+            tabPageBorder.Controls.Add(pnlPrev);
+
+            string[] names = { AppL10n.T("Không viền (None)", "None"), AppL10n.T("Hộp (Box)", "Box"), AppL10n.T("Đổ bóng (Shadow)", "Shadow"), AppL10n.T("Hiệu ứng 3-D", "3-D") };
+            for (int i = 0; i < names.Length; i++)
+            {
+                int idx = i;
+                Button btn = new Button
+                {
+                    Text = names[i],
+                    Location = new Point(14, 40 + i * 44),
+                    Size = new Size(220, 36),
+                    BackColor = Color.FromArgb(248, 250, 252),
+                    FlatStyle = FlatStyle.Flat,
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                btn.Click += (s, e) => { pageBorderSetting = idx; pnlPrev.Invalidate(); };
+                tabPageBorder.Controls.Add(btn);
+            }
+
+            Label lblPColor = new Label { Text = AppL10n.T("Màu sắc (Color):", "Color:"), Location = new Point(14, 224), AutoSize = true };
+            Button btnPColor = new Button { Text = AppL10n.T("Chọn màu viền trang...", "Choose Border Color..."), Location = new Point(14, 246), Size = new Size(140, 28), BackColor = pageBorderColor, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            btnPColor.Click += (s, e) =>
+            {
+                using (ColorDialog cd = new ColorDialog { Color = pageBorderColor })
+                {
+                    if (cd.ShowDialog(this) == DialogResult.OK)
+                    {
+                        pageBorderColor = cd.Color;
+                        btnPColor.BackColor = cd.Color;
+                        pnlPrev.Invalidate();
+                    }
+                }
+            };
+            ComboBox cboPWidth = new ZenQOffice.UI.FluentComboBox { Location = new Point(164, 246), Size = new Size(88, 26), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboPWidth.Items.AddRange(new object[] { "0.5 pt", "1.0 pt", "1.5 pt", "2.25 pt", "3.0 pt" });
+            cboPWidth.SelectedIndex = 2;
+            cboPWidth.SelectedIndexChanged += (s, e) =>
+            {
+                float[] wVals = { 0.5f, 1.0f, 1.5f, 2.25f, 3.0f };
+                if (cboPWidth.SelectedIndex >= 0) pageBorderWidthPt = wVals[cboPWidth.SelectedIndex];
+                pnlPrev.Invalidate();
+            };
+
+            Label lblApply = new Label { Text = AppL10n.T("Áp dụng cho (Apply to):", "Apply to:"), Location = new Point(268, 288), AutoSize = true };
+            ComboBox cboPApply = new ZenQOffice.UI.FluentComboBox { Location = new Point(268, 308), Size = new Size(212, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboPApply.Items.AddRange(new object[] { AppL10n.T("Toàn bộ tài liệu (Whole document)", "Whole document"), AppL10n.T("Phần này (This section)", "This section") });
+            cboPApply.SelectedIndex = 0;
+
+            tabPageBorder.Controls.AddRange(new Control[] { lblPColor, btnPColor, cboPWidth, lblApply, cboPApply });
         }
 
         private void ApplyAndClose()
@@ -413,6 +502,11 @@ namespace ZenQOffice.UI
                             writerView.ParagraphBorders[pStart] = info;
                         }
                     }
+                }
+
+                if (tabControl != null && tabControl.SelectedIndex == 1 && OnPageBorderApplied != null)
+                {
+                    OnPageBorderApplied(pageBorderSetting > 0, pageBorderColor, pageBorderWidthPt, pageBorderSetting);
                 }
 
                 writerView.InvalidateLayoutAndTextCache();

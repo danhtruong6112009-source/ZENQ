@@ -23,7 +23,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Goal Seek (Dò tìm mục tiêu)";
+            this.Text = AppL10n.T("Goal Seek (Dò tìm mục tiêu)", "Goal Seek");
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -33,7 +33,7 @@ namespace ZenQOffice.UI
             this.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
 
             Label lblSetCell = new Label();
-            lblSetCell.Text = "Ô đặt giá trị (Set cell):";
+            lblSetCell.Text = AppL10n.T("Ô đặt giá trị (Set cell):", "Set cell:");
             lblSetCell.Location = new Point(16, 20);
             lblSetCell.AutoSize = true;
             this.Controls.Add(lblSetCell);
@@ -53,7 +53,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(txtSetCell);
 
             Label lblToVal = new Label();
-            lblToVal.Text = "Giá trị đích (To value):";
+            lblToVal.Text = AppL10n.T("Giá trị đích (To value):", "To value:");
             lblToVal.Location = new Point(16, 56);
             lblToVal.AutoSize = true;
             this.Controls.Add(lblToVal);
@@ -64,7 +64,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(txtToValue);
 
             Label lblChgCell = new Label();
-            lblChgCell.Text = "Bằng cách đổi ô (By changing):";
+            lblChgCell.Text = AppL10n.T("Bằng cách đổi ô (By changing):", "By changing cell:");
             lblChgCell.Location = new Point(16, 92);
             lblChgCell.AutoSize = true;
             this.Controls.Add(lblChgCell);
@@ -75,14 +75,14 @@ namespace ZenQOffice.UI
             this.Controls.Add(txtChangingCell);
 
             btnOk = new Button();
-            btnOk.Text = "Đồng ý";
+            btnOk.Text = AppL10n.T("Đồng ý", "OK");
             btnOk.Location = new Point(136, 138);
             btnOk.Size = new Size(80, 28);
             btnOk.Click += (s, e) => ExecuteGoalSeek();
             this.Controls.Add(btnOk);
 
             btnCancel = new Button();
-            btnCancel.Text = "Hủy";
+            btnCancel.Text = AppL10n.T("Hủy", "Cancel");
             btnCancel.DialogResult = DialogResult.Cancel;
             btnCancel.Location = new Point(222, 138);
             btnCancel.Size = new Size(80, 28);
@@ -103,14 +103,14 @@ namespace ZenQOffice.UI
             uint setRow, setCol;
             if (!SparseMatrix.TryParseCellReference(setRef, out setRow, out setCol))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Ô đặt giá trị không hợp lệ. Vui lòng nhập tọa độ như A1 hoặc $A$1.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Ô đặt giá trị không hợp lệ. Vui lòng nhập tọa độ như A1 hoặc $A$1.", "Invalid Set cell reference. Enter e.g. A1 or $A$1."), "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             uint chgRow, chgCol;
             if (!SparseMatrix.TryParseCellReference(chgRef, out chgRow, out chgCol))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Ô cần thay đổi không hợp lệ. Vui lòng nhập tọa độ như B2 hoặc $B$2.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Ô cần thay đổi không hợp lệ. Vui lòng nhập tọa độ như B2 hoặc $B$2.", "Invalid By changing cell reference. Enter e.g. B2 or $B$2."), "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -118,14 +118,14 @@ namespace ZenQOffice.UI
             if (!double.TryParse(toValStr, NumberStyles.Float, CultureInfo.InvariantCulture, out targetVal) &&
                 !double.TryParse(toValStr, NumberStyles.Float, CultureInfo.CurrentCulture, out targetVal))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Giá trị mục tiêu phải là một số hợp lệ.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Giá trị mục tiêu phải là một số hợp lệ.", "Target value must be a valid number."), "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             CellData setCell = _calcView.CurrentSheet.GetCell(setRow, setCol);
             if (setCell == null || string.IsNullOrEmpty(setCell.FormulaStr))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Ô đặt giá trị (" + setRef + ") phải chứa một công thức.", "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Ô đặt giá trị (", "Set cell (") + setRef + AppL10n.T(") phải chứa một công thức.", ") must contain a formula."), "Goal Seek", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -221,13 +221,10 @@ namespace ZenQOffice.UI
         private void ShowResultDialog(string setRef, double targetVal, double actualVal, double origVal, CellData chgCell)
         {
             string msg = string.Format(
-                "Dò tìm mục tiêu cho ô {0} đã hoàn thành.\n\n" +
-                "Giá trị mục tiêu: {1:N2}\n" +
-                "Giá trị hiện tại: {2:N2}\n\n" +
-                "Nhấn OK để giữ giá trị đã giải, hoặc Cancel để hoàn tác về giá trị ban đầu.",
+                AppL10n.T("Dò tìm mục tiêu cho ô {0} đã hoàn thành.\n\nGiá trị mục tiêu: {1:N2}\nGiá trị hiện tại: {2:N2}\n\nNhấn OK để giữ giá trị đã giải, hoặc Cancel để hoàn tác về giá trị ban đầu.", "Goal Seeking with Cell {0} found a solution.\n\nTarget value: {1:N2}\nCurrent value: {2:N2}\n\nClick OK to keep the solution, or Cancel to revert."),
                 setRef, targetVal, actualVal);
 
-            DialogResult dr = ZenQOffice.UI.FluentMessageBox.Show(msg, "Trạng thái Dò tìm Mục tiêu", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+            DialogResult dr = ZenQOffice.UI.FluentMessageBox.Show(msg, AppL10n.T("Trạng thái Dò tìm Mục tiêu", "Goal Seek Status"), MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
             if (dr == DialogResult.Cancel)
             {
                 SetCellNum(chgCell, origVal);

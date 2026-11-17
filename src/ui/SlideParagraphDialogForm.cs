@@ -55,7 +55,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            Text = "Đoạn văn (Paragraph)";
+            Text = AppL10n.T("Đoạn văn (Paragraph)", "Paragraph");
             Size = new Size(520, 520);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -65,20 +65,20 @@ namespace ZenQOffice.UI
             Font = new Font("Segoe UI", 9f);
 
             // Group 1: General (Chung - Căn chỉnh)
-            GroupBox grpGeneral = new GroupBox { Text = "Căn chỉnh chung", Location = new Point(14, 12), Size = new Size(475, 75) };
+            GroupBox grpGeneral = new GroupBox { Text = AppL10n.T("Căn chỉnh chung", "General"), Location = new Point(14, 12), Size = new Size(475, 75) };
             
-            Label lblAlign = new Label { Text = "Căn chỉnh:", Location = new Point(16, 26), AutoSize = true };
+            Label lblAlign = new Label { Text = AppL10n.T("Căn chỉnh:", "Alignment:"), Location = new Point(16, 26), AutoSize = true };
             cboAlignment = new ZenQOffice.UI.FluentComboBox { Location = new Point(90, 23), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboAlignment.Items.AddRange(new object[] { "Căn trái", "Căn giữa", "Căn phải", "Căn đều hai bên" });
+            cboAlignment.Items.AddRange(new object[] { AppL10n.T("Căn trái", "Left"), AppL10n.T("Căn giữa", "Centered"), AppL10n.T("Căn phải", "Right"), AppL10n.T("Căn đều hai bên", "Justified") });
             cboAlignment.SelectedIndex = AlignmentResult == TextAlignment.Center ? 1 : (AlignmentResult == TextAlignment.Right ? 2 : (AlignmentResult == TextAlignment.Justify ? 3 : 0));
             cboAlignment.SelectedIndexChanged += (s, e) => {
                 AlignmentResult = cboAlignment.SelectedIndex == 1 ? TextAlignment.Center : (cboAlignment.SelectedIndex == 2 ? TextAlignment.Right : (cboAlignment.SelectedIndex == 3 ? TextAlignment.Justify : TextAlignment.Left));
                 UpdatePreview();
             };
 
-            Label lblVert = new Label { Text = "Dọc:", Location = new Point(245, 26), AutoSize = true };
+            Label lblVert = new Label { Text = AppL10n.T("Dọc:", "Vertical:"), Location = new Point(245, 26), AutoSize = true };
             cboVerticalAlignment = new ZenQOffice.UI.FluentComboBox { Location = new Point(310, 23), Size = new Size(140, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboVerticalAlignment.Items.AddRange(new object[] { "Trên cùng", "Ở giữa", "Dưới cùng" });
+            cboVerticalAlignment.Items.AddRange(new object[] { AppL10n.T("Trên cùng", "Top"), AppL10n.T("Ở giữa", "Middle"), AppL10n.T("Dưới cùng", "Bottom") });
             cboVerticalAlignment.SelectedIndex = VerticalAlignmentResult == VerticalTextAlignment.Middle ? 1 : (VerticalAlignmentResult == VerticalTextAlignment.Bottom ? 2 : 0);
             cboVerticalAlignment.SelectedIndexChanged += (s, e) => {
                 VerticalAlignmentResult = cboVerticalAlignment.SelectedIndex == 1 ? VerticalTextAlignment.Middle : (cboVerticalAlignment.SelectedIndex == 2 ? VerticalTextAlignment.Bottom : VerticalTextAlignment.Top);
@@ -89,13 +89,13 @@ namespace ZenQOffice.UI
             Controls.Add(grpGeneral);
 
             // Group 2: Indentation (Thụt lề)
-            GroupBox grpIndent = new GroupBox { Text = "Thụt lề", Location = new Point(14, 95), Size = new Size(475, 75) };
+            GroupBox grpIndent = new GroupBox { Text = AppL10n.T("Thụt lề", "Indentation"), Location = new Point(14, 95), Size = new Size(475, 75) };
             
-            Label lblIndL = new Label { Text = "Bên trái (pt):", Location = new Point(16, 28), AutoSize = true };
+            Label lblIndL = new Label { Text = AppL10n.T("Bên trái (pt):", "Left (pt):"), Location = new Point(16, 28), AutoSize = true };
             numIndentLeft = new NumericUpDown { Location = new Point(100, 26), Size = new Size(90, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 200, Value = (decimal)MarginLeftResult };
             numIndentLeft.ValueChanged += (s, e) => { MarginLeftResult = (float)numIndentLeft.Value; UpdatePreview(); };
 
-            Label lblIndR = new Label { Text = "Bên phải (pt):", Location = new Point(245, 28), AutoSize = true };
+            Label lblIndR = new Label { Text = AppL10n.T("Bên phải (pt):", "Right (pt):"), Location = new Point(245, 28), AutoSize = true };
             numIndentRight = new NumericUpDown { Location = new Point(340, 26), Size = new Size(90, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 200, Value = (decimal)MarginRightResult };
             numIndentRight.ValueChanged += (s, e) => { MarginRightResult = (float)numIndentRight.Value; UpdatePreview(); };
 
@@ -103,21 +103,21 @@ namespace ZenQOffice.UI
             Controls.Add(grpIndent);
 
             // Group 3: Spacing (Giãn cách)
-            GroupBox grpSpacing = new GroupBox { Text = "Giãn cách", Location = new Point(14, 180), Size = new Size(475, 120) };
+            GroupBox grpSpacing = new GroupBox { Text = AppL10n.T("Giãn cách", "Spacing"), Location = new Point(14, 180), Size = new Size(475, 120) };
 
-            Label lblSpcBef = new Label { Text = "Trước đoạn (pt):", Location = new Point(16, 26), AutoSize = true };
+            Label lblSpcBef = new Label { Text = AppL10n.T("Trước đoạn (pt):", "Before (pt):"), Location = new Point(16, 26), AutoSize = true };
             numSpaceBefore = new NumericUpDown { Location = new Point(125, 23), Size = new Size(80, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 100, Value = (decimal)SpaceBeforeResult };
             numSpaceBefore.ValueChanged += (s, e) => { SpaceBeforeResult = (float)numSpaceBefore.Value; UpdatePreview(); };
 
-            Label lblSpcAft = new Label { Text = "Sau đoạn (pt):", Location = new Point(16, 65), AutoSize = true };
+            Label lblSpcAft = new Label { Text = AppL10n.T("Sau đoạn (pt):", "After (pt):"), Location = new Point(16, 65), AutoSize = true };
             numSpaceAfter = new NumericUpDown { Location = new Point(125, 62), Size = new Size(80, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 100, Value = (decimal)SpaceAfterResult };
             numSpaceAfter.ValueChanged += (s, e) => { SpaceAfterResult = (float)numSpaceAfter.Value; UpdatePreview(); };
 
-            Label lblLnSpc = new Label { Text = "Cách dòng:", Location = new Point(245, 26), AutoSize = true };
+            Label lblLnSpc = new Label { Text = AppL10n.T("Cách dòng:", "Line spacing:"), Location = new Point(245, 26), AutoSize = true };
             cboLineSpacing = new ZenQOffice.UI.FluentComboBox { Location = new Point(325, 23), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboLineSpacing.Items.AddRange(new object[] { "Dòng đơn", "1.5 dòng", "Dòng đôi", "Nhiều dòng" });
+            cboLineSpacing.Items.AddRange(new object[] { AppL10n.T("Dòng đơn", "Single"), AppL10n.T("1.5 dòng", "1.5 lines"), AppL10n.T("Dòng đôi", "Double"), AppL10n.T("Nhiều dòng", "Multiple") });
 
-            Label lblAt = new Label { Text = "Bằng:", Location = new Point(245, 65), AutoSize = true };
+            Label lblAt = new Label { Text = AppL10n.T("Bằng:", "At:"), Location = new Point(245, 65), AutoSize = true };
             numLineSpacingAt = new NumericUpDown { Location = new Point(325, 62), Size = new Size(80, 24), DecimalPlaces = 2, Minimum = 0.5m, Maximum = 5m, Increment = 0.1m, Value = 1.2m };
 
             if (Math.Abs(LineSpacingResult - 1.0f) < 0.05f) { cboLineSpacing.SelectedIndex = 0; numLineSpacingAt.Value = 1.0m; }
@@ -141,19 +141,19 @@ namespace ZenQOffice.UI
             Controls.Add(grpSpacing);
 
             // Group 4: Preview (Xem trước)
-            GroupBox grpPreview = new GroupBox { Text = "Xem trước", Location = new Point(14, 310), Size = new Size(475, 115) };
+            GroupBox grpPreview = new GroupBox { Text = AppL10n.T("Xem trước", "Preview"), Location = new Point(14, 310), Size = new Size(475, 115) };
             pnlPreview = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(8) };
             
             lblPreviewP1 = new Label {
                 Dock = DockStyle.Top,
                 Height = 45,
-                Text = "Đoạn văn mẫu thứ nhất minh họa căn chỉnh lề, khoảng cách dòng và thụt lề chuẩn bản trình chiếu.",
+                Text = AppL10n.T("Đoạn văn mẫu thứ nhất minh họa căn chỉnh lề, khoảng cách dòng và thụt lề chuẩn bản trình chiếu.", "First sample paragraph illustrating alignment, line spacing, and indentation."),
                 Font = new Font("Segoe UI", 9f)
             };
             lblPreviewP2 = new Label {
                 Dock = DockStyle.Top,
                 Height = 45,
-                Text = "Đoạn văn tiếp theo thể hiện khoảng cách giữa hai đoạn (Before/After Spacing) trực quan.",
+                Text = AppL10n.T("Đoạn văn tiếp theo thể hiện khoảng cách giữa hai đoạn (Before/After Spacing) trực quan.", "Second sample paragraph demonstrating Before/After spacing."),
                 Font = new Font("Segoe UI", 9f)
             };
             pnlPreview.Controls.Add(lblPreviewP2);
@@ -162,8 +162,8 @@ namespace ZenQOffice.UI
             Controls.Add(grpPreview);
 
             // Action Buttons
-            Button btnOk = new SettingsActionButton { Text = "Đồng ý", DialogResult = DialogResult.OK, Location = new Point(320, 438), Size = new Size(80, 30), BackColor = Color.FromArgb(210, 71, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            Button btnCancel = new SettingsActionButton { Text = "Hủy", DialogResult = DialogResult.Cancel, Location = new Point(410, 438), Size = new Size(80, 30), BackColor = Color.FromArgb(229, 231, 235), FlatStyle = FlatStyle.Flat };
+            Button btnOk = new SettingsActionButton { Text = AppL10n.T("Đồng ý", "OK"), DialogResult = DialogResult.OK, Location = new Point(320, 438), Size = new Size(80, 30), BackColor = Color.FromArgb(210, 71, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            Button btnCancel = new SettingsActionButton { Text = AppL10n.T("Hủy", "Cancel"), DialogResult = DialogResult.Cancel, Location = new Point(410, 438), Size = new Size(80, 30), BackColor = Color.FromArgb(229, 231, 235), FlatStyle = FlatStyle.Flat };
 
             btnOk.FlatAppearance.BorderSize = 0;
             btnCancel.FlatAppearance.BorderSize = 0;

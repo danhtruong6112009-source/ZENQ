@@ -666,6 +666,226 @@ namespace ZenQOffice.Core
         }
 
         /// <summary>
+        /// Trích xuất đoạn văn bản mẫu thực tế từ bài trình chiếu đang mở trong bộ nhớ
+        /// </summary>
+        public static string ExtractPresentationSampleText(PresentationRoot pres, int maxLength = 120)
+        {
+            if (pres?.Slides == null) return null;
+            try
+            {
+                foreach (var s in pres.Slides)
+                {
+                    if (s.Shapes != null)
+                    {
+                        foreach (var sp in s.Shapes)
+                        {
+                            if (!string.IsNullOrWhiteSpace(sp.Text))
+                            {
+                                string t = sp.Text.Trim().Replace("\r", " ").Replace("\n", " ");
+                                while (t.Contains("  ")) t = t.Replace("  ", " ");
+                                if (t.Length > 10)
+                                {
+                                    if (t.Length > maxLength) t = t.Substring(0, maxLength) + "...";
+                                    return t;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// Quét toàn bộ phông chữ trực tiếp từ PresentationRoot đang mở (slides, shapes, runs, masters & font nhúng)
+        /// Giúp nhận diện tức thì phông từ slide đang mở mà không cần lưu hoặc nhập tệp thủ công.
+        /// </summary>
+        public static List<ExtractedFontInfo> AnalyzePresentationModel(PresentationRoot pres, string sourcePath = null)
+        {
+            var list = new List<ExtractedFontInfo>();
+            var map = new Dictionary<string, ExtractedFontInfo>(StringComparer.OrdinalIgnoreCase);
+            var bodyFonts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // 1. Nếu có tệp trên ổ đĩa, nạp dữ liệu gói PPTX
+            if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
+            {
+                try
+                {
+                    var diskFonts = AnalyzeDocumentFonts(sourcePath);
+                    foreach (var f in diskFonts)
+                    {
+                        map[f.Typeface] = f;
+                        if (f.IsUsedInDocumentBody) bodyFonts.Add(f.Typeface);
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Quét toàn bộ shape, text run trong tất cả slide đang mở
+            if (pres != null)
+            {
+                void ScanShapes(List<ShapeNode> shapes)
+                {
+                    if (shapes == null) return;
+                    foreach (var sp in shapes)
+                    {
+                        if (!string.IsNullOrWhiteSpace(sp.FontName))
+                        {
+                            bodyFonts.Add(sp.FontName.Trim());
+                        }
+                        if (sp.TextRuns != null)
+                        {
+                            foreach (var run in sp.TextRuns)
+                            {
+                                if (!string.IsNullOrWhiteSpace(run.FontName))
+                                {
+                                    bodyFonts.Add(run.FontName.Trim());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (pres.Slides != null)
+                {
+                    foreach (var sl in pres.Slides)
+                    {
+                        ScanShapes(sl.Shapes);
+                    }
+                }
+                if (pres.MasterSlides != null)
+                {
+                    foreach (var m in pres.MasterSlides)
+                    {
+                        ScanShapes(m.Shapes);
+                    }
+                }
+            }
+
+            // 3. Quét và bảo tồn font nhúng của chính bài trình chiếu hiện tại (hoặc từ SlideFontManager cho các phông đang dùng)
+            try
+            {
+                var fontFilesSource = (pres != null && pres.EmbeddedFontFiles != null && pres.EmbeddedFontFiles.Count > 0)
+                    ? pres.EmbeddedFontFiles
+                    : SlideFontManager.EmbeddedFontFiles;
+                var fontTfSource = (pres != null && pres.EmbeddedFontTypefaces != null && pres.EmbeddedFontTypefaces.Count > 0)
+                    ? pres.EmbeddedFontTypefaces
+                    : SlideFontManager.EmbeddedFontTypefaces;
+                bool usingGlobalPool = !(pres != null && pres.EmbeddedFontFiles != null && pres.EmbeddedFontFiles.Count > 0);
+
+                foreach (var kvp in fontFilesSource)
+                {
+                    string entryName = kvp.Key;
+                    byte[] rawFontBytes = kvp.Value;
+                    if (rawFontBytes == null || rawFontBytes.Length == 0) continue;
+
+                    bool isOtf = false;
+                    byte[] fontBytes = rawFontBytes;
+                    if (entryName.EndsWith(".fntdata", StringComparison.OrdinalIgnoreCase))
+                    {
+                        byte[] extracted = ExtractEotFont(rawFontBytes, out isOtf);
+                        if (extracted != null && extracted.Length > 0) fontBytes = extracted;
+                    }
+
+                    string tf = null;
+                    if (fontTfSource.TryGetValue(entryName, out var mapped) && !string.IsNullOrWhiteSpace(mapped))
+                    {
+                        tf = mapped.Trim();
+                    }
+                    if (string.IsNullOrEmpty(tf))
+                    {
+                        string subfamTmp;
+                        tf = ReadFontFamilyName(fontBytes, out subfamTmp);
+                    }
+                    if (string.IsNullOrEmpty(tf))
+                    {
+                        tf = Path.GetFileNameWithoutExtension(entryName);
+                    }
+
+                    // Nếu lấy từ pool toàn cục, chỉ liệt kê các phông thực sự đang dùng trong bài trình chiếu này
+                    if (usingGlobalPool && bodyFonts.Count > 0 && !bodyFonts.Contains(tf))
+                    {
+                        continue;
+                    }
+
+                    if (!map.ContainsKey(tf) || map[tf].Data == null)
+                    {
+                        if (!isOtf)
+                        {
+                            isOtf = fontBytes.Length > 4 && fontBytes[0] == 0x4F && fontBytes[1] == 0x54 && fontBytes[2] == 0x54 && fontBytes[3] == 0x4F;
+                        }
+                        string subfam;
+                        ReadFontFamilyName(fontBytes, out subfam);
+                        List<char> missing;
+                        bool viSupport = CheckFontVietnameseSupport(fontBytes, out missing);
+
+                        map[tf] = new ExtractedFontInfo
+                        {
+                            Typeface = tf,
+                            Subfamily = subfam ?? "Regular",
+                            Format = isOtf ? "OpenType" : "TrueType",
+                            FileName = $"{tf.Replace(' ', '_')}.{(isOtf ? "otf" : "ttf")}",
+                            Data = fontBytes,
+                            IsEmbedded = true,
+                            IsInstalledOnSystem = IsSystemFontInstalled(tf),
+                            HasVietnameseSupport = viSupport,
+                            MissingVietnameseChars = missing ?? new List<char>(),
+                            SuggestedVietnameseFont = viSupport ? tf : GetSuggestedVietnameseFont(tf),
+                            SourceDocument = sourcePath ?? "Bài trình chiếu hiện tại",
+                            IsUsedInDocumentBody = bodyFonts.Contains(tf)
+                        };
+                    }
+                }
+            }
+            catch { }
+
+            // 4. Bổ sung các phông chữ dùng trong hình vẽ/văn bản
+            foreach (var fam in bodyFonts)
+            {
+                if (!map.ContainsKey(fam))
+                {
+                    bool isTcvn3 = fam.StartsWith(".Vn", StringComparison.OrdinalIgnoreCase) || fam.StartsWith(".vn", StringComparison.OrdinalIgnoreCase);
+                    bool isVni = fam.StartsWith("VNI-", StringComparison.OrdinalIgnoreCase) || fam.StartsWith("vni-", StringComparison.OrdinalIgnoreCase);
+                    string formatStr = isTcvn3 ? "TCVN3 (ABC)" : (isVni ? "VNI-Windows" : "TrueType");
+
+                    List<char> missing;
+                    bool viSupport = CheckInstalledFontVietnameseSupport(fam, out missing);
+
+                    map[fam] = new ExtractedFontInfo
+                    {
+                        Typeface = fam,
+                        Subfamily = "Regular",
+                        Format = formatStr,
+                        FileName = $"{fam.Replace(' ', '_')}.ttf",
+                        Data = null,
+                        IsEmbedded = false,
+                        IsInstalledOnSystem = IsSystemFontInstalled(fam),
+                        HasVietnameseSupport = viSupport,
+                        MissingVietnameseChars = missing ?? new List<char>(),
+                        SuggestedVietnameseFont = viSupport ? fam : GetSuggestedVietnameseFont(fam),
+                        SourceDocument = sourcePath ?? "Bài trình chiếu hiện tại",
+                        IsUsedInDocumentBody = true
+                    };
+                }
+                else
+                {
+                    map[fam].IsUsedInDocumentBody = true;
+                }
+            }
+
+            list.AddRange(map.Values);
+            list.Sort((a, b) =>
+            {
+                int scoreA = (!a.HasVietnameseSupport ? 100 : 0) + (a.IsEmbedded ? 50 : 0) + (a.IsUsedInDocumentBody ? 25 : 0);
+                int scoreB = (!b.HasVietnameseSupport ? 100 : 0) + (b.IsEmbedded ? 50 : 0) + (b.IsUsedInDocumentBody ? 25 : 0);
+                if (scoreA != scoreB) return scoreB.CompareTo(scoreA);
+                return string.Compare(a.Typeface, b.Typeface, StringComparison.OrdinalIgnoreCase);
+            });
+            return list;
+        }
+
+        /// <summary>
         /// Quét toàn bộ phông chữ trong tệp PPTX, DOCX hoặc TTF/OTF
         /// </summary>
         public static List<ExtractedFontInfo> AnalyzeDocumentFonts(string filePath)
@@ -928,6 +1148,58 @@ namespace ZenQOffice.Core
                     }
                 }
             }
+
+            // 7. Bảo tồn và đồng bộ mọi font nhúng từ SlideFontManager (tránh thất lạc font khi máy chưa cài)
+            try
+            {
+                foreach (var kvp in SlideFontManager.EmbeddedFontFiles)
+                {
+                    string entryName = kvp.Key;
+                    byte[] fontBytes = kvp.Value;
+                    if (fontBytes == null || fontBytes.Length == 0) continue;
+
+                    string tf = null;
+                    if (SlideFontManager.EmbeddedFontTypefaces.TryGetValue(entryName, out var mappedTf) && !string.IsNullOrWhiteSpace(mappedTf))
+                    {
+                        tf = mappedTf.Trim();
+                    }
+                    if (string.IsNullOrEmpty(tf))
+                    {
+                        string subfam;
+                        tf = ReadFontFamilyName(fontBytes, out subfam);
+                    }
+                    if (string.IsNullOrEmpty(tf))
+                    {
+                        tf = Path.GetFileNameWithoutExtension(entryName);
+                    }
+
+                    if (!map.ContainsKey(tf) || map[tf].Data == null)
+                    {
+                        bool isOtf = fontBytes.Length > 4 && fontBytes[0] == 0x4F && fontBytes[1] == 0x54 && fontBytes[2] == 0x54 && fontBytes[3] == 0x4F;
+                        string subfam;
+                        ReadFontFamilyName(fontBytes, out subfam);
+                        List<char> missing;
+                        bool viSupport = CheckFontVietnameseSupport(fontBytes, out missing);
+
+                        map[tf] = new ExtractedFontInfo
+                        {
+                            Typeface = tf,
+                            Subfamily = subfam ?? "Regular",
+                            Format = isOtf ? "OpenType" : "TrueType",
+                            FileName = $"{tf.Replace(' ', '_')}.{(isOtf ? "otf" : "ttf")}",
+                            Data = fontBytes,
+                            IsEmbedded = true,
+                            IsInstalledOnSystem = IsSystemFontInstalled(tf),
+                            HasVietnameseSupport = viSupport,
+                            MissingVietnameseChars = missing ?? new List<char>(),
+                            SuggestedVietnameseFont = viSupport ? tf : GetSuggestedVietnameseFont(tf),
+                            SourceDocument = pptxPath,
+                            IsUsedInDocumentBody = bodyFonts.Contains(tf)
+                        };
+                    }
+                }
+            }
+            catch { }
 
             list.AddRange(map.Values);
             list.Sort((a, b) =>
@@ -1208,44 +1480,214 @@ namespace ZenQOffice.Core
             if (string.IsNullOrEmpty(text)) return text;
             StringBuilder sb = new StringBuilder(text);
 
+            // Xử lý nhóm VNI 'ô'/'Ô' (-> ơ/Ơ) trước khi 'oâ'/'OÂ' sinh ra ký tự Unicode 'ô'/'Ô'
+            sb.Replace("ôù", "ớ").Replace("ôø", "ờ").Replace("ôû", "ở").Replace("ôõ", "ỡ").Replace("ôï", "ợ").Replace("ô", "ơ");
+            sb.Replace("ÔÙ", "Ớ").Replace("ÔØ", "Ờ").Replace("ÔÛ", "Ở").Replace("ÔÕ", "Ỡ").Replace("ÔÏ", "Ợ").Replace("Ô", "Ơ");
+
+            // Ưu tiên thay thế các tổ hợp 2 ký tự trước để không làm hỏng nguyên âm gốc
             foreach (var kvp in VniToUnicodeMap)
             {
-                sb.Replace(kvp.Key, kvp.Value);
+                if (kvp.Key.Length >= 2 && kvp.Key[0] != 'ô' && kvp.Key[0] != 'Ô')
+                    sb.Replace(kvp.Key, kvp.Value);
+            }
+            foreach (var kvp in VniToUnicodeMap)
+            {
+                if (kvp.Key.Length == 1 && kvp.Key != "ô" && kvp.Key != "Ô")
+                    sb.Replace(kvp.Key, kvp.Value);
             }
 
             return sb.ToString().Normalize(NormalizationForm.FormC);
         }
 
         /// <summary>
-        /// Tự động phát hiện và sửa toàn diện văn bản tiếng Việt: TCVN3, VNI hoặc Unicode tổ hợp
+        /// Kiểm tra chuỗi đã chứa các ký tự Tiếng Việt mở rộng của bảng mã Unicode (ngoài vùng Latin-1 U+0000..U+00FF) hay chưa.
+        /// Nếu có bất kỳ ký tự nào thuộc nhóm này, chuỗi chắc chắn là Unicode chứ KHÔNG PHẢI TCVN3 hay VNI 8-bit.
         /// </summary>
-        public static string FixVietnameseTextString(string text, FontFixOptions options)
+        private static bool HasUnicodeVietnameseExtended(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            foreach (char c in text)
+            {
+                if ((c >= '\u1EA0' && c <= '\u1EF9') ||
+                    c == '\u0102' || c == '\u0103' || // Ă, ă
+                    c == '\u0110' || c == '\u0111' || // Đ, đ
+                    c == '\u0128' || c == '\u0129' || // Ĩ, ĩ
+                    c == '\u0168' || c == '\u0169' || // Ũ, ũ
+                    c == '\u01A0' || c == '\u01A1' || // Ơ, ơ
+                    c == '\u01AF' || c == '\u01B0')   // Ư, ư
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Chỉ trả về true khi chuỗi không có ký tự Unicode mở rộng VÀ chứa các mã byte đặc trưng riêng của TCVN3
+        /// (không trùng với các nguyên âm tiếng Việt chuẩn trong vùng Latin-1 như á, à, â, ê, ì, í, ó, ò, ô, ú, ù, ý).
+        /// </summary>
+        private static bool HasUnmistakableTcvn3Markers(string text)
+        {
+            if (string.IsNullOrEmpty(text) || HasUnicodeVietnameseExtended(text)) return false;
+            foreach (char c in text)
+            {
+                if ((c >= '\u00A7' && c <= '\u00AE') ||
+                    (c >= '\u00B5' && c <= '\u00BE') ||
+                    c == '\u00C6' || c == '\u00C7' || c == '\u00CB' ||
+                    c == '\u00CE' || c == '\u00CF' || c == '\u00D0' || c == '\u00D1' ||
+                    c == '\u00D6' || c == '\u00D7' || c == '\u00D8' || c == '\u00DC' || c == '\u00DE' || c == '\u00DF' ||
+                    (c >= '\u00E4' && c <= '\u00E7') ||
+                    c == '\u00EB' || c == '\u00EE' || c == '\u00EF' || c == '\u00F1' ||
+                    (c >= '\u00F6' && c <= '\u00F8') || c == '\u00FB' || c == '\u00FC' || c == '\u00FE')
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool HasUnmistakableVniMarkers(string text)
+        {
+            if (string.IsNullOrEmpty(text) || HasUnicodeVietnameseExtended(text)) return false;
+            foreach (var kvp in VniToUnicodeMap)
+            {
+                if (kvp.Key.Length >= 2 && text.IndexOf(kvp.Key, StringComparison.Ordinal) >= 0)
+                    return true;
+            }
+            return false;
+        }
+
+        private static readonly (string Bad, string Good)[] MojibakeWordRepairs = new (string Bad, string Good)[]
+        {
+            ("Cụng Nghệ", "Công Nghệ"), ("Cụng nghệ", "Công nghệ"), ("cụng nghệ", "công nghệ"),
+            ("thủ cụng", "thủ công"), ("Thủ cụng", "Thủ công"),
+            ("thụng minh", "thông minh"), ("Thụng minh", "Thông minh"),
+            ("thụng tin", "thông tin"), ("Thụng tin", "Thông tin"),
+            ("khụng", "không"), ("Khụng", "Không"),
+            ("quy mụ", "quy mô"), ("Quy mụ", "Quy mô"),
+            ("người dựng", "người dùng"), ("Người dựng", "Người dùng"),
+            ("vũng đời", "vòng đời"), ("Vũng đời", "Vòng đời"),
+            ("cừu hỏi", "câu hỏi"), ("Cừu hỏi", "Câu hỏi"),
+            ("đam mờ", "đam mê"), ("Đam mờ", "Đam mê"),
+            ("bứt phỏ", "bứt phá"), ("Bứt phỏ", "Bứt phá"),
+            ("đột phỏ", "đột phá"), ("Đột phỏ", "Đột phá"),
+            ("giỏ trị", "giá trị"), ("Giỏ trị", "Giá trị"),
+            ("dự ỏn", "dự án"), ("Dự ỏn", "Dự án"),
+            ("sai sỳt", "sai sót"), ("Sai sỳt", "Sai sót"),
+            ("hiện cố", "hiện có"),
+            ("đũ triển khai", "đã triển khai"), ("Đũ triển khai", "Đã triển khai"),
+            ("đũ quan tâm", "đã quan tâm"), ("đũ quan từm", "đã quan tâm"),
+            ("đũ được", "đã được"), ("Đũ được", "Đã được")
+        };
+
+        /// <summary>
+        /// Khôi phục văn bản Unicode tiếng Việt từng bị chuyển mã nhầm qua TCVN3 (ví dụ: "Lộ Trỡnh" -> "Lộ Trình", "phỏt triển" -> "phát triển").
+        /// Chỉ sửa các tổ hợp âm vị không thể tồn tại trong tiếng Việt chuẩn để đảm bảo an toàn 100% cho văn bản bình thường.
+        /// </summary>
+        public static string RepairMojibakeVietnamese(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            string s = text;
+
+            // 1. Khôi phục chữ HOA bị xen nguyên âm thường do chuyển nhầm TCVN3 (TRốNH -> TRÌNH, LIấN -> LIÊN, CễNG -> CÔNG)
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([A-ZĂÂĐÊÔƠƯÁÀẢÃẠẮẰẲẴẶẤẦẨẪẬÉÈẺẼẸẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌỐỒỔỖỘỚỜỞỠỢÚÙỦŨỤỨỪỬỮỰÝỲỶỸỴ]{1,})([ốèấễểẩẫế]+)([A-ZĂÂĐÊÔƠƯÁÀẢÃẠẮẰẲẴẶẤẦẨẪẬÉÈẺẼẸẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌỐỒỔỖỘỚỜỞỠỢÚÙỦŨỤỨỪỬỮỰÝỲỶỸỴ]{1,})\b", m =>
+            {
+                string mid = m.Groups[2].Value
+                    .Replace('ố', 'Ì').Replace('è', 'Ì')
+                    .Replace('ấ', 'Ê')
+                    .Replace('ễ', 'Ô')
+                    .Replace('ể', 'Ó')
+                    .Replace('ẩ', 'È')
+                    .Replace('ẫ', 'É')
+                    .Replace('ế', 'Õ');
+                return m.Groups[1].Value + mid + m.Groups[3].Value;
+            });
+
+            // 2. Các tổ hợp âm tiết bất khả thi trong chính tả Tiếng Việt chuẩn
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"(?<=[A-Za-zĐđ])ớ(?=ển|ến|ền|ể|ế|ề)", "i"); // Trớển -> Triển
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"([Ii])ờ(?=[mnptcnghu]|nh|ch)", m => (char.IsUpper(m.Groups[1].Value[0]) ? "Iê" : "iê")); // Nghiờn -> Nghiên, tiờn -> tiên, tiờu -> tiêu, liờn -> liên
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"([Yy])ờ(?=[mnptcnghu])", m => (char.IsUpper(m.Groups[1].Value[0]) ? "Yê" : "yê")); // chuyờn -> chuyên
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"(?<=[A-Za-zĐđ])ờ(?=u\b|nh\b|ch\b)", "ê"); // Kờu -> Kêu, kờnh -> kênh
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Tt]r|[Nn]|[Ll]|[Tt]h)ờ([nm])\b", "$1ê$2"); // trờn -> trên, nờn -> nên, lờn -> lên, thờm -> thêm
+
+            // ỡ + phụ âm cuối (Trỡnh -> Trình, hỡnh -> hình, tỡm -> tìm, nhỡn -> nhìn)
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"(?<=[A-Za-zĐđ])ỡ(?=nh\b|ch\b|[mnptc]\b)", "ì");
+
+            // ớ + nh/ch/u/a (chớnh -> chính, tớnh -> tính, tớch -> tích, ớch -> ích)
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"ớ(?=nh\b|ch\b)", "í");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Tt]r|[Ll]|[Kk]|[Pp]h)ớ\b", "$1í"); // Trớ tuệ -> Trí tuệ, phớ -> phí
+
+            // ỏ + ch/nh/o/u/y và các vần đóng bất khả thi (khỏch -> khách, bỏo -> báo, phỏt -> phát, phỏp -> pháp, đỏp -> đáp, khỏc -> khác, tỏc -> tác, xỏc -> xác)
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"(?<=[A-Za-zĐđ])ỏ(?=ch\b|nh\b|[ouy]\b)", "á");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Pp]h|[Kk]h|[Tt]|[Xx]|[Gg]i|[Đđ]|[Bb]|[Cc])ỏ([ptc])\b", "$1á$2");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Tt]h)ỏng\b", "$1áng");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Gg]i)ỏn\b", "$1án");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Đđ])ỏm\b", "$1ám");
+
+            // ừ (từ 2 lần TCVN3 của â): từm -> tâm, phừn -> phân, nhừn -> nhân, thừn -> thân, xừy -> xây, đừy -> đây, mừy -> mây, nừng -> nâng
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Tt])ừm\b", "$1âm");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Pp]h|[Nn]h|[Tt]h)ừn\b", "$1ân");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Xx]|[Đđ]|[Mm])ừy\b", "$1ây");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Nn])ừng\b", "$1âng");
+
+            // ỳ + phụ âm cuối / nguyên âm cuối (giỳp -> giúp, chỳng -> chúng, đỳng -> đúng, phỳt -> phút, lỳc -> lúc, thỳc -> thúc, nhỳm -> nhóm, hỳa -> hóa, gỳi -> gói)
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Gg]i)ỳp\b", "$1úp");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Cc]h|[Đđ])ỳng\b", "$1úng");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Pp]h)ỳt\b", "$1út");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Ll]|[Tt]h)ỳc\b", "$1úc");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Nn]h)ỳm\b", "$1óm");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Hh])ỳa\b", "$1óa");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Gg])ỳi\b", "$1ói");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\b([Cc])ựng\b", "$1ùng");
+
+            // 3. Các cụm từ cố định bị biến dạng (cụng nghệ -> công nghệ, thụng minh -> thông minh, người dựng -> người dùng...)
+            foreach (var pair in MojibakeWordRepairs)
+            {
+                if (s.IndexOf(pair.Bad, StringComparison.Ordinal) >= 0)
+                {
+                    s = s.Replace(pair.Bad, pair.Good);
+                }
+            }
+
+            return s;
+        }
+
+        /// <summary>
+        /// Tự động phát hiện và sửa toàn diện văn bản tiếng Việt: TCVN3, VNI, khôi phục lỗi chuyển mã nhầm hoặc Unicode tổ hợp
+        /// </summary>
+        public static string FixVietnameseTextString(string text, FontFixOptions options, string fontName = null)
         {
             if (string.IsNullOrEmpty(text)) return text;
             string cur = text;
 
-            // 1. Chuyển mã TCVN3 nếu phát hiện ký tự TCVN3 đặc trưng
-            if (options.ConvertTcvn3)
+            bool isTcvn3Font = !string.IsNullOrEmpty(fontName) &&
+                !fontName.StartsWith("VNI", StringComparison.OrdinalIgnoreCase) && (fontName.StartsWith(".Vn", StringComparison.OrdinalIgnoreCase) || fontName.StartsWith("VnTime", StringComparison.OrdinalIgnoreCase) || fontName.StartsWith("VnArial", StringComparison.OrdinalIgnoreCase));
+            bool isVniFont = !string.IsNullOrEmpty(fontName) && (fontName.StartsWith("VNI-", StringComparison.OrdinalIgnoreCase) || fontName.StartsWith("VNI ", StringComparison.OrdinalIgnoreCase));
+
+            // 0. Tự động khôi phục nếu văn bản Unicode từng bị chuyển mã nhầm qua TCVN3
+            cur = RepairMojibakeVietnamese(cur);
+
+            bool alreadyUnicodeVi = HasUnicodeVietnameseExtended(cur);
+            bool hasVni = !alreadyUnicodeVi && !isTcvn3Font && (isVniFont || HasUnmistakableVniMarkers(cur));
+
+            // 1. Chuyển mã VNI nếu phông là VNI-* hoặc có tổ hợp 2 ký tự VNI đặc trưng (ưu tiên kiểm tra trước TCVN3 vì VNI dùng tổ hợp 2 ký tự như eä, oâ...)
+            if (options != null && options.ConvertVni && hasVni)
             {
-                bool hasTcvn3 = false;
-                foreach (char c in cur)
-                {
-                    if (Tcvn3ToUnicodeMap.ContainsKey(c)) { hasTcvn3 = true; break; }
-                }
-                if (hasTcvn3) cur = ConvertTcvn3ToUnicode(cur);
+                cur = ConvertVniToUnicode(cur);
+                alreadyUnicodeVi = true;
             }
 
-            // 2. Chuyển mã VNI nếu phát hiện tổ hợp VNI
-            if (options.ConvertVni)
+            // 2. Chuyển mã TCVN3 CHỈ KHI phông là .Vn* hoặc có dấu hiệu byte TCVN3 đặc trưng (tuyệt đối không chạy trên văn bản đã là Unicode hoặc VNI!)
+            if (options != null && options.ConvertTcvn3 && !alreadyUnicodeVi && !isVniFont)
             {
-                if (cur.Contains("aù") || cur.Contains("aø") || cur.Contains("aû") || cur.Contains("eù") || cur.Contains("uù") || cur.Contains("ñ"))
+                if (isTcvn3Font || HasUnmistakableTcvn3Markers(cur))
                 {
-                    cur = ConvertVniToUnicode(cur);
+                    cur = ConvertTcvn3ToUnicode(cur);
                 }
             }
 
             // 3. Chuẩn hóa sang Unicode Dựng Sẵn (NFC)
-            if (options.NormalizeNfc)
+            if (options == null || options.NormalizeNfc)
             {
                 cur = cur.Normalize(NormalizationForm.FormC);
             }
@@ -1336,6 +1778,187 @@ namespace ZenQOffice.Core
         /// <summary>
         /// Sửa lỗi Tiếng Việt và thay thế phông chữ thiếu tiếng Việt trong tệp PPTX
         /// </summary>
+        /// <summary>
+        /// Sửa lỗi Tiếng Việt và thay thế phông chữ trực tiếp trên PresentationRoot trong bộ nhớ (không cần lưu file riêng)
+        /// </summary>
+        public static DocumentFixReport FixPresentationModel(PresentationRoot pres, FontFixOptions options, Dictionary<string, string> customReplacements = null)
+        {
+            var report = new DocumentFixReport();
+            if (pres == null)
+            {
+                report.Message = "Không có bài thuyết trình nào đang mở.";
+                return report;
+            }
+
+            try
+            {
+                Dictionary<string, string> replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (customReplacements != null)
+                {
+                    foreach (var kv in customReplacements) replacements[kv.Key] = kv.Value;
+                }
+
+                if (options.ReplaceUnsupportedFonts)
+                {
+                    var fontList = AnalyzePresentationModel(pres);
+                    foreach (var f in fontList)
+                    {
+                        if (!f.HasVietnameseSupport && !replacements.ContainsKey(f.Typeface))
+                        {
+                            string target = options.CustomFontReplacements.ContainsKey(f.Typeface)
+                                ? options.CustomFontReplacements[f.Typeface]
+                                : f.SuggestedVietnameseFont;
+
+                            if (!string.IsNullOrEmpty(target) && !string.Equals(f.Typeface, target, StringComparison.OrdinalIgnoreCase))
+                            {
+                                replacements[f.Typeface] = target;
+                            }
+                        }
+                    }
+                }
+
+                int textFixedCount = 0;
+                int fontReplacedCount = 0;
+
+                void FixShape(ShapeNode sp)
+                {
+                    if (sp == null) return;
+
+                    string origShapeFont = sp.FontName != null ? sp.FontName.Trim() : "";
+
+                    // 1. Phông chữ của Shape
+                    if (!string.IsNullOrWhiteSpace(origShapeFont) && replacements.TryGetValue(origShapeFont, out var newFont))
+                    {
+                        sp.FontName = newFont;
+                        fontReplacedCount++;
+                    }
+
+                    // 2. Chuyển mã & chuẩn hóa văn bản của Shape
+                    if (!string.IsNullOrEmpty(sp.Text))
+                    {
+                        string fixedText = FixVietnameseTextString(sp.Text, options, origShapeFont);
+                        if (fixedText != sp.Text)
+                        {
+                            sp.Text = fixedText;
+                            textFixedCount++;
+                        }
+                    }
+
+                    // 3. TextRuns
+                    if (sp.TextRuns != null)
+                    {
+                        foreach (var run in sp.TextRuns)
+                        {
+                            string origRunFont = !string.IsNullOrWhiteSpace(run.FontName) ? run.FontName.Trim() : origShapeFont;
+                            if (!string.IsNullOrWhiteSpace(run.FontName) && replacements.TryGetValue(run.FontName.Trim(), out var runFont))
+                            {
+                                run.FontName = runFont;
+                                fontReplacedCount++;
+                            }
+                            if (!string.IsNullOrEmpty(run.Text))
+                            {
+                                string fixedRunText = FixVietnameseTextString(run.Text, options, origRunFont);
+                                if (fixedRunText != run.Text)
+                                {
+                                    run.Text = fixedRunText;
+                                    textFixedCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (pres.Slides != null)
+                {
+                    foreach (var s in pres.Slides)
+                    {
+                        if (s.Shapes != null)
+                        {
+                            foreach (var sp in s.Shapes) FixShape(sp);
+                        }
+                    }
+                }
+
+                if (pres.MasterSlides != null)
+                {
+                    foreach (var m in pres.MasterSlides)
+                    {
+                        if (m.Shapes != null)
+                        {
+                            foreach (var sp in m.Shapes) FixShape(sp);
+                        }
+                    }
+                }
+
+                report.Success = true;
+                foreach (var kv in replacements)
+                {
+                    report.ReplacedFonts.Add($"{kv.Key} ➔ {kv.Value}");
+                }
+                report.Message = $"Đã thay thế {fontReplacedCount} lượt phông và chuẩn hóa {textFixedCount} đoạn văn bản trực tiếp trên Slide.";
+                return report;
+            }
+            catch (Exception ex)
+            {
+                report.Message = "Lỗi khi xử lý Slide: " + ex.Message;
+                return report;
+            }
+        }
+
+        /// <summary>
+        /// Thay thế tức thì một phông chữ cụ thể sang phông mới trên toàn bộ slide
+        /// </summary>
+        public static int ReplaceSingleFontInPresentation(PresentationRoot pres, string oldFont, string newFont)
+        {
+            if (pres == null || string.IsNullOrWhiteSpace(oldFont) || string.IsNullOrWhiteSpace(newFont)) return 0;
+            int count = 0;
+            oldFont = oldFont.Trim();
+            newFont = newFont.Trim();
+
+            void CheckShape(ShapeNode sp)
+            {
+                if (sp == null) return;
+                if (!string.IsNullOrWhiteSpace(sp.FontName) && string.Equals(sp.FontName.Trim(), oldFont, StringComparison.OrdinalIgnoreCase))
+                {
+                    sp.FontName = newFont;
+                    count++;
+                }
+                if (sp.TextRuns != null)
+                {
+                    foreach (var r in sp.TextRuns)
+                    {
+                        if (!string.IsNullOrWhiteSpace(r.FontName) && string.Equals(r.FontName.Trim(), oldFont, StringComparison.OrdinalIgnoreCase))
+                        {
+                            r.FontName = newFont;
+                            count++;
+                        }
+                    }
+                }
+            }
+
+            if (pres.Slides != null)
+            {
+                foreach (var s in pres.Slides)
+                {
+                    if (s.Shapes != null)
+                    {
+                        foreach (var sp in s.Shapes) CheckShape(sp);
+                    }
+                }
+            }
+            if (pres.MasterSlides != null)
+            {
+                foreach (var m in pres.MasterSlides)
+                {
+                    if (m.Shapes != null)
+                    {
+                        foreach (var sp in m.Shapes) CheckShape(sp);
+                    }
+                }
+            }
+            return count;
+        }
+
         public static DocumentFixReport FixPresentationVietnamese(string pptxPath, string outPath, FontFixOptions options)
         {
             var report = new DocumentFixReport { OutputFilePath = outPath };

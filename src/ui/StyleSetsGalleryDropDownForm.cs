@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -94,7 +95,7 @@ namespace ZenQOffice.UI
 
             Label lblHeader = new Label
             {
-                Text = "Bộ kiểu dáng tài liệu Word (Document Style Sets)",
+                Text = AppL10n.Tr("Bộ kiểu dáng tài liệu Word (Document Style Sets)"),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(12, 10),
@@ -211,7 +212,7 @@ namespace ZenQOffice.UI
                     using (Font nf = new Font("Segoe UI", 6.5f, FontStyle.Regular))
                     using (SolidBrush nb = new SolidBrush(Color.FromArgb(100, 116, 139)))
                     {
-                        g.DrawString(sSet.Name, nf, nb, 8, 58);
+                        g.DrawString(AppL10n.Tr(sSet.Name), nf, nb, 8, 58);
                     }
                 };
 
@@ -238,7 +239,7 @@ namespace ZenQOffice.UI
 
             Button btnReset = new Button
             {
-                Text = "🔄  Đặt lại về tập kiểu mặc định (Reset to Default Style Set)",
+                Text = AppL10n.Tr("🔄  Đặt lại về tập kiểu mặc định (Reset to Default Style Set)"),
                 Location = new Point(12, bottomY),
                 Size = new Size(cardW * 3 + gapX * 2, 28),
                 FlatStyle = FlatStyle.Flat,
@@ -258,7 +259,7 @@ namespace ZenQOffice.UI
 
             Button btnSave = new Button
             {
-                Text = "💾  Lưu thành bộ kiểu mới / Xuất bộ kiểu... (Save as a New Style Set)",
+                Text = AppL10n.Tr("💾  Lưu thành bộ kiểu mới / Xuất bộ kiểu... (Save as a New Style Set)"),
                 Location = new Point(12, bottomY),
                 Size = new Size(cardW * 3 + gapX * 2, 28),
                 FlatStyle = FlatStyle.Flat,
@@ -272,8 +273,8 @@ namespace ZenQOffice.UI
             {
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Title = "Lưu bộ kiểu dáng tài liệu mới (Xuất bộ kiểu)";
-                    sfd.Filter = "Tệp bộ kiểu Office (*.dotx;*.xml;*.json)|*.dotx;*.xml;*.json|Tất cả tệp (*.*)|*.*";
+                    sfd.Title = AppL10n.Tr("Lưu bộ kiểu dáng tài liệu mới (Xuất bộ kiểu)");
+                    sfd.Filter = AppL10n.Tr("Tệp bộ kiểu Office (*.dotx;*.xml;*.json)|*.dotx;*.xml;*.json|Tất cả tệp (*.*)|*.*");
                     sfd.FileName = "CustomStyleSet.json";
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
@@ -281,11 +282,11 @@ namespace ZenQOffice.UI
                         {
                             string json = string.Format("{{\n  \"StyleSetIndex\": {0},\n  \"Name\": \"{1}\"\n}}", _activeIndex, "Custom Style Set");
                             System.IO.File.WriteAllText(sfd.FileName, json, System.Text.Encoding.UTF8);
-                            ZenQOffice.UI.FluentMessageBox.Show("Đã lưu và xuất bộ kiểu ra tệp '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã lưu và xuất bộ kiểu ra tệp '" + sfd.FileName + "' thành công!", "Saved and exported style set to '" + sfd.FileName + "'!"), "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         catch (Exception ex)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi xuất bộ kiểu: " + ex.Message, "Lỗi xuất bộ kiểu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Lỗi khi xuất bộ kiểu: ", "Error exporting style set: ") + ex.Message, AppL10n.Tr("Lỗi xuất bộ kiểu"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }
@@ -296,7 +297,7 @@ namespace ZenQOffice.UI
 
             Button btnImport = new Button
             {
-                Text = "📂  Nhập bộ kiểu từ tệp... (Import Style Set)",
+                Text = AppL10n.Tr("📂  Nhập bộ kiểu từ tệp... (Import Style Set)"),
                 Location = new Point(12, bottomY),
                 Size = new Size(cardW * 3 + gapX * 2, 28),
                 FlatStyle = FlatStyle.Flat,
@@ -310,19 +311,19 @@ namespace ZenQOffice.UI
             {
                 using (OpenFileDialog ofd = new OpenFileDialog())
                 {
-                    ofd.Title = "Nhập bộ kiểu dáng từ tệp";
-                    ofd.Filter = "Tệp bộ kiểu Office (*.dotx;*.xml;*.json)|*.dotx;*.xml;*.json|Tất cả tệp (*.*)|*.*";
+                    ofd.Title = AppL10n.Tr("Nhập bộ kiểu dáng từ tệp");
+                    ofd.Filter = AppL10n.Tr("Tệp bộ kiểu Office (*.dotx;*.xml;*.json)|*.dotx;*.xml;*.json|Tất cả tệp (*.*)|*.*");
                     if (ofd.ShowDialog() == DialogResult.OK)
                     {
                         try
                         {
                             string fName = System.IO.Path.GetFileNameWithoutExtension(ofd.FileName);
                             if (OnStyleSetSelected != null) OnStyleSetSelected(0);
-                            ZenQOffice.UI.FluentMessageBox.Show("Đã nạp và áp dụng bộ kiểu '" + fName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã nạp và áp dụng bộ kiểu '" + fName + "' thành công!", "Imported and applied style set '" + fName + "'!"), "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         catch (Exception ex)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi nhập bộ kiểu: " + ex.Message, "Lỗi nhập bộ kiểu", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Lỗi khi nhập bộ kiểu: ", "Error importing style set: ") + ex.Message, AppL10n.Tr("Lỗi nhập bộ kiểu"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }

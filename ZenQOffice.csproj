@@ -84,6 +84,9 @@
     <EmbeddedResource Include="icon\bannernew.png">
       <LogicalName>bannernew.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="icon\banner2.png">
+      <LogicalName>banner2.png</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="icon\zenqofficenew.png">
       <LogicalName>zenqofficenew.png</LogicalName>
     </EmbeddedResource>
@@ -123,6 +126,10 @@
     <None Update="fonts\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="8.0.3" />
   </ItemGroup>
 
 

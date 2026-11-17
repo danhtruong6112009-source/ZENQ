@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -12,6 +13,8 @@ namespace ZenQOffice.UI
         public bool LineBetween { get; set; }
         public string PresetType { get; set; }
         public string ApplyTo { get; set; }
+        public bool EqualColumnWidth { get; set; }
+        public float Col1WidthInches { get; set; }
 
         private NumericUpDown numColumns;
         private CheckBox chkLineBetween;
@@ -25,16 +28,18 @@ namespace ZenQOffice.UI
 
         public event Action OnApply;
 
-        public ColumnsDialogForm(int curCols, float curSpacing, bool curLineBetween, string curPreset)
+        public ColumnsDialogForm(int curCols, float curSpacing, bool curLineBetween, string curPreset, bool curEqualWidth = true, float curCol1Width = 0f)
         {
             ColumnCount = curCols > 0 ? curCols : 1;
             ColumnSpacingInches = curSpacing > 0 ? curSpacing : 0.5f;
             LineBetween = curLineBetween;
             PresetType = string.IsNullOrEmpty(curPreset) ? (ColumnCount == 1 ? "One" : (ColumnCount == 2 ? "Two" : (ColumnCount == 3 ? "Three" : "One"))) : curPreset;
             ApplyTo = "Whole document";
+            EqualColumnWidth = (PresetType == "Left" || PresetType == "Right") ? false : curEqualWidth;
+            Col1WidthInches = curCol1Width > 0 ? curCol1Width : (ColumnCount >= 2 ? (float)Math.Round(Math.Max(1.0f, (6.27f - (ColumnCount - 1) * ColumnSpacingInches) / ColumnCount), 2) : 6.27f);
 
-            Text = "Chia cột (Columns)";
-            Size = new Size(420, 390);
+            Text = AppL10n.T("Chia cột (Columns)", "Columns");
+            Size = new Size(468, 400);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -45,15 +50,15 @@ namespace ZenQOffice.UI
             // ==================== 1. PRESETS GROUP ====================
             GroupBox grpPresets = new GroupBox
             {
-                Text = "Mẫu có sẵn (Presets)",
+                Text = AppL10n.T("Mẫu có sẵn (Presets)", "Presets"),
                 Location = new Point(12, 10),
-                Size = new Size(380, 80),
+                Size = new Size(428, 84),
                 BackColor = Color.Transparent
             };
 
             presetPanels = new Panel[5];
-            int pStartX = 14;
-            int pGap = 72;
+            int pStartX = 28;
+            int pGap = 78;
 
             for (int i = 0; i < 5; i++)
             {
@@ -146,6 +151,11 @@ namespace ZenQOffice.UI
                     if (PresetType == "One") numColumns.Value = 1;
                     else if (PresetType == "Two" || PresetType == "Left" || PresetType == "Right") numColumns.Value = 2;
                     else if (PresetType == "Three") numColumns.Value = 3;
+                    if (chkEqualWidth != null)
+                    {
+                        chkEqualWidth.Checked = (PresetType != "Left" && PresetType != "Right");
+                        if (numCol1Width != null) numCol1Width.Enabled = !chkEqualWidth.Checked && (int)numColumns.Value > 1;
+                    }
                     foreach (var p in presetPanels) if (p != null) p.Invalidate();
                     if (picPreview != null) picPreview.Invalidate();
                 };
@@ -157,8 +167,8 @@ namespace ZenQOffice.UI
             Controls.Add(grpPresets);
 
             // ==================== 2. NUMBER OF COLUMNS & LINE BETWEEN ====================
-            Label lblNum = new Label { Text = "Số lượng cột:", Location = new Point(14, 98), AutoSize = true };
-            numColumns = new NumericUpDown { Location = new Point(110, 95), Size = new Size(55, 24), Minimum = 1, Maximum = 10, Value = ColumnCount };
+            Label lblNum = new Label { Text = AppL10n.T("Số lượng cột:", "Number of columns:"), Location = new Point(14, 104), AutoSize = true };
+            numColumns = new NumericUpDown { Location = new Point(106, 101), Size = new Size(54, 24), Minimum = 1, Maximum = 10, Value = ColumnCount };
             numColumns.ValueChanged += (s, e) =>
             {
                 ColumnCount = (int)numColumns.Value;
@@ -166,24 +176,28 @@ namespace ZenQOffice.UI
                 else if (ColumnCount == 2) { if (PresetType != "Left" && PresetType != "Right") PresetType = "Two"; }
                 else if (ColumnCount == 3) PresetType = "Three";
                 else PresetType = "Custom";
+                if (numCol1Width != null && chkEqualWidth != null)
+                {
+                    numCol1Width.Enabled = !chkEqualWidth.Checked && ColumnCount > 1;
+                }
                 foreach (var p in presetPanels) if (p != null) p.Invalidate();
                 if (picPreview != null) picPreview.Invalidate();
             };
             Controls.Add(lblNum);
             Controls.Add(numColumns);
 
-            chkLineBetween = new CheckBox { Text = "Đường kẻ giữa các cột (Line between)", Location = new Point(190, 97), AutoSize = true, Checked = LineBetween };
+            chkLineBetween = new CheckBox { Text = AppL10n.T("Đường kẻ giữa các cột (Line between)", "Line between"), Location = new Point(176, 103), AutoSize = true, Checked = LineBetween };
             chkLineBetween.CheckedChanged += (s, e) => { LineBetween = chkLineBetween.Checked; if (picPreview != null) picPreview.Invalidate(); };
             Controls.Add(chkLineBetween);
 
             // ==================== 3. WIDTH AND SPACING ====================
-            GroupBox grpWidth = new GroupBox { Text = "Độ rộng & Khoảng cách (Width and spacing)", Location = new Point(12, 130), Size = new Size(245, 120) };
-            Label lblColH = new Label { Text = "Cột 1:", Location = new Point(10, 26), AutoSize = true };
-            Label lblW = new Label { Text = "Rộng:", Location = new Point(55, 26), AutoSize = true };
-            numCol1Width = new NumericUpDown { Location = new Point(95, 23), Size = new Size(55, 22), DecimalPlaces = 2, Increment = 0.1m, Minimum = 0.5m, Maximum = 10.0m, Value = 6.5m };
+            GroupBox grpWidth = new GroupBox { Text = AppL10n.T("Độ rộng && Khoảng cách (in)", "Width && spacing (in)"), Location = new Point(12, 136), Size = new Size(276, 126) };
+            Label lblColH = new Label { Text = AppL10n.T("Cột 1:", "Col #1:"), Location = new Point(12, 32), AutoSize = true };
+            Label lblW = new Label { Text = AppL10n.T("Rộng:", "Width:"), Location = new Point(62, 32), AutoSize = true };
+            numCol1Width = new NumericUpDown { Location = new Point(104, 29), Size = new Size(58, 22), DecimalPlaces = 2, Increment = 0.1m, Minimum = 0.5m, Maximum = 10.0m, Value = 6.5m };
 
-            Label lblS = new Label { Text = "Cách:", Location = new Point(155, 26), AutoSize = true };
-            numCol1Spacing = new NumericUpDown { Location = new Point(190, 23), Size = new Size(48, 22), DecimalPlaces = 2, Increment = 0.1m, Minimum = 0.1m, Maximum = 3.0m, Value = (decimal)ColumnSpacingInches };
+            Label lblS = new Label { Text = AppL10n.T("Cách:", "Spacing:"), Location = new Point(170, 32), AutoSize = true };
+            numCol1Spacing = new NumericUpDown { Location = new Point(210, 29), Size = new Size(54, 22), DecimalPlaces = 2, Increment = 0.1m, Minimum = 0.1m, Maximum = 3.0m, Value = (decimal)ColumnSpacingInches };
             numCol1Spacing.ValueChanged += (s, e) => { ColumnSpacingInches = (float)numCol1Spacing.Value; if (picPreview != null) picPreview.Invalidate(); };
 
             grpWidth.Controls.Add(lblColH);
@@ -192,31 +206,40 @@ namespace ZenQOffice.UI
             grpWidth.Controls.Add(lblS);
             grpWidth.Controls.Add(numCol1Spacing);
 
-            chkEqualWidth = new CheckBox { Text = "Độ rộng cột bằng nhau (Equal width)", Location = new Point(10, 65), AutoSize = true, Checked = true };
+            chkEqualWidth = new CheckBox { Text = AppL10n.T("Độ rộng cột bằng nhau (Equal width)", "Equal column width"), Location = new Point(12, 74), AutoSize = true, Checked = EqualColumnWidth };
+            numCol1Width.Value = Math.Max(numCol1Width.Minimum, Math.Min(numCol1Width.Maximum, (decimal)Col1WidthInches));
+            numCol1Width.Enabled = !chkEqualWidth.Checked && ColumnCount > 1;
+            numCol1Width.ValueChanged += (s, e) => { Col1WidthInches = (float)numCol1Width.Value; if (picPreview != null) picPreview.Invalidate(); };
+            chkEqualWidth.CheckedChanged += (s, e) =>
+            {
+                EqualColumnWidth = chkEqualWidth.Checked;
+                numCol1Width.Enabled = !EqualColumnWidth && ColumnCount > 1;
+                if (picPreview != null) picPreview.Invalidate();
+            };
             grpWidth.Controls.Add(chkEqualWidth);
 
             Controls.Add(grpWidth);
 
             // ==================== 4. PREVIEW ====================
-            GroupBox grpPrev = new GroupBox { Text = "Xem trước (Preview)", Location = new Point(265, 130), Size = new Size(127, 120) };
-            picPreview = new PictureBox { Location = new Point(16, 18), Size = new Size(95, 92), BackColor = Color.White };
+            GroupBox grpPrev = new GroupBox { Text = AppL10n.T("Xem trước", "Preview"), Location = new Point(296, 136), Size = new Size(144, 126) };
+            picPreview = new PictureBox { Location = new Point(20, 22), Size = new Size(104, 94), BackColor = Color.White };
             picPreview.Paint += DrawPreview;
             grpPrev.Controls.Add(picPreview);
             Controls.Add(grpPrev);
 
             // ==================== 5. APPLY TO & BUTTONS ====================
-            Label lblApply = new Label { Text = "Áp dụng vào:", Location = new Point(14, 265), AutoSize = true };
-            cboApplyTo = new ZenQOffice.UI.FluentComboBox { Location = new Point(95, 262), Size = new Size(162, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboApplyTo.Items.AddRange(new object[] { "Toàn bộ tài liệu (Whole document)", "Đoạn văn bản đã chọn", "Từ điểm này trở đi" });
+            Label lblApply = new Label { Text = AppL10n.T("Áp dụng vào:", "Apply to:"), Location = new Point(14, 278), AutoSize = true };
+            cboApplyTo = new ZenQOffice.UI.FluentComboBox { Location = new Point(106, 274), Size = new Size(240, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+            cboApplyTo.Items.AddRange(new object[] { AppL10n.T("Toàn bộ tài liệu (Whole document)", "Whole document"), AppL10n.T("Đoạn văn bản đã chọn", "Selected text"), AppL10n.T("Từ điểm này trở đi", "This point forward") });
             cboApplyTo.SelectedIndex = 0;
             Controls.Add(lblApply);
             Controls.Add(cboApplyTo);
 
             Button btnOK = new Button
             {
-                Text = "Đồng ý",
+                Text = AppL10n.T("Đồng ý", "OK"),
                 DialogResult = DialogResult.OK,
-                Location = new Point(225, 305),
+                Location = new Point(272, 316),
                 Size = new Size(80, 28),
                 BackColor = Color.FromArgb(2, 132, 199),
                 ForeColor = Color.White,
@@ -228,6 +251,8 @@ namespace ZenQOffice.UI
                 ColumnCount = (int)numColumns.Value;
                 ColumnSpacingInches = (float)numCol1Spacing.Value;
                 LineBetween = chkLineBetween.Checked;
+                EqualColumnWidth = chkEqualWidth.Checked;
+                Col1WidthInches = EqualColumnWidth ? 0f : (float)numCol1Width.Value;
                 ApplyTo = cboApplyTo.SelectedItem.ToString();
                 if (OnApply != null) OnApply();
             };
@@ -235,9 +260,9 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 DialogResult = DialogResult.Cancel,
-                Location = new Point(312, 305),
+                Location = new Point(360, 316),
                 Size = new Size(80, 28),
                 BackColor = Color.White,
                 FlatStyle = FlatStyle.Flat

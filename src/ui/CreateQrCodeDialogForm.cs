@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using ZenQOffice.Core;
@@ -16,7 +16,7 @@ namespace ZenQOffice.UI
 
         public CreateQrCodeDialogForm(string initialText = "https://zenqoffice.com")
         {
-            Text = "Tạo mã QR - Tiện ích mở rộng";
+            Text = AppL10n.T("Tạo mã QR - Tiện ích mở rộng", "Create QR Code - Add-in");
             Size = new Size(420, 480);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -27,7 +27,7 @@ namespace ZenQOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "Nhập liên kết Website hoặc nội dung văn bản:",
+                Text = AppL10n.T("Nhập liên kết Website hoặc nội dung văn bản:", "Enter website URL or text content:"),
                 Location = new Point(24, 20),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
@@ -56,7 +56,7 @@ namespace ZenQOffice.UI
 
             Label lblSubtitle = new Label
             {
-                Text = "✓ Chuẩn quốc tế ISO/IEC 18004 — Quét tức thì bằng Camera điện thoại",
+                Text = AppL10n.T("✓ Chuẩn quốc tế ISO/IEC 18004 — Quét tức thì bằng Camera điện thoại", "✓ ISO/IEC 18004 Standard — Instant smartphone camera scan"),
                 Location = new Point(20, 310),
                 Size = new Size(364, 40),
                 TextAlign = ContentAlignment.TopCenter,
@@ -67,7 +67,7 @@ namespace ZenQOffice.UI
 
             btnInsert = new Button
             {
-                Text = "Chèn vào trang chiếu",
+                Text = AppL10n.T("Chèn vào trang chiếu", "Insert into Slide"),
                 Location = new Point(180, 380),
                 Size = new Size(200, 36),
                 BackColor = Color.FromArgb(37, 99, 235),
@@ -86,7 +86,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(90, 380),
                 Size = new Size(80, 36),
                 BackColor = Color.FromArgb(229, 231, 235),

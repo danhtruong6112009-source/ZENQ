@@ -154,32 +154,7 @@ namespace ZenQOffice.UI
             // Selection Handles
             if (isSelected)
             {
-                using (Pen selPen = new Pen(Color.FromArgb(0, 120, 215), 1.5f))
-                {
-                    selPen.DashStyle = DashStyle.Dash;
-                    g.DrawRectangle(selPen, bounds);
-                }
-                int hs = (int)(7 * zoomLevel);
-                Point[] handles = new Point[]
-                {
-                    new Point(bounds.Left, bounds.Top),
-                    new Point(bounds.Left + bounds.Width / 2, bounds.Top),
-                    new Point(bounds.Right, bounds.Top),
-                    new Point(bounds.Right, bounds.Top + bounds.Height / 2),
-                    new Point(bounds.Right, bounds.Bottom),
-                    new Point(bounds.Left + bounds.Width / 2, bounds.Bottom),
-                    new Point(bounds.Left, bounds.Bottom),
-                    new Point(bounds.Left, bounds.Top + bounds.Height / 2)
-                };
-                for (int hi = 0; hi < handles.Length; hi++)
-                {
-                    Rectangle hR = new Rectangle(handles[hi].X - hs / 2, handles[hi].Y - hs / 2, hs, hs);
-                    g.FillRectangle(Brushes.White, hR);
-                    using (Pen hPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                    {
-                        g.DrawRectangle(hPen, hR);
-                    }
-                }
+                ShapeRenderer.DrawGrayBoxSelectionHandles(g, bounds, zoomLevel, dashed: true);
             }
         }
 

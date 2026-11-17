@@ -242,7 +242,7 @@ namespace ZenQOffice.UI
             btnChooseConn.Location = new Point(48, 120);
             btnChooseConn.Size = new Size(150, 26);
             btnChooseConn.Click += (s, e) => {
-                ZenQOffice.UI.FluentMessageBox.Show("Kết nối nguồn dữ liệu bên ngoài (SQL Server, OData, Power BI, CSV Data Model).", "Choose Connection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Kết nối nguồn dữ liệu bên ngoài (SQL Server, OData, Power BI, CSV Data Model).", "Connect to external data source (SQL Server, OData, Power BI, CSV Data Model)."), "Choose Connection", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
             this.Controls.Add(btnChooseConn);
 

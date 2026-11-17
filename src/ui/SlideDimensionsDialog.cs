@@ -34,7 +34,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            Text = "Kích cỡ Trang chiếu (Slide Size)";
+            Text = AppL10n.T("Kích cỡ Trang chiếu (Slide Size)", "Slide Size");
             Width = 460;
             Height = 420;
             StartPosition = FormStartPosition.CenterParent;
@@ -48,7 +48,7 @@ namespace ZenQOffice.UI
 
             Label lblPreset = new Label
             {
-                Text = "Kích cỡ trang chiếu cho (Slides sized for):",
+                Text = AppL10n.T("Kích cỡ trang chiếu cho (Slides sized for):", "Slides sized for:"),
                 Location = new Point(20, curY),
                 Size = new Size(380, 20),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -62,20 +62,20 @@ namespace ZenQOffice.UI
                 Size = new Size(395, 26),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            _cboPresets.Items.Add("Màn hình rộng (16:9)");
-            _cboPresets.Items.Add("Tiêu chuẩn (4:3)");
-            _cboPresets.Items.Add("Giấy A4 (210 x 297 mm)");
-            _cboPresets.Items.Add("Giấy A3 (297 x 420 mm)");
-            _cboPresets.Items.Add("Giấy Thư (Letter 8.5 x 11 in)");
-            _cboPresets.Items.Add("Biểu ngữ (Banner)");
-            _cboPresets.Items.Add("Tùy chỉnh (Custom)");
+            _cboPresets.Items.Add(AppL10n.T("Màn hình rộng (16:9)", "Widescreen (16:9)"));
+            _cboPresets.Items.Add(AppL10n.T("Tiêu chuẩn (4:3)", "Standard (4:3)"));
+            _cboPresets.Items.Add(AppL10n.T("Giấy A4 (210 x 297 mm)", "A4 Paper (210 x 297 mm)"));
+            _cboPresets.Items.Add(AppL10n.T("Giấy A3 (297 x 420 mm)", "A3 Paper (297 x 420 mm)"));
+            _cboPresets.Items.Add(AppL10n.T("Giấy Thư (Letter 8.5 x 11 in)", "Letter Paper (8.5 x 11 in)"));
+            _cboPresets.Items.Add(AppL10n.T("Biểu ngữ (Banner)", "Banner"));
+            _cboPresets.Items.Add(AppL10n.T("Tùy chỉnh (Custom)", "Custom"));
             _cboPresets.SelectedIndexChanged += OnPresetChanged;
             Controls.Add(_cboPresets);
             curY += 38;
 
             Label lblWidth = new Label
             {
-                Text = "Chiều rộng (Width - cm):",
+                Text = AppL10n.T("Chiều rộng (Width - cm):", "Width (cm):"),
                 Location = new Point(20, curY),
                 Size = new Size(180, 20),
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -84,7 +84,7 @@ namespace ZenQOffice.UI
 
             Label lblHeight = new Label
             {
-                Text = "Chiều cao (Height - cm):",
+                Text = AppL10n.T("Chiều cao (Height - cm):", "Height (cm):"),
                 Location = new Point(225, curY),
                 Size = new Size(180, 20),
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -119,7 +119,7 @@ namespace ZenQOffice.UI
 
             GroupBox gbOrient = new GroupBox
             {
-                Text = "Hướng trang chiếu (Orientation)",
+                Text = AppL10n.T("Hướng trang chiếu (Orientation)", "Orientation"),
                 Location = new Point(20, curY),
                 Size = new Size(395, 75),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -136,7 +136,7 @@ namespace ZenQOffice.UI
 
             _rbPortrait = new RadioButton
             {
-                Text = "Dọc (Portrait)",
+                Text = AppL10n.T("Dọc (Portrait)", "Portrait"),
                 Location = new Point(210, 28),
                 Size = new Size(160, 24)
             };
@@ -147,14 +147,14 @@ namespace ZenQOffice.UI
 
             GroupBox gbFit = new GroupBox
             {
-                Text = "Tỷ lệ tỷ xích đối tượng (Scaling)",
+                Text = AppL10n.T("Tỷ lệ tỷ xích đối tượng (Scaling)", "Scaling"),
                 Location = new Point(20, curY),
                 Size = new Size(395, 68),
                 ForeColor = Color.FromArgb(30, 41, 59)
             };
             _rbMaximize = new RadioButton
             {
-                Text = "Tối đa hóa (Maximize)",
+                Text = AppL10n.T("Tối đa hóa (Maximize)", "Maximize"),
                 Location = new Point(25, 26),
                 Size = new Size(170, 24),
                 Checked = true
@@ -163,7 +163,7 @@ namespace ZenQOffice.UI
 
             _rbEnsureFit = new RadioButton
             {
-                Text = "Đảm bảo Vừa khít (Ensure Fit)",
+                Text = AppL10n.T("Đảm bảo Vừa khít (Ensure Fit)", "Ensure Fit"),
                 Location = new Point(210, 26),
                 Size = new Size(175, 24)
             };
@@ -173,7 +173,7 @@ namespace ZenQOffice.UI
 
             _btnOk = new SettingsActionButton
             {
-                Text = "Đồng ý",
+                Text = AppL10n.T("Đồng ý", "OK"),
                 Location = new Point(225, curY),
                 Size = new Size(95, 32),
                 DialogResult = DialogResult.OK,
@@ -188,7 +188,7 @@ namespace ZenQOffice.UI
 
             _btnCancel = new SettingsActionButton
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(330, curY),
                 Size = new Size(85, 32),
                 DialogResult = DialogResult.Cancel,

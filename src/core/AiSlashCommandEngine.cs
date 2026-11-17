@@ -51,7 +51,7 @@ namespace ZenQOffice.Core
                 Name = "/file",
                 Aliases = new[] { "/f", "/tailieu", "/tep", "/read" },
                 DisplayName = "/file [tệp...] [yêu cầu]",
-                Description = "Đọc, đối chiếu và trích xuất dữ liệu từ các tệp bên ngoài hoặc các Tab khác",
+                Description = AppL10n.T("Đọc, đối chiếu và trích xuất dữ liệu từ các tệp bên ngoài hoặc các Tab khác", "Read, compare, and extract data from files or other open tabs"),
                 IconGlyph = "/doc",
                 IsFilePicker = true
             },
@@ -60,7 +60,7 @@ namespace ZenQOffice.Core
                 Name = "/summary",
                 Aliases = new[] { "/tomtat", "/s" },
                 DisplayName = "/summary [tùy chọn]",
-                Description = "Tóm tắt thông minh toàn diện tài liệu theo ý chính và luận điểm cốt lõi",
+                Description = AppL10n.T("Tóm tắt thông minh toàn diện tài liệu theo ý chính và luận điểm cốt lõi", "Summarize key points and takeaways from the active document"),
                 IconGlyph = "/list"
             },
             new AiSlashCommand
@@ -68,7 +68,7 @@ namespace ZenQOffice.Core
                 Name = "/page",
                 Aliases = new[] { "/trang", "/p" },
                 DisplayName = "/page [số_trang] [câu hỏi]",
-                Description = "Phân tích sâu, trích xuất hoặc giải đáp nội dung của một trang cụ thể (PDF/Slide)",
+                Description = AppL10n.T("Phân tích sâu, trích xuất hoặc giải đáp nội dung của một trang cụ thể (PDF/Slide)", "Analyze or explain a specific page or slide (PDF/Slides)"),
                 IconGlyph = "/page"
             },
             new AiSlashCommand
@@ -76,7 +76,7 @@ namespace ZenQOffice.Core
                 Name = "/translate",
                 Aliases = new[] { "/dich", "/t" },
                 DisplayName = "/translate [ngôn ngữ]",
-                Description = "Dịch tài liệu hoặc trang hiện tại sang Tiếng Việt, Tiếng Anh, v.v.",
+                Description = AppL10n.T("Dịch tài liệu hoặc trang hiện tại sang Tiếng Việt, Tiếng Anh, v.v.", "Translate the document or current page to another language"),
                 IconGlyph = "/globe"
             },
             new AiSlashCommand
@@ -84,7 +84,7 @@ namespace ZenQOffice.Core
                 Name = "/table",
                 Aliases = new[] { "/bang", "/excel" },
                 DisplayName = "/table [mô tả]",
-                Description = "Bóc tách dữ liệu văn bản/PDF thành bảng biểu có cấu trúc (cho Calc/Excel)",
+                Description = AppL10n.T("Bóc tách dữ liệu văn bản/PDF thành bảng biểu có cấu trúc (cho Calc/Excel)", "Extract text/PDF data into a structured table (for Calc/Excel)"),
                 IconGlyph = "/sheet"
             },
             new AiSlashCommand
@@ -92,7 +92,7 @@ namespace ZenQOffice.Core
                 Name = "/canvas",
                 Aliases = new[] { "/c", "/interactive", "/de", "/quiz", "/cauhoi", "/tracnghiem", "/q" },
                 DisplayName = "/canvas [yêu cầu đề thi/ngữ liệu/bài tập...]",
-                Description = "Tạo không gian tương tác (trắc nghiệm, ngữ liệu đọc hiểu, đúng/sai, điền khuyết, tự luận) trên Canvas",
+                Description = AppL10n.T("Tạo không gian tương tác (trắc nghiệm, ngữ liệu đọc hiểu, đúng/sai, điền khuyết, tự luận) trên Canvas", "Generate an interactive quiz or practice workspace on Canvas"),
                 IconGlyph = "/sparkle"
             },
             new AiSlashCommand
@@ -100,7 +100,7 @@ namespace ZenQOffice.Core
                 Name = "/explain",
                 Aliases = new[] { "/giaithich", "/e" },
                 DisplayName = "/explain [thuật ngữ / đoạn]",
-                Description = "Giải thích chi tiết, chuyên sâu một khái niệm, công thức hoặc đoạn văn bản",
+                Description = AppL10n.T("Giải thích chi tiết, chuyên sâu một khái niệm, công thức hoặc đoạn văn bản", "Explain a concept, formula, or selected passage in detail"),
                 IconGlyph = "/bulb"
             },
             new AiSlashCommand
@@ -108,7 +108,7 @@ namespace ZenQOffice.Core
                 Name = "/ocr",
                 Aliases = new[] { "/scan" },
                 DisplayName = "/ocr",
-                Description = "Hướng dẫn hoặc nhận diện ký tự quang học từ trang hình ảnh hoặc PDF scan",
+                Description = AppL10n.T("Hướng dẫn hoặc nhận diện ký tự quang học từ trang hình ảnh hoặc PDF scan", "OCR recognition tips and text extraction for scanned PDFs/images"),
                 IconGlyph = "/camera"
             },
             new AiSlashCommand
@@ -116,7 +116,7 @@ namespace ZenQOffice.Core
                 Name = "/help",
                 Aliases = new[] { "/?", "/trogiup" },
                 DisplayName = "/help",
-                Description = "Xem danh sách và hướng dẫn sử dụng toàn bộ các lệnh / (Slash Commands)",
+                Description = AppL10n.T("Xem danh sách và hướng dẫn sử dụng toàn bộ các lệnh / (Slash Commands)", "View all available / Slash Commands"),
                 IconGlyph = "/help"
             }
         };

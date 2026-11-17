@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -52,7 +53,7 @@ namespace ZenQOffice.UI
 
         private void InitializeUI()
         {
-            this.Text = "Bộ Thiết Kế Dải Màu Gradient & Kênh Alpha (Gradient Editor)";
+            this.Text = AppL10n.T("Bộ Thiết Kế Dải Màu Gradient & Kênh Alpha (Gradient Editor)", "Gradient & Alpha Editor");
             this.Size = new Size(580, 560);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -64,7 +65,7 @@ namespace ZenQOffice.UI
             // 1. Header
             Label lblHeader = new Label
             {
-                Text = "Cấu hình dải màu đa sắc & độ trong suốt từng điểm màu",
+                Text = AppL10n.T("Cấu hình dải màu đa sắc & độ trong suốt từng điểm màu", "Configure multi-stop gradient colors and alpha opacity"),
                 Font = new Font("Segoe UI", 10.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(20, 14),
@@ -73,12 +74,12 @@ namespace ZenQOffice.UI
             this.Controls.Add(lblHeader);
 
             // 2. Chế độ dải màu: Tuyến tính vs Tỏa tròn
-            Label lblType = new Label { Text = "Dạng chuyển sắc:", Location = new Point(20, 46), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblType = new Label { Text = AppL10n.T("Dạng chuyển sắc:", "Gradient type:"), Location = new Point(20, 46), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             this.Controls.Add(lblType);
 
             _rbLinear = new RadioButton
             {
-                Text = "Tuyến tính (Linear)",
+                Text = AppL10n.T("Tuyến tính (Linear)", "Linear"),
                 Location = new Point(150, 44),
                 AutoSize = true,
                 Checked = (SelectedFillType == VectorFillType.LinearGradient)
@@ -90,7 +91,7 @@ namespace ZenQOffice.UI
 
             _rbRadial = new RadioButton
             {
-                Text = "Tỏa tròn (Radial)",
+                Text = AppL10n.T("Tỏa tròn (Radial)", "Radial"),
                 Location = new Point(310, 44),
                 AutoSize = true,
                 Checked = (SelectedFillType == VectorFillType.RadialGradient)
@@ -101,7 +102,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(_rbRadial);
 
             // 3. Góc dải màu (Angle)
-            Label lblAngle = new Label { Text = "Góc xoay (Angle):", Location = new Point(20, 80), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblAngle = new Label { Text = AppL10n.T("Góc xoay (Angle):", "Angle:"), Location = new Point(20, 80), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             this.Controls.Add(lblAngle);
 
             _tbAngle = new TrackBar
@@ -125,7 +126,7 @@ namespace ZenQOffice.UI
 
             // Nút bấm góc nhanh
             int[] quickAngles = new int[] { 0, 45, 90, 180, 270 };
-            string[] quickLabels = new string[] { "0° (Trái->Phải)", "45° (Chéo)", "90° (Trên->Dưới)", "180° (Phải->Trái)", "270° (Dưới->Trên)" };
+            string[] quickLabels = new string[] { AppL10n.T("0° (Trái->Phải)", "0° (Left->Right)"), AppL10n.T("45° (Chéo)", "45° (Diag)"), AppL10n.T("90° (Trên->Dưới)", "90° (Top->Down)"), AppL10n.T("180° (Phải->Trái)", "180° (Right->Left)"), AppL10n.T("270° (Dưới->Trên)", "270° (Bottom->Up)") };
             int btnAngX = 20;
             for (int ai = 0; ai < quickAngles.Length; ai++)
             {
@@ -151,7 +152,7 @@ namespace ZenQOffice.UI
             }
 
             // 4. Thanh Gradient trực quan (Draggable Stops Bar)
-            Label lblBarTitle = new Label { Text = "Thanh dải màu & các điểm dừng (Bấm vào thanh để thêm điểm):", Location = new Point(20, 150), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblBarTitle = new Label { Text = AppL10n.T("Thanh dải màu & các điểm dừng (Bấm vào thanh để thêm điểm):", "Gradient bar & stops (click bar to add stop):"), Location = new Point(20, 150), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             this.Controls.Add(lblBarTitle);
 
             _pnlGradientBar = new ColorDoubleBufferedPanel
@@ -169,14 +170,14 @@ namespace ZenQOffice.UI
             // 5. Khung tinh chỉnh điểm màu đang chọn
             GroupBox gbStop = new GroupBox
             {
-                Text = "Thuộc tính điểm dừng đang chọn",
+                Text = AppL10n.T("Thuộc tính điểm dừng đang chọn", "Selected Stop Properties"),
                 Location = new Point(20, 236),
                 Size = new Size(330, 176),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold)
             };
             this.Controls.Add(gbStop);
 
-            Label lblColor = new Label { Text = "Màu sắc:", Location = new Point(14, 28), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
+            Label lblColor = new Label { Text = AppL10n.T("Màu sắc:", "Color:"), Location = new Point(14, 28), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
             gbStop.Controls.Add(lblColor);
 
             _pnlStopColor = new Panel
@@ -191,7 +192,7 @@ namespace ZenQOffice.UI
 
             Button btnPickColor = new Button
             {
-                Text = "Chọn màu & Alpha...",
+                Text = AppL10n.T("Chọn màu & Alpha...", "Pick Color & Alpha..."),
                 Location = new Point(130, 25),
                 Size = new Size(130, 26),
                 BackColor = Color.FromArgb(241, 245, 249),
@@ -203,7 +204,7 @@ namespace ZenQOffice.UI
             gbStop.Controls.Add(btnPickColor);
 
             // Alpha slider cho stop này
-            Label lblAlpha = new Label { Text = "Độ đục:", Location = new Point(14, 66), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
+            Label lblAlpha = new Label { Text = AppL10n.T("Độ đục:", "Opacity:"), Location = new Point(14, 66), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
             gbStop.Controls.Add(lblAlpha);
 
             _tbStopAlpha = new TrackBar
@@ -227,7 +228,7 @@ namespace ZenQOffice.UI
             gbStop.Controls.Add(_lblStopAlphaVal);
 
             // Vị trí stop (0..100%)
-            Label lblPos = new Label { Text = "Vị trí (%):", Location = new Point(14, 102), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
+            Label lblPos = new Label { Text = AppL10n.T("Vị trí (%):", "Location (%):"), Location = new Point(14, 102), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular) };
             gbStop.Controls.Add(lblPos);
 
             _numStopPos = new NumericUpDown
@@ -247,7 +248,7 @@ namespace ZenQOffice.UI
             // Thêm & Xóa điểm dừng
             Button btnAddStop = new Button
             {
-                Text = "+ Thêm điểm",
+                Text = AppL10n.T("+ Thêm điểm", "+ Add Stop"),
                 Location = new Point(14, 136),
                 Size = new Size(110, 28),
                 BackColor = Color.FromArgb(241, 245, 249),
@@ -260,7 +261,7 @@ namespace ZenQOffice.UI
 
             _btnDeleteStop = new Button
             {
-                Text = "- Xóa điểm",
+                Text = AppL10n.T("- Xóa điểm", "- Remove Stop"),
                 Location = new Point(132, 136),
                 Size = new Size(95, 28),
                 BackColor = Color.FromArgb(254, 242, 242),
@@ -275,7 +276,7 @@ namespace ZenQOffice.UI
             // 6. Preview Box (Hình xem trước trực tiếp)
             GroupBox gbPrev = new GroupBox
             {
-                Text = "Hình xem trước (Live Preview)",
+                Text = AppL10n.T("Hình xem trước (Live Preview)", "Live Preview"),
                 Location = new Point(362, 236),
                 Size = new Size(178, 176),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold)
@@ -292,20 +293,20 @@ namespace ZenQOffice.UI
             gbPrev.Controls.Add(_pnlPreview);
 
             // 7. Mẫu Gradient dựng sẵn (Presets)
-            Label lblPresets = new Label { Text = "Mẫu Gradient thiết kế sẵn:", Location = new Point(20, 420), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblPresets = new Label { Text = AppL10n.T("Mẫu Gradient thiết kế sẵn:", "Gradient Presets:"), Location = new Point(20, 420), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             this.Controls.Add(lblPresets);
 
             var presets = new (string Name, List<PhotoGradientStop> Stops, float Angle)[]
             {
-                ("Đỏ 50% -> Xanh", new List<PhotoGradientStop> {
+                (AppL10n.T("Đỏ 50% -> Xanh", "Red 50% -> Blue"), new List<PhotoGradientStop> {
                     new PhotoGradientStop(Color.FromArgb(128, 239, 68, 68), 0.0f),
                     new PhotoGradientStop(Color.FromArgb(255, 59, 130, 246), 1.0f)
                 }, 0f),
-                ("Đen -> Trong suốt", new List<PhotoGradientStop> {
+                (AppL10n.T("Đen -> Trong suốt", "Black -> Transparent"), new List<PhotoGradientStop> {
                     new PhotoGradientStop(Color.FromArgb(255, 15, 23, 42), 0.0f),
                     new PhotoGradientStop(Color.FromArgb(0, 15, 23, 42), 1.0f)
                 }, 90f),
-                ("Cầu vồng 7 sắc", new List<PhotoGradientStop> {
+                (AppL10n.T("Cầu vồng 7 sắc", "Rainbow"), new List<PhotoGradientStop> {
                     new PhotoGradientStop(Color.FromArgb(239, 68, 68), 0.0f),
                     new PhotoGradientStop(Color.FromArgb(249, 115, 22), 0.17f),
                     new PhotoGradientStop(Color.FromArgb(234, 179, 8), 0.33f),
@@ -314,7 +315,7 @@ namespace ZenQOffice.UI
                     new PhotoGradientStop(Color.FromArgb(59, 130, 246), 0.83f),
                     new PhotoGradientStop(Color.FromArgb(168, 85, 247), 1.0f)
                 }, 0f),
-                ("Hoàng hôn", new List<PhotoGradientStop> {
+                (AppL10n.T("Hoàng hôn", "Sunset"), new List<PhotoGradientStop> {
                     new PhotoGradientStop(Color.FromArgb(245, 158, 11), 0.0f),
                     new PhotoGradientStop(Color.FromArgb(236, 72, 153), 0.5f),
                     new PhotoGradientStop(Color.FromArgb(79, 70, 229), 1.0f)
@@ -351,7 +352,7 @@ namespace ZenQOffice.UI
             // 8. Buttons OK / Cancel
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(452, 480),
                 Size = new Size(88, 30),
@@ -365,7 +366,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new Button
             {
-                Text = "Áp dụng",
+                Text = AppL10n.T("Áp dụng", "Apply"),
                 DialogResult = DialogResult.OK,
                 Location = new Point(354, 480),
                 Size = new Size(88, 30),

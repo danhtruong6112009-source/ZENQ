@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -42,7 +42,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Cắt Âm thanh (Trim Audio)";
+            this.Text = AppL10n.T("Cắt Âm thanh (Trim Audio)", "Trim Audio");
             this.Size = new Size(580, 420);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -60,16 +60,16 @@ namespace ZenQOffice.UI
             };
             Label title = new Label
             {
-                Text = "✂️ Cắt bỏ phần đầu và phần cuối của tệp âm thanh",
+                Text = AppL10n.T("✂️ Cắt bỏ phần đầu và phần cuối của tệp âm thanh", "✂️ Trim the beginning and end of your audio clip"),
                 Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
                 ForeColor = System.Drawing.Color.FromArgb(15, 23, 42),
                 AutoSize = true,
                 Location = new Point(16, 8)
             };
-            string fileName = (_shape != null && !string.IsNullOrEmpty(_shape.AudioPath)) ? Path.GetFileName(_shape.AudioPath) : "Tệp âm thanh";
+            string fileName = (_shape != null && !string.IsNullOrEmpty(_shape.AudioPath)) ? Path.GetFileName(_shape.AudioPath) : AppL10n.T("Tệp âm thanh", "Audio file");
             Label sub = new Label
             {
-                Text = "Tệp đang chọn: " + fileName,
+                Text = AppL10n.T("Tệp đang chọn: ", "Selected file: ") + fileName,
                 Font = new Font("Segoe UI", 8.5f),
                 ForeColor = System.Drawing.Color.FromArgb(100, 116, 139),
                 AutoSize = true,
@@ -108,7 +108,7 @@ namespace ZenQOffice.UI
             // Play / Pause Button
             _btnPlayPause = new Button
             {
-                Text = "▶ Phát",
+                Text = AppL10n.T("▶ Phát", "▶ Play"),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 Location = new Point(20, 105),
                 Size = new Size(88, 36),
@@ -123,7 +123,7 @@ namespace ZenQOffice.UI
 
             _lblCurrentTime = new Label
             {
-                Text = "Vị trí: 00:00.00",
+                Text = AppL10n.T("Vị trí: 00:00.00", "Position: 00:00.00"),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 ForeColor = System.Drawing.Color.FromArgb(30, 41, 59),
                 Location = new Point(120, 114),
@@ -133,7 +133,7 @@ namespace ZenQOffice.UI
 
             _lblTrimmedDuration = new Label
             {
-                Text = "Thời lượng sau cắt: 00:00.00",
+                Text = AppL10n.T("Thời lượng sau cắt: 00:00.00", "Trimmed duration: 00:00.00"),
                 Font = new Font("Segoe UI", 9f),
                 ForeColor = System.Drawing.Color.FromArgb(71, 85, 105),
                 Location = new Point(320, 114),
@@ -144,7 +144,7 @@ namespace ZenQOffice.UI
             // Time inputs group
             GroupBox grpTimes = new GroupBox
             {
-                Text = "Điểm cắt thời gian (Giây)",
+                Text = AppL10n.T("Điểm cắt thời gian (Giây)", "Trim Points (Seconds)"),
                 Location = new Point(20, 155),
                 Size = new Size(492, 105),
                 Font = new Font("Segoe UI", 9f, FontStyle.Regular),
@@ -153,7 +153,7 @@ namespace ZenQOffice.UI
 
             Label lblStart = new Label
             {
-                Text = "🟢 Bắt đầu (Start):",
+                Text = AppL10n.T("🟢 Bắt đầu (Start):", "🟢 Start Time:"),
                 Location = new Point(20, 32),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
@@ -181,7 +181,7 @@ namespace ZenQOffice.UI
 
             Label lblEnd = new Label
             {
-                Text = "🔴 Kết thúc (End):",
+                Text = AppL10n.T("🔴 Kết thúc (End):", "🔴 End Time:"),
                 Location = new Point(290, 32),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
@@ -218,7 +218,7 @@ namespace ZenQOffice.UI
             // 3. Bottom Action Buttons
             Button btnOk = new Button
             {
-                Text = "Đồng ý (OK)",
+                Text = AppL10n.T("Đồng ý (OK)", "OK"),
                 DialogResult = DialogResult.OK,
                 Location = new Point(340, 355),
                 Size = new Size(100, 32),
@@ -231,7 +231,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(448, 355),
                 Size = new Size(100, 32),
@@ -305,7 +305,7 @@ namespace ZenQOffice.UI
             float trimmedSec = Math.Max(0f, (float)(_numEnd.Value - _numStart.Value));
             int m = (int)(trimmedSec / 60);
             float s = trimmedSec % 60;
-            _lblTrimmedDuration.Text = string.Format("Thời lượng sau cắt: {0:D2}:{1:00.00}", m, s);
+            _lblTrimmedDuration.Text = string.Format(AppL10n.T("Thời lượng sau cắt: {0:D2}:{1:00.00}", "Trimmed duration: {0:D2}:{1:00.00}"), m, s);
         }
 
         private void TogglePlay()
@@ -329,7 +329,7 @@ namespace ZenQOffice.UI
                 _previewPlayer.Position = TimeSpan.FromSeconds(startSec);
                 _previewPlayer.Play();
                 _isPlaying = true;
-                _btnPlayPause.Text = "❚❚ Tạm dừng";
+                _btnPlayPause.Text = AppL10n.T("❚❚ Tạm dừng", "❚❚ Pause");
                 _btnPlayPause.BackColor = System.Drawing.Color.FromArgb(234, 88, 12);
                 _previewTimer.Start();
             }
@@ -343,7 +343,7 @@ namespace ZenQOffice.UI
                 try { _previewPlayer.Pause(); } catch { }
             }
             _isPlaying = false;
-            _btnPlayPause.Text = "▶ Phát";
+            _btnPlayPause.Text = AppL10n.T("▶ Phát", "▶ Play");
             _btnPlayPause.BackColor = System.Drawing.Color.FromArgb(37, 99, 235);
             _previewTimer.Stop();
             _timelinePanel.Invalidate();
@@ -359,7 +359,7 @@ namespace ZenQOffice.UI
 
                 int m = (int)(pos / 60);
                 float s = pos % 60;
-                _lblCurrentTime.Text = string.Format("Vị trí: {0:D2}:{1:00.00}", m, s);
+                _lblCurrentTime.Text = string.Format(AppL10n.T("Vị trí: {0:D2}:{1:00.00}", "Position: {0:D2}:{1:00.00}"), m, s);
 
                 // Stop if exceeded TrimEnd
                 if (pos >= (float)_numEnd.Value)

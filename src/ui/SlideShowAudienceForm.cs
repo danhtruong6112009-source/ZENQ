@@ -24,7 +24,7 @@ namespace ZenQOffice.UI
             _slidesView = slidesView;
             _appForm = appForm;
 
-            Text = "ZenQ Slide Show - Màn hình Khán giả";
+            Text = ZenQOffice.Core.AppL10n.T("ZenQ Slide Show - Màn hình Khán giả", "ZenQ Slide Show - Audience View");
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
             Bounds = targetScreen.Bounds;

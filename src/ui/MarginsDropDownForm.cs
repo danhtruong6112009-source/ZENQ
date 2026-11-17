@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -44,7 +45,7 @@ namespace ZenQOffice.UI
 
                 Label lblName = new Label
                 {
-                    Text = presets[i][0],
+                    Text = AppL10n.Tr(presets[i][0]),
                     Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                     ForeColor = Color.Black,
                     Location = new Point(40, 4),
@@ -111,7 +112,7 @@ namespace ZenQOffice.UI
             // Custom Margins... Button
             Button btnCustom = new Button
             {
-                Text = "Custom Margins... (Lề tùy chỉnh)",
+                Text = AppL10n.Tr("Custom Margins... (Lề tùy chỉnh)"),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 ForeColor = Color.Navy,
                 FlatStyle = FlatStyle.Flat,

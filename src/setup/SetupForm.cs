@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using ZenQOffice.Core;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -236,7 +237,7 @@ namespace ZenQOffice.Setup
             using (Font hFont = new Font("Segoe UI", 9.2f, FontStyle.Bold))
             using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                g.DrawString("ĐIỀU KHOẢN VÀ CHÍNH SÁCH SỬ DỤNG ZENQ OFFICE", hFont, hBrush, 14, curY);
+                g.DrawString(AppL10n.T("ĐIỀU KHOẢN VÀ CHÍNH SÁCH SỬ DỤNG ZENQ OFFICE", "ZENQ OFFICE TERMS OF USE & PRIVACY POLICY"), hFont, hBrush, 14, curY);
                 curY += 22f;
             }
 
@@ -246,26 +247,26 @@ namespace ZenQOffice.Setup
             using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
             using (SolidBrush bodyBrush = new SolidBrush(Color.FromArgb(71, 85, 105)))
             {
-                g.DrawString("1. Bản quyền và mục đích sử dụng", secFont, secBrush, 14, curY);
+                g.DrawString(AppL10n.T("1. Bản quyền và mục đích sử dụng", "1. License and Purpose"), secFont, secBrush, 14, curY);
                 curY += 18f;
 
-                string b1 = "ZENQ OFFICE là bộ giải pháp phần mềm văn phòng thông minh được phát triển bởi NEXTGENEDUSPACE STUDIO nhằm mang lại công cụ xử lý văn bản, bảng tính, trình chiếu và tích hợp trí tuệ nhân tạo toàn diện cho người dùng.";
+                string b1 = AppL10n.T("ZENQ OFFICE là bộ giải pháp phần mềm văn phòng thông minh được phát triển bởi NEXTGENEDUSPACE STUDIO nhằm mang lại công cụ xử lý văn bản, bảng tính, trình chiếu và tích hợp trí tuệ nhân tạo toàn diện cho người dùng.", "ZENQ OFFICE is an intelligent office productivity suite developed by NEXTGENEDUSPACE STUDIO, providing word processing, spreadsheets, presentations, PDF editing, and integrated AI tools.");
                 SizeF sz1 = g.MeasureString(b1, bodyFont, (int)textW);
                 g.DrawString(b1, bodyFont, bodyBrush, new RectangleF(14, curY, textW, sz1.Height));
                 curY += sz1.Height + 10f;
 
-                g.DrawString("2. Quyền riêng tư và bảo mật dữ liệu", secFont, secBrush, 14, curY);
+                g.DrawString(AppL10n.T("2. Quyền riêng tư và bảo mật dữ liệu", "2. Privacy and Data Security"), secFont, secBrush, 14, curY);
                 curY += 18f;
 
-                string b2 = "Toàn bộ tài liệu và nội dung do bạn tạo lập đều được xử lý và lưu trữ trực tiếp trên thiết bị cá nhân. Chúng tôi cam kết tuyệt đối tôn trọng quyền riêng tư và không can thiệp trái phép vào thông tin cá nhân của người dùng.";
+                string b2 = AppL10n.T("Toàn bộ tài liệu và nội dung do bạn tạo lập đều được xử lý và lưu trữ trực tiếp trên thiết bị cá nhân. Chúng tôi cam kết tuyệt đối tôn trọng quyền riêng tư và không can thiệp trái phép vào thông tin cá nhân của người dùng.", "All documents and content you create are processed and stored locally on your device. We respect your privacy and never access your personal files without authorization.");
                 SizeF sz2 = g.MeasureString(b2, bodyFont, (int)textW);
                 g.DrawString(b2, bodyFont, bodyBrush, new RectangleF(14, curY, textW, sz2.Height));
                 curY += sz2.Height + 10f;
 
-                g.DrawString("3. Cam kết chất lượng dịch vụ", secFont, secBrush, 14, curY);
+                g.DrawString(AppL10n.T("3. Cam kết chất lượng dịch vụ", "3. Quality Commitment"), secFont, secBrush, 14, curY);
                 curY += 18f;
 
-                string b3 = "Ứng dụng liên tục được nâng cấp định kỳ nhằm mang lại hiệu suất tối ưu và trải nghiệm làm việc mượt mà nhất.";
+                string b3 = AppL10n.T("Ứng dụng liên tục được nâng cấp định kỳ nhằm mang lại hiệu suất tối ưu và trải nghiệm làm việc mượt mà nhất.", "The application receives regular updates to deliver optimal performance and a smooth experience.");
                 SizeF sz3 = g.MeasureString(b3, bodyFont, (int)textW);
                 g.DrawString(b3, bodyFont, bodyBrush, new RectangleF(14, curY, textW, sz3.Height));
                 curY += sz3.Height + 10f;
@@ -347,7 +348,7 @@ namespace ZenQOffice.Setup
         private Stopwatch _stopwatch;
         private float _progress = 0.05f;
         private float _targetProgress = 0.05f;
-        private string _statusText = "Chuẩn bị cài đặt...";
+        private string _statusText = AppL10n.T("Chuẩn bị cài đặt...", "Preparing setup...");
         private bool _isCompleted = false;
         private bool _isDragging = false;
         private Point _dragStart;
@@ -379,7 +380,7 @@ namespace ZenQOffice.Setup
             DoubleBuffered = true;
             ShowInTaskbar = true;
             ShowIcon = true;
-            Text = "Cài đặt ZENQ OFFICE";
+            Text = AppL10n.T("Cài đặt ZENQ OFFICE", "Install ZENQ OFFICE");
 
             try
             {
@@ -480,7 +481,7 @@ namespace ZenQOffice.Setup
 
             _chkAgree = new ModernRoundedCheckBox
             {
-                Text = "Tôi đã đọc và đồng ý với điều khoản sử dụng của ZENQ OFFICE",
+                Text = AppL10n.T("Tôi đã đọc và đồng ý với điều khoản sử dụng của ZENQ OFFICE", "I have read and accept the ZENQ OFFICE Terms of Use"),
                 Location = new Point(48, 386),
                 Size = new Size(464, 24),
                 Checked = true
@@ -493,7 +494,7 @@ namespace ZenQOffice.Setup
 
             _btnStep1Next = new ModernRoundedButton
             {
-                Text = "Tiếp tục →",
+                Text = AppL10n.T("Tiếp tục →", "Continue →"),
                 Location = new Point(362, 422),
                 Size = new Size(150, 40),
                 BaseColor = Color.FromArgb(37, 99, 235),
@@ -506,7 +507,7 @@ namespace ZenQOffice.Setup
             // ================= STEP 2: TÙY CHỌN CÀI ĐẶT =================
             _lblPath = new Label
             {
-                Text = "Thư mục cài đặt:",
+                Text = AppL10n.T("Thư mục cài đặt:", "Install location:"),
                 Location = new Point(48, 246),
                 Size = new Size(464, 20),
                 Font = new Font("Segoe UI", 9.2f, FontStyle.Bold),
@@ -524,7 +525,7 @@ namespace ZenQOffice.Setup
 
             _btnBrowse = new ModernRoundedButton
             {
-                Text = "Duyệt...",
+                Text = AppL10n.T("Duyệt...", "Browse..."),
                 Location = new Point(420, 268),
                 Size = new Size(92, 32),
                 BaseColor = Color.FromArgb(241, 245, 249),
@@ -539,7 +540,7 @@ namespace ZenQOffice.Setup
             {
                 using (FolderBrowserDialog fbd = new FolderBrowserDialog())
                 {
-                    fbd.Description = "Chọn thư mục cài đặt ZENQ OFFICE";
+                    fbd.Description = AppL10n.T("Chọn thư mục cài đặt ZENQ OFFICE", "Choose ZENQ OFFICE installation folder");
                     fbd.SelectedPath = _txtPathContainer.InnerTextBox.Text;
                     if (fbd.ShowDialog() == DialogResult.OK)
                     {
@@ -551,7 +552,7 @@ namespace ZenQOffice.Setup
 
             _chkDesktopShortcut = new ModernRoundedCheckBox
             {
-                Text = "Tạo lối tắt ZENQ OFFICE trên màn hình nền Desktop",
+                Text = AppL10n.T("Tạo lối tắt ZENQ OFFICE trên màn hình nền Desktop", "Create ZENQ OFFICE shortcut on Desktop"),
                 Location = new Point(48, 314),
                 Size = new Size(464, 24),
                 Checked = true
@@ -560,7 +561,7 @@ namespace ZenQOffice.Setup
 
             _chkStartMenuShortcut = new ModernRoundedCheckBox
             {
-                Text = "Thêm lối tắt ZENQ OFFICE vào Start Menu",
+                Text = AppL10n.T("Thêm lối tắt ZENQ OFFICE vào Start Menu", "Add ZENQ OFFICE shortcut to Start Menu"),
                 Location = new Point(48, 344),
                 Size = new Size(464, 24),
                 Checked = true
@@ -569,7 +570,7 @@ namespace ZenQOffice.Setup
 
             _chkCleanInstall = new ModernRoundedCheckBox
             {
-                Text = "Cài đặt mới hoàn toàn (Xóa sạch dữ liệu cũ và cấu hình trước đó)",
+                Text = AppL10n.T("Cài đặt mới hoàn toàn (Xóa sạch dữ liệu cũ và cấu hình trước đó)", "Clean install (Remove previous settings and cache)"),
                 Location = new Point(48, 374),
                 Size = new Size(464, 24),
                 Checked = false
@@ -578,7 +579,7 @@ namespace ZenQOffice.Setup
 
             _btnStep2Back = new ModernRoundedButton
             {
-                Text = "← Quay lại",
+                Text = AppL10n.T("← Quay lại", "← Back"),
                 Location = new Point(48, 422),
                 Size = new Size(130, 40),
                 BaseColor = Color.FromArgb(241, 245, 249),
@@ -594,7 +595,7 @@ namespace ZenQOffice.Setup
 
             _btnStep2Install = new ModernRoundedButton
             {
-                Text = "Cài đặt ngay",
+                Text = AppL10n.T("Cài đặt ngay", "Install Now"),
                 Location = new Point(362, 422),
                 Size = new Size(150, 40),
                 BaseColor = Color.FromArgb(16, 185, 129), // Emerald Green
@@ -665,17 +666,17 @@ namespace ZenQOffice.Setup
 
                     if (cleanInstall)
                     {
-                        SetStatus("Đang dọn dẹp dữ liệu và cấu hình phiên bản cũ...", 0.10f);
+                        SetStatus(AppL10n.T("Đang dọn dẹp dữ liệu và cấu hình phiên bản cũ...", "Cleaning up previous version data..."), 0.10f);
                         ShortcutHelper.RemoveUserData();
                         Thread.Sleep(300);
                     }
 
                     if (!Directory.Exists(chosenPath)) Directory.CreateDirectory(chosenPath);
 
-                    SetStatus("Chuẩn bị môi trường cài đặt...", 0.15f);
+                    SetStatus(AppL10n.T("Chuẩn bị môi trường cài đặt...", "Preparing installation environment..."), 0.15f);
                     Thread.Sleep(400);
 
-                    SetStatus("Đang giải nén tập tin ứng dụng ZENQ OFFICE...", 0.35f);
+                    SetStatus(AppL10n.T("Đang giải nén tập tin ứng dụng ZENQ OFFICE...", "Extracting ZENQ OFFICE application files..."), 0.35f);
 
                     Assembly asm = Assembly.GetExecutingAssembly();
                     Stream payloadStream = asm.GetManifestResourceStream("payload.zip");
@@ -711,7 +712,7 @@ namespace ZenQOffice.Setup
                                     }
                                 }
                                 float stepProg = 0.35f + ((float)(i + 1) / totalEntries) * 0.35f;
-                                SetStatus(string.Format("Đang cài đặt: {0}...", entry.Name), stepProg);
+                                SetStatus(string.Format(AppL10n.T("Đang cài đặt: {0}...", "Installing: {0}..."), entry.Name), stepProg);
                                 Thread.Sleep(20);
                             }
                         }
@@ -731,7 +732,7 @@ namespace ZenQOffice.Setup
                             {
                                 File.Copy(src, Path.Combine(chosenPath, f), true);
                             }
-                            SetStatus(string.Format("Đang sao chép: {0}...", f), 0.35f + ((float)(i + 1) / filesToCopy.Length) * 0.35f);
+                            SetStatus(string.Format(AppL10n.T("Đang sao chép: {0}...", "Copying: {0}..."), f), 0.35f + ((float)(i + 1) / filesToCopy.Length) * 0.35f);
                             Thread.Sleep(70);
                         }
 
@@ -740,7 +741,7 @@ namespace ZenQOffice.Setup
                     }
 
                     // Generate Uninstall.exe
-                    SetStatus("Đang thiết lập trình gỡ cài đặt...", 0.78f);
+                    SetStatus(AppL10n.T("Đang thiết lập trình gỡ cài đặt...", "Configuring uninstaller..."), 0.78f);
                     string uninstallExePath = Path.Combine(chosenPath, "Uninstall.exe");
                     try
                     {
@@ -750,7 +751,7 @@ namespace ZenQOffice.Setup
                     Thread.Sleep(250);
 
                     // Shortcuts & Registry
-                    SetStatus("Đang thiết lập lối tắt và đăng ký hệ thống...", 0.88f);
+                    SetStatus(AppL10n.T("Đang thiết lập lối tắt và đăng ký hệ thống...", "Creating shortcuts and file associations..."), 0.88f);
                     string exePath = Path.Combine(chosenPath, "ZenQOffice.exe");
                     string icoPath = Path.Combine(chosenPath, "ZenQOffice.ico");
 
@@ -771,12 +772,12 @@ namespace ZenQOffice.Setup
                     ShortcutHelper.RegisterUninstall(chosenPath);
                     Thread.Sleep(300);
 
-                    SetStatus("Cài đặt hoàn tất! Đang khởi động ZENQ OFFICE...", 1.0f);
+                    SetStatus(AppL10n.T("Cài đặt hoàn tất! Đang khởi động ZENQ OFFICE...", "Installation complete! Launching ZENQ OFFICE..."), 1.0f);
                     _isCompleted = true;
                 }
                 catch (Exception ex)
                 {
-                    SetStatus("Lỗi cài đặt: " + ex.Message, 1.0f);
+                    SetStatus(AppL10n.T("Lỗi cài đặt: ", "Installation error: ") + ex.Message, 1.0f);
                     _isCompleted = true;
                 }
             });
@@ -846,13 +847,13 @@ namespace ZenQOffice.Setup
             using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
                 StringFormat sf = new StringFormat { Alignment = StringAlignment.Center };
-                string titleText = "Cài đặt ZENQ OFFICE";
+                string titleText = AppL10n.T("Cài đặt ZENQ OFFICE", "Install ZENQ OFFICE");
                 if (_currentStep == SetupStep.TermsAgreement)
-                    titleText = "Chào mừng bạn đến với ZENQ OFFICE";
+                    titleText = AppL10n.T("Chào mừng bạn đến với ZENQ OFFICE", "Welcome to ZENQ OFFICE");
                 else if (_currentStep == SetupStep.InstallOptions)
-                    titleText = "Tùy chọn cài đặt ZENQ OFFICE";
+                    titleText = AppL10n.T("Tùy chọn cài đặt ZENQ OFFICE", "Installation Options");
                 else if (_currentStep == SetupStep.Installing)
-                    titleText = "Đang cài đặt ZENQ OFFICE...";
+                    titleText = AppL10n.T("Đang cài đặt ZENQ OFFICE...", "Installing ZENQ OFFICE...");
 
                 g.DrawString(titleText, titleFont, titleB, new RectangleF(0, textY, Width, 30), sf);
             }

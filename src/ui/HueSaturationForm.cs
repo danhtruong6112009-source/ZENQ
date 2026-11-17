@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -18,7 +19,7 @@ namespace ZenQOffice.UI
 
         public HueSaturationForm()
         {
-            this.Text = "Cân Bằng Màu Sắc & Sắc Độ (Hue / Saturation)";
+            this.Text = AppL10n.T("Cân Bằng Màu Sắc & Sắc Độ (Hue / Saturation)", "Hue / Saturation");
             this.Size = new Size(420, 260);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -30,7 +31,7 @@ namespace ZenQOffice.UI
             // Header
             Label lblHeader = new Label
             {
-                Text = "Điều chỉnh độ bão hòa và độ sáng ảnh",
+                Text = AppL10n.T("Điều chỉnh độ bão hòa và độ sáng ảnh", "Adjust image saturation and lightness"),
                 Font = new Font("Segoe UI", 10.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(20, 16),
@@ -41,7 +42,7 @@ namespace ZenQOffice.UI
             // Saturation Trackbar
             Label lblSat = new Label
             {
-                Text = "Độ bão hòa (Saturation):",
+                Text = AppL10n.T("Độ bão hòa (Saturation):", "Saturation:"),
                 Location = new Point(20, 56),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -77,7 +78,7 @@ namespace ZenQOffice.UI
             // Lightness Trackbar
             Label lblLight = new Label
             {
-                Text = "Độ sáng (Lightness):",
+                Text = AppL10n.T("Độ sáng (Lightness):", "Lightness:"),
                 Location = new Point(20, 126),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -113,7 +114,7 @@ namespace ZenQOffice.UI
             // Buttons
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Location = new Point(290, 185),
                 Size = new Size(90, 30),
                 BackColor = Color.FromArgb(241, 245, 249),
@@ -124,7 +125,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new Button
             {
-                Text = "Áp dụng",
+                Text = AppL10n.T("Áp dụng", "Apply"),
                 Location = new Point(190, 185),
                 Size = new Size(90, 30),
                 BackColor = Color.FromArgb(99, 102, 241),

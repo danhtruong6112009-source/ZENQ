@@ -85,7 +85,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Định dạng Ô (Format Cells)";
+            this.Text = AppL10n.T("Định dạng Ô (Format Cells)", "Format Cells");
             this.Size = new Size(580, 520);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -103,37 +103,37 @@ namespace ZenQOffice.UI
             };
 
             // 1. Tab Số (Number)
-            TabPage tabNumber = new TabPage("Số (Number)");
+            TabPage tabNumber = new TabPage(AppL10n.T("Số (Number)", "Number"));
             tabNumber.BackColor = Color.White;
             BuildNumberTab(tabNumber);
             _tabControl.TabPages.Add(tabNumber);
 
             // 2. Tab Căn chỉnh (Alignment)
-            TabPage tabAlignment = new TabPage("Căn chỉnh (Alignment)");
+            TabPage tabAlignment = new TabPage(AppL10n.T("Căn chỉnh (Alignment)", "Alignment"));
             tabAlignment.BackColor = Color.White;
             BuildAlignmentTab(tabAlignment);
             _tabControl.TabPages.Add(tabAlignment);
 
             // 3. Tab Phông chữ (Font)
-            TabPage tabFont = new TabPage("Phông chữ (Font)");
+            TabPage tabFont = new TabPage(AppL10n.T("Phông chữ (Font)", "Font"));
             tabFont.BackColor = Color.White;
             BuildFontTab(tabFont);
             _tabControl.TabPages.Add(tabFont);
 
             // 4. Tab Đường viền (Border)
-            TabPage tabBorder = new TabPage("Đường viền (Border)");
+            TabPage tabBorder = new TabPage(AppL10n.T("Đường viền (Border)", "Border"));
             tabBorder.BackColor = Color.White;
             BuildBorderTab(tabBorder);
             _tabControl.TabPages.Add(tabBorder);
 
             // 5. Tab Tô màu (Fill)
-            TabPage tabFill = new TabPage("Tô màu (Fill)");
+            TabPage tabFill = new TabPage(AppL10n.T("Tô màu (Fill)", "Fill"));
             tabFill.BackColor = Color.White;
             BuildFillTab(tabFill);
             _tabControl.TabPages.Add(tabFill);
 
             // 6. Tab Bảo vệ (Protection)
-            TabPage tabProtection = new TabPage("Bảo vệ (Protection)");
+            TabPage tabProtection = new TabPage(AppL10n.T("Bảo vệ (Protection)", "Protection"));
             tabProtection.BackColor = Color.White;
             BuildProtectionTab(tabProtection);
             _tabControl.TabPages.Add(tabProtection);
@@ -157,7 +157,7 @@ namespace ZenQOffice.UI
 
             _btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(468, 437),
                 Size = new Size(84, 30),
@@ -176,28 +176,28 @@ namespace ZenQOffice.UI
         #region Tab 1: Số (Number)
         private void BuildNumberTab(TabPage tab)
         {
-            Label lblCat = new Label { Text = "Loại định dạng (Category):", Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblCat = new Label { Text = AppL10n.T("Loại định dạng (Category):", "Category:"), Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             tab.Controls.Add(lblCat);
 
             _lstCategory = new ZenQOffice.UI.FluentListBox { Location = new Point(16, 36), Size = new Size(160, 260) };
             _lstCategory.Items.AddRange(new object[] {
-                "Chung (General)",
-                "Số (Number)",
-                "Tiền tệ (Currency)",
-                "Kế toán (Accounting)",
-                "Ngày tháng (Date)",
-                "Giờ (Time)",
-                "Phần trăm (Percentage)",
-                "Phân số (Fraction)",
-                "Khoa học (Scientific)",
-                "Văn bản (Text)"
+                AppL10n.T("Chung (General)", "General"),
+                AppL10n.T("Số (Number)", "Number"),
+                AppL10n.T("Tiền tệ (Currency)", "Currency"),
+                AppL10n.T("Kế toán (Accounting)", "Accounting"),
+                AppL10n.T("Ngày tháng (Date)", "Date"),
+                AppL10n.T("Giờ (Time)", "Time"),
+                AppL10n.T("Phần trăm (Percentage)", "Percentage"),
+                AppL10n.T("Phân số (Fraction)", "Fraction"),
+                AppL10n.T("Khoa học (Scientific)", "Scientific"),
+                AppL10n.T("Văn bản (Text)", "Text")
             });
             _lstCategory.SelectedIndex = 0;
             _lstCategory.SelectedIndexChanged += (s, e) => UpdateNumberOptionsUI();
             tab.Controls.Add(_lstCategory);
 
             // Sample Box
-            GroupBox grpSample = new GroupBox { Text = "Mẫu xem trước (Sample)", Location = new Point(190, 30), Size = new Size(330, 68) };
+            GroupBox grpSample = new GroupBox { Text = AppL10n.T("Mẫu xem trước (Sample)", "Sample"), Location = new Point(190, 30), Size = new Size(330, 68) };
             _lblSamplePreview = new Label { Text = "12345.67", Location = new Point(16, 26), Size = new Size(295, 28), TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 11f, FontStyle.Bold), BackColor = Color.FromArgb(249, 250, 251), BorderStyle = BorderStyle.FixedSingle };
             grpSample.Controls.Add(_lblSamplePreview);
             tab.Controls.Add(grpSample);
@@ -206,18 +206,18 @@ namespace ZenQOffice.UI
             _pnlNumberOptions = new Panel { Location = new Point(190, 110), Size = new Size(330, 250) };
             tab.Controls.Add(_pnlNumberOptions);
 
-            Label lblDec = new Label { Text = "Số chữ số thập phân:", Location = new Point(0, 10), AutoSize = true };
+            Label lblDec = new Label { Text = AppL10n.T("Số chữ số thập phân:", "Decimal places:"), Location = new Point(0, 10), AutoSize = true };
             _pnlNumberOptions.Controls.Add(lblDec);
 
             _numDecimals = new NumericUpDown { Location = new Point(160, 8), Size = new Size(60, 24), Minimum = 0, Maximum = 10, Value = 2 };
             _numDecimals.ValueChanged += (s, e) => UpdateSamplePreview();
             _pnlNumberOptions.Controls.Add(_numDecimals);
 
-            Label lblSymbol = new Label { Text = "Ký hiệu tiền tệ:", Location = new Point(0, 46), AutoSize = true };
+            Label lblSymbol = new Label { Text = AppL10n.T("Ký hiệu tiền tệ:", "Symbol:"), Location = new Point(0, 46), AutoSize = true };
             _pnlNumberOptions.Controls.Add(lblSymbol);
 
             _cboCurrencySymbol = new ZenQOffice.UI.FluentComboBox { Location = new Point(120, 44), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
-            _cboCurrencySymbol.Items.AddRange(new object[] { "₫ (VND)", "$ (USD)", "€ (EUR)", "¥ (JPY)", "£ (GBP)", "None (Không)" });
+            _cboCurrencySymbol.Items.AddRange(new object[] { "₫ (VND)", "$ (USD)", "€ (EUR)", "¥ (JPY)", "£ (GBP)", AppL10n.T("None (Không)", "None") });
             _cboCurrencySymbol.SelectedIndex = 0;
             _cboCurrencySymbol.SelectedIndexChanged += (s, e) => UpdateSamplePreview();
             _pnlNumberOptions.Controls.Add(_cboCurrencySymbol);
@@ -284,38 +284,38 @@ namespace ZenQOffice.UI
         #region Tab 2: Căn chỉnh (Alignment)
         private void BuildAlignmentTab(TabPage tab)
         {
-            GroupBox grpAlign = new GroupBox { Text = "Căn lề văn bản (Text alignment)", Location = new Point(16, 16), Size = new Size(500, 140) };
+            GroupBox grpAlign = new GroupBox { Text = AppL10n.T("Căn lề văn bản (Text alignment)", "Text alignment"), Location = new Point(16, 16), Size = new Size(500, 140) };
 
-            Label lblH = new Label { Text = "Căn lề ngang (Horizontal):", Location = new Point(16, 30), AutoSize = true };
+            Label lblH = new Label { Text = AppL10n.T("Căn lề ngang (Horizontal):", "Horizontal:"), Location = new Point(16, 30), AutoSize = true };
             grpAlign.Controls.Add(lblH);
 
             _cboHAlign = new ZenQOffice.UI.FluentComboBox { Location = new Point(180, 26), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
-            _cboHAlign.Items.AddRange(new object[] { "Mặc định (General)", "Trái (Left)", "Giữa (Center)", "Phải (Right)" });
+            _cboHAlign.Items.AddRange(new object[] { AppL10n.T("Mặc định (General)", "General"), AppL10n.T("Trái (Left)", "Left"), AppL10n.T("Giữa (Center)", "Center"), AppL10n.T("Phải (Right)", "Right") });
             _cboHAlign.SelectedIndex = 0;
             grpAlign.Controls.Add(_cboHAlign);
 
-            Label lblIndent = new Label { Text = "Thụt lề (Indent):", Location = new Point(380, 30), AutoSize = true };
+            Label lblIndent = new Label { Text = AppL10n.T("Thụt lề (Indent):", "Indent:"), Location = new Point(380, 30), AutoSize = true };
             grpAlign.Controls.Add(lblIndent);
 
             _numIndent = new NumericUpDown { Location = new Point(440, 28), Size = new Size(46, 24), Minimum = 0, Maximum = 15, Value = 0 };
             grpAlign.Controls.Add(_numIndent);
 
-            Label lblV = new Label { Text = "Căn lề dọc (Vertical):", Location = new Point(16, 76), AutoSize = true };
+            Label lblV = new Label { Text = AppL10n.T("Căn lề dọc (Vertical):", "Vertical:"), Location = new Point(16, 76), AutoSize = true };
             grpAlign.Controls.Add(lblV);
 
             _cboVAlign = new ZenQOffice.UI.FluentComboBox { Location = new Point(180, 72), Size = new Size(180, 26), DropDownStyle = ComboBoxStyle.DropDownList };
-            _cboVAlign.Items.AddRange(new object[] { "Trên (Top)", "Giữa (Middle)", "Dưới (Bottom)" });
+            _cboVAlign.Items.AddRange(new object[] { AppL10n.T("Trên (Top)", "Top"), AppL10n.T("Giữa (Middle)", "Center"), AppL10n.T("Dưới (Bottom)", "Bottom") });
             _cboVAlign.SelectedIndex = 1;
             grpAlign.Controls.Add(_cboVAlign);
 
             tab.Controls.Add(grpAlign);
 
-            GroupBox grpControl = new GroupBox { Text = "Điều khiển văn bản (Text control)", Location = new Point(16, 170), Size = new Size(500, 110) };
+            GroupBox grpControl = new GroupBox { Text = AppL10n.T("Điều khiển văn bản (Text control)", "Text control"), Location = new Point(16, 170), Size = new Size(500, 110) };
 
-            _chkWrapText = new CheckBox { Text = "Tự động xuống dòng (Wrap text)", Location = new Point(16, 30), AutoSize = true };
+            _chkWrapText = new CheckBox { Text = AppL10n.T("Tự động xuống dòng (Wrap text)", "Wrap text"), Location = new Point(16, 30), AutoSize = true };
             grpControl.Controls.Add(_chkWrapText);
 
-            _chkMergeCells = new CheckBox { Text = "Gộp các ô đang chọn (Merge cells)", Location = new Point(16, 64), AutoSize = true };
+            _chkMergeCells = new CheckBox { Text = AppL10n.T("Gộp các ô đang chọn (Merge cells)", "Merge cells"), Location = new Point(16, 64), AutoSize = true };
             grpControl.Controls.Add(_chkMergeCells);
 
             tab.Controls.Add(grpControl);
@@ -326,7 +326,7 @@ namespace ZenQOffice.UI
         private void BuildFontTab(TabPage tab)
         {
             // Font Family
-            Label lblFont = new Label { Text = "Phông chữ:", Location = new Point(16, 12), AutoSize = true };
+            Label lblFont = new Label { Text = AppL10n.T("Phông chữ:", "Font:"), Location = new Point(16, 12), AutoSize = true };
             tab.Controls.Add(lblFont);
 
             _txtFontName = new TextBox { Location = new Point(16, 32), Size = new Size(180, 24), Text = "Calibri" };
@@ -343,14 +343,14 @@ namespace ZenQOffice.UI
             tab.Controls.Add(_lstFontName);
 
             // Font Style
-            Label lblStyle = new Label { Text = "Kiểu chữ:", Location = new Point(208, 12), AutoSize = true };
+            Label lblStyle = new Label { Text = AppL10n.T("Kiểu chữ:", "Font style:"), Location = new Point(208, 12), AutoSize = true };
             tab.Controls.Add(lblStyle);
 
-            _txtFontStyle = new TextBox { Location = new Point(208, 32), Size = new Size(120, 24), Text = "Thường" };
+            _txtFontStyle = new TextBox { Location = new Point(208, 32), Size = new Size(120, 24), Text = AppL10n.T("Thường", "Regular") };
             tab.Controls.Add(_txtFontStyle);
 
             _lstFontStyle = new ZenQOffice.UI.FluentListBox { Location = new Point(208, 58), Size = new Size(120, 160) };
-            _lstFontStyle.Items.AddRange(new object[] { "Thường (Regular)", "Nghiêng (Italic)", "Đậm (Bold)", "Đậm Nghiêng (Bold Italic)" });
+            _lstFontStyle.Items.AddRange(new object[] { AppL10n.T("Thường (Regular)", "Regular"), AppL10n.T("Nghiêng (Italic)", "Italic"), AppL10n.T("Đậm (Bold)", "Bold"), AppL10n.T("Đậm Nghiêng (Bold Italic)", "Bold Italic") });
             _lstFontStyle.SelectedIndex = 0;
             _lstFontStyle.SelectedIndexChanged += (s, e) => {
                 if (_lstFontStyle.SelectedItem != null) _txtFontStyle.Text = _lstFontStyle.SelectedItem.ToString();
@@ -359,7 +359,7 @@ namespace ZenQOffice.UI
             tab.Controls.Add(_lstFontStyle);
 
             // Font Size
-            Label lblSize = new Label { Text = "Cỡ chữ:", Location = new Point(340, 12), AutoSize = true };
+            Label lblSize = new Label { Text = AppL10n.T("Cỡ chữ:", "Size:"), Location = new Point(340, 12), AutoSize = true };
             tab.Controls.Add(lblSize);
 
             _txtFontSize = new TextBox { Location = new Point(340, 32), Size = new Size(60, 24), Text = "11" };
@@ -375,11 +375,11 @@ namespace ZenQOffice.UI
             tab.Controls.Add(_lstFontSize);
 
             // Text Color
-            Label lblCol = new Label { Text = "Màu chữ:", Location = new Point(416, 12), AutoSize = true };
+            Label lblCol = new Label { Text = AppL10n.T("Màu chữ:", "Color:"), Location = new Point(416, 12), AutoSize = true };
             tab.Controls.Add(lblCol);
 
             _selectedTextColor = Color.Black;
-            _btnTextColor = new Button { Location = new Point(416, 32), Size = new Size(100, 26), Text = "Màu chữ...", BackColor = Color.Black, ForeColor = Color.White };
+            _btnTextColor = new Button { Location = new Point(416, 32), Size = new Size(100, 26), Text = AppL10n.T("Màu chữ...", "Font Color..."), BackColor = Color.Black, ForeColor = Color.White };
             _btnTextColor.Click += (s, e) => {
                 using (ColorDialog cd = new ColorDialog { Color = _selectedTextColor })
                 {
@@ -395,16 +395,16 @@ namespace ZenQOffice.UI
             tab.Controls.Add(_btnTextColor);
 
             // Effects
-            _chkUnderline = new CheckBox { Text = "Gạch chân (Underline)", Location = new Point(416, 75), AutoSize = true };
+            _chkUnderline = new CheckBox { Text = AppL10n.T("Gạch chân (Underline)", "Underline"), Location = new Point(416, 75), AutoSize = true };
             _chkUnderline.CheckedChanged += (s, e) => UpdateFontPreview();
             tab.Controls.Add(_chkUnderline);
 
-            _chkStrikethrough = new CheckBox { Text = "Gạch ngang (Strikethrough)", Location = new Point(416, 105), AutoSize = true };
+            _chkStrikethrough = new CheckBox { Text = AppL10n.T("Gạch ngang (Strikethrough)", "Strikethrough"), Location = new Point(416, 105), AutoSize = true };
             _chkStrikethrough.CheckedChanged += (s, e) => UpdateFontPreview();
             tab.Controls.Add(_chkStrikethrough);
 
             // Preview Box
-            GroupBox grpFontPreview = new GroupBox { Text = "Xem trước (Preview)", Location = new Point(16, 230), Size = new Size(500, 100) };
+            GroupBox grpFontPreview = new GroupBox { Text = AppL10n.T("Xem trước (Preview)", "Preview"), Location = new Point(16, 230), Size = new Size(500, 100) };
             _lblFontPreview = new Label { Text = "AaBbCc ZyZ 1234", Location = new Point(16, 24), Size = new Size(468, 60), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.White };
             grpFontPreview.Controls.Add(_lblFontPreview);
             tab.Controls.Add(grpFontPreview);
@@ -441,48 +441,48 @@ namespace ZenQOffice.UI
         #region Tab 4: Đường viền (Border)
         private void BuildBorderTab(TabPage tab)
         {
-            Label lblPresets = new Label { Text = "Mẫu thiết lập sẵn (Presets):", Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblPresets = new Label { Text = AppL10n.T("Mẫu thiết lập sẵn (Presets):", "Presets:"), Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             tab.Controls.Add(lblPresets);
 
-            _btnBorderNone = new Button { Text = "❌ Không viền", Location = new Point(16, 38), Size = new Size(110, 36), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+            _btnBorderNone = new Button { Text = AppL10n.T("❌ Không viền", "❌ None"), Location = new Point(16, 38), Size = new Size(110, 36), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
             _btnBorderNone.Click += (s, e) => SetBorderToggles(false, false, false, false);
             tab.Controls.Add(_btnBorderNone);
 
-            _btnBorderOutline = new Button { Text = "⬜ Viền ngoài", Location = new Point(136, 38), Size = new Size(110, 36), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+            _btnBorderOutline = new Button { Text = AppL10n.T("⬜ Viền ngoài", "⬜ Outline"), Location = new Point(136, 38), Size = new Size(110, 36), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
             _btnBorderOutline.Click += (s, e) => SetBorderToggles(true, true, true, true);
             tab.Controls.Add(_btnBorderOutline);
 
-            _btnBorderAll = new Button { Text = "⊞ Tất cả viền", Location = new Point(256, 38), Size = new Size(110, 36), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+            _btnBorderAll = new Button { Text = AppL10n.T("⊞ Tất cả viền", "⊞ All Borders"), Location = new Point(256, 38), Size = new Size(110, 36), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
             _btnBorderAll.Click += (s, e) => SetBorderToggles(true, true, true, true);
             tab.Controls.Add(_btnBorderAll);
 
             // Individual toggles
-            GroupBox grpBorder = new GroupBox { Text = "Tùy chỉnh từng cạnh (Borders)", Location = new Point(16, 90), Size = new Size(500, 160) };
+            GroupBox grpBorder = new GroupBox { Text = AppL10n.T("Tùy chỉnh từng cạnh (Borders)", "Border"), Location = new Point(16, 90), Size = new Size(500, 160) };
 
-            _chkBorderTop = new CheckBox { Text = "Viền trên (Top Border)", Location = new Point(20, 32), AutoSize = true };
+            _chkBorderTop = new CheckBox { Text = AppL10n.T("Viền trên (Top Border)", "Top Border"), Location = new Point(20, 32), AutoSize = true };
             grpBorder.Controls.Add(_chkBorderTop);
 
-            _chkBorderBottom = new CheckBox { Text = "Viền dưới (Bottom Border)", Location = new Point(20, 64), AutoSize = true };
+            _chkBorderBottom = new CheckBox { Text = AppL10n.T("Viền dưới (Bottom Border)", "Bottom Border"), Location = new Point(20, 64), AutoSize = true };
             grpBorder.Controls.Add(_chkBorderBottom);
 
-            _chkBorderLeft = new CheckBox { Text = "Viền trái (Left Border)", Location = new Point(200, 32), AutoSize = true };
+            _chkBorderLeft = new CheckBox { Text = AppL10n.T("Viền trái (Left Border)", "Left Border"), Location = new Point(200, 32), AutoSize = true };
             grpBorder.Controls.Add(_chkBorderLeft);
 
-            _chkBorderRight = new CheckBox { Text = "Viền phải (Right Border)", Location = new Point(200, 64), AutoSize = true };
+            _chkBorderRight = new CheckBox { Text = AppL10n.T("Viền phải (Right Border)", "Right Border"), Location = new Point(200, 64), AutoSize = true };
             grpBorder.Controls.Add(_chkBorderRight);
 
-            Label lblStyle = new Label { Text = "Kiểu nét vẽ:", Location = new Point(20, 110), AutoSize = true };
+            Label lblStyle = new Label { Text = AppL10n.T("Kiểu nét vẽ:", "Line Style:"), Location = new Point(20, 110), AutoSize = true };
             grpBorder.Controls.Add(lblStyle);
 
             _cboBorderStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(100, 106), Size = new Size(120, 26), DropDownStyle = ComboBoxStyle.DropDownList };
-            _cboBorderStyle.Items.AddRange(new object[] { "Mảnh (Thin)", "Trung bình (Medium)", "Đậm (Thick)", "Nét đứt (Dashed)", "Nét đôi (Double)" });
+            _cboBorderStyle.Items.AddRange(new object[] { AppL10n.T("Mảnh (Thin)", "Thin"), AppL10n.T("Trung bình (Medium)", "Medium"), AppL10n.T("Đậm (Thick)", "Thick"), AppL10n.T("Nét đứt (Dashed)", "Dashed"), AppL10n.T("Nét đôi (Double)", "Double") });
             _cboBorderStyle.SelectedIndex = 0;
             grpBorder.Controls.Add(_cboBorderStyle);
 
-            Label lblCol = new Label { Text = "Màu viền:", Location = new Point(260, 110), AutoSize = true };
+            Label lblCol = new Label { Text = AppL10n.T("Màu viền:", "Color:"), Location = new Point(260, 110), AutoSize = true };
             grpBorder.Controls.Add(lblCol);
 
-            _btnBorderColor = new Button { Location = new Point(330, 106), Size = new Size(120, 26), Text = "Chọn màu...", BackColor = Color.Black, ForeColor = Color.White };
+            _btnBorderColor = new Button { Location = new Point(330, 106), Size = new Size(120, 26), Text = AppL10n.T("Chọn màu...", "Choose Color..."), BackColor = Color.Black, ForeColor = Color.White };
             _btnBorderColor.Click += (s, e) => {
                 using (ColorDialog cd = new ColorDialog { Color = _selectedBorderColor })
                 {
@@ -511,10 +511,10 @@ namespace ZenQOffice.UI
         #region Tab 5: Tô màu (Fill)
         private void BuildFillTab(TabPage tab)
         {
-            Label lblTitle = new Label { Text = "Màu nền ô (Background color):", Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblTitle = new Label { Text = AppL10n.T("Màu nền ô (Background color):", "Background Color:"), Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             tab.Controls.Add(lblTitle);
 
-            _btnNoColor = new Button { Text = "Không màu (No Color)", Location = new Point(16, 40), Size = new Size(160, 30), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+            _btnNoColor = new Button { Text = AppL10n.T("Không màu (No Color)", "No Color"), Location = new Point(16, 40), Size = new Size(160, 30), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
             _btnNoColor.Click += (s, e) => {
                 _selectedBgColor = Color.Empty;
                 UpdateFillPreview();
@@ -562,7 +562,7 @@ namespace ZenQOffice.UI
             tab.Controls.Add(_pnlColorPalette);
 
             // More colors button
-            Button btnMore = new Button { Text = "Nhiều màu hơn (More Colors)...", Location = new Point(16, 260), Size = new Size(200, 28), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+            Button btnMore = new Button { Text = AppL10n.T("Nhiều màu hơn (More Colors)...", "More Colors..."), Location = new Point(16, 260), Size = new Size(200, 28), BackColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnMore.Click += (s, e) => {
                 using (ColorDialog cd = new ColorDialog { Color = _selectedBgColor })
                 {
@@ -576,7 +576,7 @@ namespace ZenQOffice.UI
             tab.Controls.Add(btnMore);
 
             // Fill preview
-            GroupBox grpFillPrev = new GroupBox { Text = "Mẫu xem trước (Sample)", Location = new Point(230, 255), Size = new Size(286, 75) };
+            GroupBox grpFillPrev = new GroupBox { Text = AppL10n.T("Mẫu xem trước (Sample)", "Sample"), Location = new Point(230, 255), Size = new Size(286, 75) };
             _lblFillPreview = new Label { Location = new Point(16, 22), Size = new Size(254, 38), BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
             grpFillPrev.Controls.Add(_lblFillPreview);
             tab.Controls.Add(grpFillPrev);
@@ -588,7 +588,7 @@ namespace ZenQOffice.UI
             if (_selectedBgColor.IsEmpty || _selectedBgColor.A == 0)
             {
                 _lblFillPreview.BackColor = Color.White;
-                _lblFillPreview.Text = "Không màu";
+                _lblFillPreview.Text = AppL10n.T("Không màu", "No Color");
                 _lblFillPreview.TextAlign = ContentAlignment.MiddleCenter;
             }
             else
@@ -604,7 +604,7 @@ namespace ZenQOffice.UI
         {
             _chkLocked = new CheckBox
             {
-                Text = "Khóa ô (Locked)",
+                Text = AppL10n.T("Khóa ô (Locked)", "Locked"),
                 Location = new Point(24, 24),
                 AutoSize = true,
                 Checked = true,
@@ -614,7 +614,7 @@ namespace ZenQOffice.UI
 
             Label lblLockedDesc = new Label
             {
-                Text = "Khóa ô hoặc ẩn công thức chỉ có tác dụng khi bạn bảo vệ bảng tính\n(Tab Xem lại > Bảo vệ Bảng tính / Review > Protect Sheet).",
+                Text = AppL10n.T("Khóa ô hoặc ẩn công thức chỉ có tác dụng khi bạn bảo vệ bảng tính\n(Tab Xem lại > Bảo vệ Bảng tính / Review > Protect Sheet).", "Locking cells or hiding formulas has no effect until you protect the worksheet\n(Review tab > Protect Sheet)."),
                 Location = new Point(44, 48),
                 Size = new Size(460, 40),
                 ForeColor = Color.Gray
@@ -623,7 +623,7 @@ namespace ZenQOffice.UI
 
             _chkHidden = new CheckBox
             {
-                Text = "Ẩn công thức (Hidden)",
+                Text = AppL10n.T("Ẩn công thức (Hidden)", "Hidden"),
                 Location = new Point(24, 100),
                 AutoSize = true,
                 Checked = false,
@@ -633,7 +633,7 @@ namespace ZenQOffice.UI
 
             Label lblHiddenDesc = new Label
             {
-                Text = "Ngăn người dùng xem công thức hiển thị trên thanh công thức khi chọn ô.",
+                Text = AppL10n.T("Ngăn người dùng xem công thức hiển thị trên thanh công thức khi chọn ô.", "Hides formulas from appearing in the formula bar when selecting cells."),
                 Location = new Point(44, 124),
                 Size = new Size(460, 40),
                 ForeColor = Color.Gray

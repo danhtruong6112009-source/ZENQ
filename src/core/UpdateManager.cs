@@ -38,8 +38,8 @@ namespace ZenQOffice.Core
 
     public static class UpdateManager
     {
-        public const string CURRENT_VERSION = "6.0.0";
-        public const string CURRENT_VERSION_TAG = "v6.0";
+        public const string CURRENT_VERSION = "6.1.0";
+        public const string CURRENT_VERSION_TAG = "v6.1";
         public const string GITHUB_OWNER = "danhtruong6112009-source";
         public const string GITHUB_REPO = "ZENQ";
 
@@ -126,7 +126,7 @@ namespace ZenQOffice.Core
 
                 if (string.IsNullOrEmpty(jsonResponse))
                 {
-                    info.ErrorMessage = "Không nhận được dữ liệu từ GitHub.";
+                    info.ErrorMessage = AppL10n.T("Không nhận được dữ liệu từ GitHub.", "No data received from GitHub.");
                     return info;
                 }
 
@@ -135,7 +135,7 @@ namespace ZenQOffice.Core
                 Dictionary<string, object> root = parsed as Dictionary<string, object>;
                 if (root == null)
                 {
-                    info.ErrorMessage = "Dữ liệu phản hồi không hợp lệ.";
+                    info.ErrorMessage = AppL10n.T("Dữ liệu phản hồi không hợp lệ.", "Invalid response data.");
                     return info;
                 }
 
@@ -274,7 +274,7 @@ namespace ZenQOffice.Core
                 info.TagName = CURRENT_VERSION_TAG;
                 info.Version = ParseVersion(CURRENT_VERSION);
                 info.HasUpdate = false;
-                info.ErrorMessage = "Không thể kết nối đến máy chủ kiểm tra cập nhật. Vui lòng kiểm tra lại kết nối mạng.";
+                info.ErrorMessage = AppL10n.T("Không thể kết nối đến máy chủ kiểm tra cập nhật. Vui lòng kiểm tra lại kết nối mạng.", "Unable to reach update server. Please check your network connection.");
             }
             catch (Exception)
             {
@@ -347,7 +347,7 @@ namespace ZenQOffice.Core
         {
             if (release == null || string.IsNullOrEmpty(release.DownloadUrl))
             {
-                if (onError != null) onError("Không tìm thấy đường dẫn tải tệp cập nhật.");
+                if (onError != null) onError(AppL10n.T("Không tìm thấy đường dẫn tải tệp cập nhật.", "Update download URL not found."));
                 return;
             }
 
@@ -428,7 +428,7 @@ namespace ZenQOffice.Core
                             {
                                 if (_isCancelRequested)
                                 {
-                                    throw new OperationCanceledException("Người dùng đã hủy quá trình tải xuống.");
+                                    throw new OperationCanceledException(AppL10n.T("Người dùng đã hủy quá trình tải xuống.", "Download cancelled by user."));
                                 }
 
                                 sOut.Write(buffer, 0, bytesRead);
@@ -453,7 +453,7 @@ namespace ZenQOffice.Core
 
                     if (_isCancelRequested)
                     {
-                        throw new OperationCanceledException("Người dùng đã hủy quá trình tải xuống.");
+                        throw new OperationCanceledException(AppL10n.T("Người dùng đã hủy quá trình tải xuống.", "Download cancelled by user."));
                     }
 
                     // Chuyển tệp tạm hoàn chỉnh vào đường dẫn bộ cài chính thức
@@ -572,7 +572,7 @@ namespace ZenQOffice.Core
 
                     if (!_isCancelRequested && onError != null)
                     {
-                        onError("Lỗi khi tải hoặc cài đặt bản cập nhật: " + ex.Message);
+                        onError(AppL10n.T("Lỗi khi tải hoặc cài đặt bản cập nhật: ", "Error downloading or installing update: ") + ex.Message);
                     }
                 }
                 finally

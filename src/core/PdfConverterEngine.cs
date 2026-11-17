@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -150,7 +150,7 @@ namespace ZenQOffice.Core
             try
             {
                 string text = ExtractAllText(doc, includePageHeaders: false);
-                if (string.IsNullOrEmpty(text)) text = "Tài liệu PDF không chứa lớp văn bản trích xuất được.";
+                if (string.IsNullOrEmpty(text)) text = AppL10n.T("Tài liệu PDF không chứa lớp văn bản trích xuất được.", "This PDF contains no extractable text layer.");
                 string dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 return DocxHandler.SaveDocxFile(outputPath, text);
@@ -211,7 +211,7 @@ namespace ZenQOffice.Core
 
                 if (curRow == 1)
                 {
-                    calcView.CurrentSheet.SetCellText(1, 1, "Tài liệu PDF không có nội dung bảng biểu.");
+                    calcView.CurrentSheet.SetCellText(1, 1, AppL10n.T("Tài liệu PDF không có nội dung bảng biểu.", "This PDF contains no table data."));
                 }
 
                 string dir = Path.GetDirectoryName(outputPath);

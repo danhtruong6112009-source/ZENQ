@@ -34,7 +34,7 @@ namespace ZenQOffice.Core
 
     public class AiCanvasQuizData
     {
-        public string Title { get; set; } = "Đề ôn tập kiến thức";
+        public string Title { get; set; } = AppL10n.T("Đề ôn tập kiến thức", "Practice Quiz");
         public string Description { get; set; } = "";
         public List<AiCanvasQuestion> Questions { get; set; } = new List<AiCanvasQuestion>();
 
@@ -108,7 +108,7 @@ namespace ZenQOffice.Core
                     var parsedQuiz = new AiCanvasQuizData();
 
                     if (TryGetProp(root, out var titleProp, "title", "Title", "name", "Name"))
-                        parsedQuiz.Title = titleProp.GetString() ?? "Đề ôn tập tương tác";
+                        parsedQuiz.Title = titleProp.GetString() ?? AppL10n.T("Đề ôn tập tương tác", "Interactive Practice Quiz");
 
                     if (TryGetProp(root, out var descProp, "description", "Description", "desc", "Desc"))
                         parsedQuiz.Description = descProp.GetString() ?? "";
@@ -167,8 +167,8 @@ namespace ZenQOffice.Core
                             // Nếu là True/False mà chưa có options, tự động thêm [Đúng, Sai]
                             if (q.Type == CanvasQuestionType.TrueFalse && q.Options.Count == 0)
                             {
-                                q.Options.Add("A. Đúng");
-                                q.Options.Add("B. Sai");
+                                q.Options.Add(AppL10n.T("A. Đúng", "A. True"));
+                                q.Options.Add(AppL10n.T("B. Sai", "B. False"));
                             }
 
                             // Đọc đáp án đúng (hỗ trợ cả int và string)
@@ -356,12 +356,12 @@ namespace ZenQOffice.Core
             if (quiz == null || quiz.Questions == null || quiz.Questions.Count == 0) return "";
 
             var sb = new StringBuilder();
-            sb.AppendLine((quiz.Title ?? "BÀI KIỂM TRA ÔN TẬP").ToUpper());
+            sb.AppendLine((quiz.Title ?? AppL10n.T("BÀI KIỂM TRA ÔN TẬP", "PRACTICE QUIZ")).ToUpper());
             if (!string.IsNullOrWhiteSpace(quiz.Description))
             {
                 sb.AppendLine(quiz.Description);
             }
-            sb.AppendLine("Thời gian làm bài: " + Math.Max(15, quiz.Questions.Count * 2) + " phút");
+            sb.AppendLine(AppL10n.T("Thời gian làm bài: " + Math.Max(15, quiz.Questions.Count * 2) + " phút", "Time allowed: " + Math.Max(15, quiz.Questions.Count * 2) + " mins"));
             sb.AppendLine(new string('─', 54));
             sb.AppendLine();
 
@@ -370,7 +370,7 @@ namespace ZenQOffice.Core
             {
                 var q = quiz.Questions[i];
                 int qNum = q.Number > 0 ? q.Number : (i + 1);
-                sb.AppendLine(string.Format("Câu {0}: {1}", qNum, q.QuestionText));
+                sb.AppendLine(AppL10n.T(string.Format("Câu {0}: {1}", qNum, q.QuestionText), string.Format("Question {0}: {1}", qNum, q.QuestionText)));
 
                 if (q.Type == CanvasQuestionType.MultipleChoice || q.Type == CanvasQuestionType.TrueFalse)
                 {
@@ -392,11 +392,11 @@ namespace ZenQOffice.Core
                 }
                 else if (q.Type == CanvasQuestionType.FillBlank)
                 {
-                    sb.AppendLine("Đáp án: ................................................................................");
+                    sb.AppendLine(AppL10n.T("Đáp án: ................................................................................", "Answer: ................................................................................"));
                 }
                 else if (q.Type == CanvasQuestionType.Essay)
                 {
-                    sb.AppendLine("Trả lời:");
+                    sb.AppendLine(AppL10n.T("Trả lời:", "Response:"));
                     sb.AppendLine("........................................................................................................................");
                     sb.AppendLine("........................................................................................................................");
                     sb.AppendLine("........................................................................................................................");
@@ -407,7 +407,7 @@ namespace ZenQOffice.Core
 
             // 2. Bảng đáp án và hướng dẫn giải chi tiết ở cuối tài liệu
             sb.AppendLine(new string('─', 54));
-            sb.AppendLine("BẢNG ĐÁP ÁN & LỜI GIẢI CHI TIẾT");
+            sb.AppendLine(AppL10n.T("BẢNG ĐÁP ÁN & LỜI GIẢI CHI TIẾT", "ANSWER KEY & DETAILED EXPLANATIONS"));
             sb.AppendLine(new string('─', 54));
 
             for (int i = 0; i < quiz.Questions.Count; i++)
@@ -422,13 +422,13 @@ namespace ZenQOffice.Core
                 }
                 else
                 {
-                    ans = !string.IsNullOrEmpty(q.CorrectAnswerText) ? q.CorrectAnswerText : "(Xem lời giải chi tiết)";
+                    ans = !string.IsNullOrEmpty(q.CorrectAnswerText) ? q.CorrectAnswerText : AppL10n.T("(Xem lời giải chi tiết)", "(See detailed explanation)");
                 }
 
-                sb.AppendLine(string.Format("Câu {0}: {1}", qNum, ans));
+                sb.AppendLine(AppL10n.T(string.Format("Câu {0}: {1}", qNum, ans), string.Format("Question {0}: {1}", qNum, ans)));
                 if (!string.IsNullOrWhiteSpace(q.Explanation))
                 {
-                    sb.AppendLine("  ↳ Lời giải: " + q.Explanation);
+                    sb.AppendLine(AppL10n.T("  ↳ Lời giải: ", "  ↳ Explanation: ") + q.Explanation);
                 }
                 sb.AppendLine();
             }

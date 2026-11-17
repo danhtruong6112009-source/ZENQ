@@ -20,7 +20,7 @@ namespace ZenQOffice.UI
         private Stopwatch _stopwatch;
         private float _progress = 0f;
         private float _targetProgress = 0f;
-        private string _statusMessage = "Đang khởi động...";
+        private string _statusMessage = AppL10n.T("Đang khởi động...", "Starting up...");
         private bool _isClosing = false;
         private AppForm _mainAppForm = null;
         private bool _sessionRestored = false;
@@ -101,38 +101,38 @@ namespace ZenQOffice.UI
                     else if (_directMode.Value == OfficeAppMode.Calc) modeTitle = "ZenQ Calc";
                     else if (_directMode.Value == OfficeAppMode.Slides) modeTitle = "ZenQ Slides";
                     else if (_directMode.Value == OfficeAppMode.Pdf) modeTitle = "ZenQ PDF";
-                    else if (_directMode.Value == OfficeAppMode.Photo) modeTitle = "ZenQ Đồ họa & Ảnh";
+                    else if (_directMode.Value == OfficeAppMode.Photo) modeTitle = AppL10n.T("ZenQ Đồ họa & Ảnh", "ZenQ Design & Photo");
 
-                    SetStatus(string.Format("Đang khởi động {0}...", modeTitle), 0.35f);
+                    SetStatus(string.Format(AppL10n.T("Đang khởi động {0}...", "Starting {0}..."), modeTitle), 0.35f);
                     Thread.Sleep(300);
 
                     if (!string.IsNullOrEmpty(_directFile))
                     {
-                        SetStatus(string.Format("Đang nạp: {0}...", Path.GetFileName(_directFile)), 0.70f);
+                        SetStatus(string.Format(AppL10n.T("Đang nạp: {0}...", "Loading: {0}..."), Path.GetFileName(_directFile)), 0.70f);
                         Thread.Sleep(300);
                     }
                     else
                     {
-                        SetStatus("Đang tải cấu hình mô-đun...", 0.70f);
+                        SetStatus(AppL10n.T("Đang tải cấu hình mô-đun...", "Loading module configuration..."), 0.70f);
                         Thread.Sleep(250);
                     }
 
                     _sessionRestored = true;
-                    SetStatus("Sẵn sàng làm việc!", 1.0f);
+                    SetStatus(AppL10n.T("Sẵn sàng làm việc!", "Ready!"), 1.0f);
                     Thread.Sleep(200);
                 }
                 else
                 {
                     // Giai đoạn 1: Khởi động hệ thống
-                    SetStatus("Đang khởi động ZENQ OFFICE...", 0.25f);
+                    SetStatus(AppL10n.T("Đang khởi động ZENQ OFFICE...", "Starting ZENQ OFFICE..."), 0.25f);
                     Thread.Sleep(400);
 
                     // Giai đoạn 2: Nạp các mô-đun
-                    SetStatus("Đang khởi tạo các mô-đun ứng dụng...", 0.50f);
+                    SetStatus(AppL10n.T("Đang khởi tạo các mô-đun ứng dụng...", "Initializing application modules..."), 0.50f);
                     Thread.Sleep(450);
 
                     // Giai đoạn 3: Kiểm tra phiên làm việc trước
-                    SetStatus("Đang kiểm tra phiên làm việc trước...", 0.75f);
+                    SetStatus(AppL10n.T("Đang kiểm tra phiên làm việc trước...", "Checking previous session..."), 0.75f);
                     Thread.Sleep(300);
 
                     var session = SessionManager.LoadSession();
@@ -141,14 +141,14 @@ namespace ZenQOffice.UI
                         for (int i = 0; i < session.Tabs.Count && i < 3; i++)
                         {
                             var tab = session.Tabs[i];
-                            string title = !string.IsNullOrEmpty(tab.Title) ? tab.Title : "Tài liệu " + (i + 1);
-                            SetStatus(string.Format("Đang khôi phục: {0}...", title), 0.75f + ((float)(i + 1) / Math.Min(3, session.Tabs.Count)) * 0.22f);
+                            string title = !string.IsNullOrEmpty(tab.Title) ? tab.Title : AppL10n.T("Tài liệu ", "Document ") + (i + 1);
+                            SetStatus(string.Format(AppL10n.T("Đang khôi phục: {0}...", "Restoring: {0}..."), title), 0.75f + ((float)(i + 1) / Math.Min(3, session.Tabs.Count)) * 0.22f);
                             Thread.Sleep(180);
                         }
                     }
 
                     _sessionRestored = true;
-                    SetStatus("Khởi tạo hoàn tất. Đang mở Workspace...", 1.0f);
+                    SetStatus(AppL10n.T("Khởi tạo hoàn tất. Đang mở Workspace...", "Ready. Opening Workspace..."), 1.0f);
                     Thread.Sleep(200);
                 }
             }
@@ -346,7 +346,7 @@ namespace ZenQOffice.UI
                 g.DrawString("© 2026 NEXTGENEDUSPACE STUDIO • Trương Nguyễn Thế Danh", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sf);
 
                 StringFormat sfLeft = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
-                g.DrawString("Phiên bản 6.0", footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sfLeft);
+                g.DrawString(AppL10n.T("Phiên bản 6.0", "Version 6.0"), footerFont, footerBrush, new RectangleF(barX, Height - 36f, barW, 20f), sfLeft);
             }
         }
 

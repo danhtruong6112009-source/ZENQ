@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -54,7 +55,7 @@ namespace ZenQOffice.UI
         {
             _writerView = writerView;
 
-            this.Text = "Chèn Phụ Đề (Insert Caption)";
+            this.Text = AppL10n.T("Chèn Phụ Đề (Insert Caption)", "Insert Caption");
             this.Size = new Size(460, 310);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -69,36 +70,36 @@ namespace ZenQOffice.UI
 
         private void BuildUI(string defaultLabel)
         {
-            Label lblCap = new Label { Text = "Tên phụ đề (Caption):", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Label lblCap = new Label { Text = AppL10n.T("Tên phụ đề (Caption):", "Caption:"), Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblCap);
 
             txtTitle = new TextBox { Location = new Point(20, 38), Size = new Size(405, 24) };
             txtTitle.TextChanged += (s, e) => UpdatePreview();
             this.Controls.Add(txtTitle);
 
-            Label lblLbl = new Label { Text = "Nhãn (Label):", Location = new Point(20, 75), AutoSize = true };
+            Label lblLbl = new Label { Text = AppL10n.T("Nhãn (Label):", "Label:"), Location = new Point(20, 75), AutoSize = true };
             this.Controls.Add(lblLbl);
 
             cboLabel = new ZenQOffice.UI.FluentComboBox { Location = new Point(20, 96), Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
-            cboLabel.Items.AddRange(new object[] { "Hình (Figure)", "Bảng (Table)", "Phương trình (Equation)" });
+            cboLabel.Items.AddRange(new object[] { AppL10n.T("Hình (Figure)", "Figure"), AppL10n.T("Bảng (Table)", "Table"), AppL10n.T("Phương trình (Equation)", "Equation") });
             if (defaultLabel == "Bảng") cboLabel.SelectedIndex = 1;
             else if (defaultLabel == "Phương trình") cboLabel.SelectedIndex = 2;
             else cboLabel.SelectedIndex = 0;
             cboLabel.SelectedIndexChanged += (s, e) => UpdatePreview();
             this.Controls.Add(cboLabel);
 
-            Label lblPos = new Label { Text = "Vị trí (Position):", Location = new Point(230, 75), AutoSize = true };
+            Label lblPos = new Label { Text = AppL10n.T("Vị trí (Position):", "Position:"), Location = new Point(230, 75), AutoSize = true };
             this.Controls.Add(lblPos);
 
             cboPosition = new ZenQOffice.UI.FluentComboBox { Location = new Point(230, 96), Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
-            cboPosition.Items.AddRange(new object[] { "Dưới mục đã chọn (Below)", "Trên mục đã chọn (Above)" });
+            cboPosition.Items.AddRange(new object[] { AppL10n.T("Dưới mục đã chọn (Below)", "Below selected item"), AppL10n.T("Trên mục đã chọn (Above)", "Above selected item") });
             cboPosition.SelectedIndex = 0;
             this.Controls.Add(cboPosition);
 
             // Preview box
             GroupBox grpPrev = new GroupBox
             {
-                Text = "Xem trước phụ đề hiển thị:",
+                Text = AppL10n.T("Xem trước phụ đề hiển thị:", "Preview:"),
                 Location = new Point(20, 132),
                 Size = new Size(405, 68),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold)
@@ -107,7 +108,7 @@ namespace ZenQOffice.UI
 
             lblPreview = new Label
             {
-                Text = "Hình 1:",
+                Text = AppL10n.T("Hình 1:", "Figure 1:"),
                 Location = new Point(12, 26),
                 Size = new Size(380, 28),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Italic),
@@ -121,7 +122,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new Button
             {
-                Text = "Chèn Phụ Đề",
+                Text = AppL10n.T("Chèn Phụ Đề", "Insert Caption"),
                 Location = new Point(225, 10),
                 Size = new Size(115, 28),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -145,7 +146,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(350, 10),
                 Size = new Size(75, 28),
                 BackColor = Color.White,

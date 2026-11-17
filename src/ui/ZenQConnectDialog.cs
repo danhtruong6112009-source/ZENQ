@@ -27,7 +27,7 @@ namespace ZenQOffice.UI
 
         public ZenQConnectDialog()
         {
-            Text = "ZenQ Connect - Điều khiển Không dây từ Mobile";
+            Text = AppL10n.T("ZenQ Connect - Điều khiển Không dây từ Mobile", "ZenQ Connect - Wireless Mobile Remote");
             ClientSize = new Size(660, 585);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -75,7 +75,7 @@ namespace ZenQOffice.UI
                 using (Brush bTitle = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 using (Pen borderPen = new Pen(Color.FromArgb(226, 232, 240), 1f))
                 {
-                    e.Graphics.DrawString("ZenQ Connect - Kết nối Điện thoại Thông minh", fTitle, bTitle, 46, 14);
+                    e.Graphics.DrawString(AppL10n.T("ZenQ Connect - Kết nối Điện thoại Thông minh", "ZenQ Connect - Smartphone Remote"), fTitle, bTitle, 46, 14);
                     e.Graphics.DrawLine(borderPen, 0, header.Height - 1, header.Width, header.Height - 1);
                 }
             };
@@ -92,8 +92,8 @@ namespace ZenQOffice.UI
                 bool isRunning = ZenQConnectServer.Instance.IsRunning;
                 Color dotColor = isRunning ? Color.FromArgb(16, 185, 129) : Color.FromArgb(239, 68, 68);
                 string text = isRunning 
-                    ? $"Đang chạy trên cổng {ZenQConnectServer.Instance.Port}"
-                    : "Máy chủ đã tạm dừng";
+                    ? AppL10n.T($"Đang chạy trên cổng {ZenQConnectServer.Instance.Port}", $"Running on port {ZenQConnectServer.Instance.Port}")
+                    : AppL10n.T("Máy chủ đã tạm dừng", "Server paused");
                 
                 using (Font f = new Font("Segoe UI Semibold", 9f))
                 {
@@ -128,7 +128,7 @@ namespace ZenQOffice.UI
 
             Label lblQrHeader = new Label
             {
-                Text = "QUÉT MÃ QR ĐỂ KẾT NỐI",
+                Text = AppL10n.T("QUÉT MÃ QR ĐỂ KẾT NỐI", "SCAN QR CODE TO CONNECT"),
                 Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(14, 12),
@@ -163,19 +163,19 @@ namespace ZenQOffice.UI
             };
             cardQr.Controls.Add(_lblUrl);
 
-            _btnCopyUrl = CreateNeutralButton("Sao chép", new Point(15, 310), new Size(115, 30), '\uE8C8');
+            _btnCopyUrl = CreateNeutralButton(AppL10n.T("Sao chép", "Copy"), new Point(15, 310), new Size(115, 30), '\uE8C8');
             _btnCopyUrl.Click += (s, e) =>
             {
                 try
                 {
                     Clipboard.SetText(ZenQConnectServer.Instance.ActiveUrl);
-                    ZenQOffice.UI.FluentMessageBox.Show(this, "Đã sao chép liên kết vào Clipboard!\nBạn có thể gửi liên kết này sang điện thoại qua tin nhắn, Zalo hoặc mở trực tiếp trên trình duyệt.", "ZenQ Connect", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Đã sao chép liên kết vào Clipboard!\nBạn có thể gửi liên kết này sang điện thoại qua tin nhắn, Zalo hoặc mở trực tiếp trên trình duyệt.", "Copied URL to Clipboard!\nSend it to your phone or open it in a browser."), "ZenQ Connect", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 catch { }
             };
             cardQr.Controls.Add(_btnCopyUrl);
 
-            _btnOpenBrowser = CreateNeutralButton("Trình duyệt", new Point(140, 310), new Size(115, 30), '\uE774');
+            _btnOpenBrowser = CreateNeutralButton(AppL10n.T("Trình duyệt", "Browser"), new Point(140, 310), new Size(115, 30), '\uE774');
             _btnOpenBrowser.Click += (s, e) =>
             {
                 try
@@ -188,7 +188,7 @@ namespace ZenQOffice.UI
 
             Label lblQrNote = new Label
             {
-                Text = "Dùng Camera điện thoại (iPhone/Android) quét mã QR để mở bảng điều khiển. Không cần cài đặt bất kỳ ứng dụng nào!",
+                Text = AppL10n.T("Dùng Camera điện thoại (iPhone/Android) quét mã QR để mở bảng điều khiển. Không cần cài đặt bất kỳ ứng dụng nào!", "Scan QR with your phone camera (iOS/Android) to open the remote. No app required!"),
                 Font = new Font("Segoe UI", 8.2f),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(12, 348),
@@ -203,7 +203,7 @@ namespace ZenQOffice.UI
             // Nhóm 1: Trạng thái & Card mạng
             Label lblNetworkHeader = new Label
             {
-                Text = "TRẠNG THÁI & KẾT NỐI MẠNG (WI-FI)",
+                Text = AppL10n.T("TRẠNG THÁI & KẾT NỐI MẠNG (WI-FI)", "STATUS & WI-FI NETWORK"),
                 UseMnemonic = false,
                 Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
@@ -227,18 +227,18 @@ namespace ZenQOffice.UI
                 if (!server.IsRunning)
                 {
                     dotColor = Color.FromArgb(148, 163, 184);
-                    text = "Máy chủ đang tắt";
+                    text = AppL10n.T("Máy chủ đang tắt", "Server offline");
                 }
                 else if (server.IsClientConnected)
                 {
                     dotColor = Color.FromArgb(16, 185, 129);
-                    string devName = string.IsNullOrEmpty(server.ConnectedDeviceName) ? "Điện thoại" : server.ConnectedDeviceName;
-                    text = $"Đã kết nối: {devName} ({server.ConnectedClientsCount} thiết bị)";
+                    string devName = string.IsNullOrEmpty(server.ConnectedDeviceName) ? AppL10n.T("Điện thoại", "Phone") : server.ConnectedDeviceName;
+                    text = AppL10n.T($"Đã kết nối: {devName} ({server.ConnectedClientsCount} thiết bị)", $"Connected: {devName} ({server.ConnectedClientsCount} device(s))");
                 }
                 else
                 {
                     dotColor = Color.FromArgb(217, 119, 6);
-                    text = "Đang chờ điện thoại quét mã QR...";
+                    text = AppL10n.T("Đang chờ điện thoại quét mã QR...", "Waiting for phone to scan QR code...");
                 }
 
                 using (SolidBrush dotBrush = new SolidBrush(dotColor))
@@ -255,7 +255,7 @@ namespace ZenQOffice.UI
 
             Label lblSelectIp = new Label
             {
-                Text = "Chọn địa chỉ IP Wi-Fi nội bộ:",
+                Text = AppL10n.T("Chọn địa chỉ IP Wi-Fi nội bộ:", "Local Wi-Fi IP Address:"),
                 Font = new Font("Segoe UI", 8.5f),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Location = new Point(14, 58),
@@ -282,14 +282,14 @@ namespace ZenQOffice.UI
             };
             cardConfig.Controls.Add(_cboIpAddresses);
 
-            _btnToggleServer = CreateNeutralButton("Tạm dừng", new Point(234, 77), new Size(100, 25), '\uE768');
+            _btnToggleServer = CreateNeutralButton(AppL10n.T("Tạm dừng", "Pause"), new Point(234, 77), new Size(100, 25), '\uE768');
             _btnToggleServer.Click += (s, e) => ToggleServerState();
             cardConfig.Controls.Add(_btnToggleServer);
 
             // Nhóm 2: Tính năng toàn diện
             Label lblFeaturesHeader = new Label
             {
-                Text = "TÍNH NĂNG ĐIỀU KHIỂN TOÀN DIỆN (TOÀN ỨNG DỤNG)",
+                Text = AppL10n.T("TÍNH NĂNG ĐIỀU KHIỂN TOÀN DIỆN (TOÀN ỨNG DỤNG)", "ALL-IN-ONE REMOTE FEATURES"),
                 Font = new Font("Segoe UI Semibold", 8.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(14, 112),
@@ -299,20 +299,20 @@ namespace ZenQOffice.UI
 
             int itemY = 134;
             itemY = AddFeatureRow(cardConfig, itemY, '\uE962', Color.FromArgb(14, 165, 233), Color.FromArgb(240, 249, 255),
-                "Touchpad & Chuột cảm ứng",
-                "Rê chuột mượt mà, chạm 1 ngón = Trái, 2 ngón = Cuộn mượt chống giật nhảy con trỏ.");
+                AppL10n.T("Touchpad & Chuột cảm ứng", "Touchpad & Mouse"),
+                AppL10n.T("Rê chuột mượt mà, chạm 1 ngón = Trái, 2 ngón = Cuộn mượt chống giật nhảy con trỏ.", "Smooth cursor tracking: 1-finger tap = Left click, 2-finger drag = Smooth scroll."));
             itemY = AddFeatureRow(cardConfig, itemY, '\uE7F4', Color.FromArgb(37, 99, 235), Color.FromArgb(239, 246, 255),
-                "Màn hình PC trực tiếp (Screen Mirror)",
-                "Xem trực tiếp màn hình PC trên điện thoại (15-20 FPS) và chạm để điều khiển từ xa.");
+                AppL10n.T("Màn hình PC trực tiếp (Screen Mirror)", "Live Screen Mirror"),
+                AppL10n.T("Xem trực tiếp màn hình PC trên điện thoại (15-20 FPS) và chạm để điều khiển từ xa.", "Stream your PC screen live (15-20 FPS) and tap to control remotely."));
             itemY = AddFeatureRow(cardConfig, itemY, '\uE714', Color.FromArgb(234, 88, 12), Color.FromArgb(255, 247, 237),
-                "Diễn giả Slide & Bút Laser",
-                "Chuyển slide, đọc Ghi chú diễn giả live, đồng hồ đếm giờ và chiếu Bút Laser đỏ.");
+                AppL10n.T("Diễn giả Slide & Bút Laser", "Presenter & Laser Pointer"),
+                AppL10n.T("Chuyển slide, đọc Ghi chú diễn giả live, đồng hồ đếm giờ và chiếu Bút Laser đỏ.", "Navigate slides, read live speaker notes, track timer, and point laser."));
             itemY = AddFeatureRow(cardConfig, itemY, '\uED5F', Color.FromArgb(16, 185, 129), Color.FromArgb(236, 253, 245),
-                "Chữ ký số & Bản vẽ tay",
-                "Ký tên hoặc vẽ trên điện thoại và bấm 'Chèn vào PC' để chèn tức thì vào tài liệu.");
+                AppL10n.T("Chữ ký số & Bản vẽ tay", "Digital Signature & Sketch"),
+                AppL10n.T("Ký tên hoặc vẽ trên điện thoại và bấm 'Chèn vào PC' để chèn tức thì vào tài liệu.", "Sign or draw on your phone and insert directly into any document."));
             itemY = AddFeatureRow(cardConfig, itemY, '\uE765', Color.FromArgb(147, 51, 234), Color.FromArgb(250, 245, 255),
-                "Bàn phím số NumPad & Gõ chữ",
-                "Bàn phím số cho Calc và nhập liệu tiếng Việt Unicode gửi trực tiếp vào PC.");
+                AppL10n.T("Bàn phím số NumPad & Gõ chữ", "NumPad & Remote Typing"),
+                AppL10n.T("Bàn phím số cho Calc và nhập liệu tiếng Việt Unicode gửi trực tiếp vào PC.", "Use NumPad for Calc and send text straight to your PC."));
 
             // 3. Footer Bar
             Panel footer = new Panel
@@ -329,7 +329,7 @@ namespace ZenQOffice.UI
                 }
             };
 
-            Button btnHelp = CreateNeutralButton("Lưu ý kết nối", new Point(16, 16), new Size(130, 30), '\uE897');
+            Button btnHelp = CreateNeutralButton(AppL10n.T("Lưu ý kết nối", "Connection Tips"), new Point(16, 16), new Size(130, 30), '\uE897');
             btnHelp.Click += (s, e) =>
             {
                 ZenQOffice.UI.FluentMessageBox.Show(this,
@@ -338,13 +338,13 @@ namespace ZenQOffice.UI
                     "2. Không cần cài đặt ứng dụng: mở Camera hoặc trình duyệt Safari (iOS) / Chrome (Android) để quét mã QR.\n" +
                     "3. Nếu có thông báo tường lửa Windows Defender Firewall, hãy bấm 'Allow access' (Cho phép truy cập mạng riêng tư).\n" +
                     "4. ZenQ Connect hoạt động trên toàn bộ ứng dụng ZenQ Office: Writer, Calc, Slides, Photo và toàn màn hình Windows.",
-                    "Hướng dẫn kết nối ZenQ Connect", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    AppL10n.T("Hướng dẫn kết nối ZenQ Connect", "ZenQ Connect Guide"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
             footer.Controls.Add(btnHelp);
 
             _btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 DialogResult = DialogResult.OK,
                 Location = new Point(510, 15),
                 Size = new Size(134, 32),
@@ -476,7 +476,7 @@ namespace ZenQOffice.UI
             _lblClientCount?.Invalidate();
             if (_btnToggleServer != null)
             {
-                _btnToggleServer.Text = server.IsRunning ? "Tạm dừng" : "Bật máy chủ";
+                _btnToggleServer.Text = server.IsRunning ? AppL10n.T("Tạm dừng", "Pause") : AppL10n.T("Bật máy chủ", "Start Server");
             }
         }
 

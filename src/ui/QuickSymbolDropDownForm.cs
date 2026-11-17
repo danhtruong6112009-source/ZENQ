@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -161,7 +162,7 @@ namespace ZenQOffice.UI
                     using (SolidBrush moreTextBrush = new SolidBrush(Color.FromArgb(20, 20, 20)))
                     {
                         g.DrawString("Ω", omFont, omBrush, 12, 161);
-                        g.DrawString("Thêm Ký hiệu (More Symbols)...", btnFont, moreTextBrush, 32, 163);
+                        g.DrawString(AppL10n.Tr("Thêm Ký hiệu (More Symbols)..."), btnFont, moreTextBrush, 32, 163);
                     }
                 }
             }

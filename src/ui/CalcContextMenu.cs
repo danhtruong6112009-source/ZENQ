@@ -398,9 +398,9 @@ namespace ZenQOffice.UI
 
                 case 11: // Align ≡ ▾
                     ContextMenuStrip aMenu = new ZenQOffice.UI.FluentContextMenuStrip();
-                    aMenu.Items.Add("Căn trái (Left)", null, (s, e) => { _calcView.SetSelectedCellAlign(0); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    aMenu.Items.Add("Căn giữa (Center)", null, (s, e) => { _calcView.SetSelectedCellAlign(1); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    aMenu.Items.Add("Căn phải (Right)", null, (s, e) => { _calcView.SetSelectedCellAlign(2); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    aMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Căn trái (Left)", "Align Left"), null, (s, e) => { _calcView.SetSelectedCellAlign(0); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    aMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Căn giữa (Center)", "Center"), null, (s, e) => { _calcView.SetSelectedCellAlign(1); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    aMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Căn phải (Right)", "Align Right"), null, (s, e) => { _calcView.SetSelectedCellAlign(2); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     aMenu.Show(this.PointToScreen(new Point(_btnRects[11].Left, _btnRects[11].Bottom)));
                     break;
 
@@ -431,21 +431,21 @@ namespace ZenQOffice.UI
                 case 14: // Borders ⊞ ▾
                     ContextMenuStrip bdrMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                     bdrMenu.ShowImageMargin = true;
-                    bdrMenu.Items.Add("Viền dưới (Bottom Border)", RibbonBar.CreateExcelBorderIcon(0), (s, e) => { _calcView.ApplyBorderPreset(0); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền trên (Top Border)", RibbonBar.CreateExcelBorderIcon(1), (s, e) => { _calcView.ApplyBorderPreset(1); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền trái (Left Border)", RibbonBar.CreateExcelBorderIcon(2), (s, e) => { _calcView.ApplyBorderPreset(2); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền phải (Right Border)", RibbonBar.CreateExcelBorderIcon(3), (s, e) => { _calcView.ApplyBorderPreset(3); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền dưới (Bottom Border)", "Bottom Border"), RibbonBar.CreateExcelBorderIcon(0), (s, e) => { _calcView.ApplyBorderPreset(0); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền trên (Top Border)", "Top Border"), RibbonBar.CreateExcelBorderIcon(1), (s, e) => { _calcView.ApplyBorderPreset(1); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền trái (Left Border)", "Left Border"), RibbonBar.CreateExcelBorderIcon(2), (s, e) => { _calcView.ApplyBorderPreset(2); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền phải (Right Border)", "Right Border"), RibbonBar.CreateExcelBorderIcon(3), (s, e) => { _calcView.ApplyBorderPreset(3); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     bdrMenu.Items.Add(new ToolStripSeparator());
-                    bdrMenu.Items.Add("Không viền (No Border / Xóa kẻ)", RibbonBar.CreateExcelBorderIcon(4), (s, e) => { _calcView.ApplyBorderPreset(4); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Tất cả viền (All Borders)", RibbonBar.CreateExcelBorderIcon(5), (s, e) => { _calcView.ApplyBorderPreset(5); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền ngoài (Outside Borders)", RibbonBar.CreateExcelBorderIcon(6), (s, e) => { _calcView.ApplyBorderPreset(6); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền ngoài đậm (Thick Outside Border)", RibbonBar.CreateExcelBorderIcon(7), (s, e) => { _calcView.ApplyBorderPreset(7); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Không viền (No Border / Xóa kẻ)", "No Border"), RibbonBar.CreateExcelBorderIcon(4), (s, e) => { _calcView.ApplyBorderPreset(4); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Tất cả viền (All Borders)", "All Borders"), RibbonBar.CreateExcelBorderIcon(5), (s, e) => { _calcView.ApplyBorderPreset(5); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền ngoài (Outside Borders)", "Outside Borders"), RibbonBar.CreateExcelBorderIcon(6), (s, e) => { _calcView.ApplyBorderPreset(6); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền ngoài đậm (Thick Outside Border)", "Thick Outside Border"), RibbonBar.CreateExcelBorderIcon(7), (s, e) => { _calcView.ApplyBorderPreset(7); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     bdrMenu.Items.Add(new ToolStripSeparator());
-                    bdrMenu.Items.Add("Viền dưới kép (Bottom Double Border)", RibbonBar.CreateExcelBorderIcon(8), (s, e) => { _calcView.ApplyBorderPreset(8); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền dưới đậm (Thick Bottom Border)", RibbonBar.CreateExcelBorderIcon(9), (s, e) => { _calcView.ApplyBorderPreset(9); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền trên và dưới (Top and Bottom Border)", RibbonBar.CreateExcelBorderIcon(10), (s, e) => { _calcView.ApplyBorderPreset(10); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền trên và dưới đậm (Top and Thick Bottom)", RibbonBar.CreateExcelBorderIcon(11), (s, e) => { _calcView.ApplyBorderPreset(11); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    bdrMenu.Items.Add("Viền trên và dưới kép (Top and Double Bottom)", RibbonBar.CreateExcelBorderIcon(12), (s, e) => { _calcView.ApplyBorderPreset(12); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền dưới kép (Bottom Double Border)", "Bottom Double Border"), RibbonBar.CreateExcelBorderIcon(8), (s, e) => { _calcView.ApplyBorderPreset(8); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền dưới đậm (Thick Bottom Border)", "Thick Bottom Border"), RibbonBar.CreateExcelBorderIcon(9), (s, e) => { _calcView.ApplyBorderPreset(9); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền trên và dưới (Top and Bottom Border)", "Top and Bottom Border"), RibbonBar.CreateExcelBorderIcon(10), (s, e) => { _calcView.ApplyBorderPreset(10); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền trên và dưới đậm (Top and Thick Bottom)", "Top and Thick Bottom Border"), RibbonBar.CreateExcelBorderIcon(11), (s, e) => { _calcView.ApplyBorderPreset(11); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    bdrMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Viền trên và dưới kép (Top and Double Bottom)", "Top and Double Bottom Border"), RibbonBar.CreateExcelBorderIcon(12), (s, e) => { _calcView.ApplyBorderPreset(12); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     bdrMenu.Show(this.PointToScreen(new Point(_btnRects[14].Left, _btnRects[14].Bottom)));
                     break;
 
@@ -499,55 +499,55 @@ namespace ZenQOffice.UI
             cms.Items.Add(new ToolStripSeparator());
 
             // 2. Cut (Ctrl+X)
-            cms.Items.Add(CreateMenuItem("Cắt (Cut - Ctrl+X)", CreateCutIcon(), (s, e) =>
+            cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Cắt (Cut - Ctrl+X)", "Cut (Ctrl+X)"), CreateCutIcon(), (s, e) =>
             {
                 calcView.Cut();
                 if (parentForm != null) parentForm.Invalidate();
             }));
 
             // 3. Copy (Ctrl+C)
-            cms.Items.Add(CreateMenuItem("Sao chép (Copy - Ctrl+C)", CreateCopyIcon(), (s, e) =>
+            cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Sao chép (Copy - Ctrl+C)", "Copy (Ctrl+C)"), CreateCopyIcon(), (s, e) =>
             {
                 calcView.Copy();
             }));
 
             // 4. Paste Options
-            ToolStripMenuItem pasteMenu = new ToolStripMenuItem("Tùy chọn Dán (Paste):");
+            ToolStripMenuItem pasteMenu = new ToolStripMenuItem(ZenQOffice.Core.AppL10n.T("Tùy chọn Dán (Paste):", "Paste Options:"));
             pasteMenu.Image = CreatePasteIcon();
-            pasteMenu.DropDownItems.Add("Dán (Paste All - Ctrl+V)", CreatePasteIcon(), (s, e) =>
+            pasteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Dán (Paste All - Ctrl+V)", "Paste (Ctrl+V)"), CreatePasteIcon(), (s, e) =>
             {
                 calcView.Paste();
                 if (parentForm != null) parentForm.Invalidate();
             });
-            pasteMenu.DropDownItems.Add("Dán giá trị (Values - 123)", CreatePasteValuesIcon(), (s, e) =>
+            pasteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Dán giá trị (Values - 123)", "Values (123)"), CreatePasteValuesIcon(), (s, e) =>
             {
                 calcView.PasteValues();
                 if (parentForm != null) parentForm.Invalidate();
             });
-            pasteMenu.DropDownItems.Add("Dán công thức (Formulas - fx)", null, (s, e) =>
+            pasteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Dán công thức (Formulas - fx)", "Formulas (fx)"), null, (s, e) =>
             {
                 calcView.PasteFormulas();
                 if (parentForm != null) parentForm.Invalidate();
             });
-            pasteMenu.DropDownItems.Add("Hoán vị hàng / cột (Transpose)", null, (s, e) =>
+            pasteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Hoán vị hàng / cột (Transpose)", "Transpose"), null, (s, e) =>
             {
                 calcView.PasteTranspose();
                 if (parentForm != null) parentForm.Invalidate();
             });
             pasteMenu.DropDownItems.Add(new ToolStripSeparator());
-            pasteMenu.DropDownItems.Add("Dán đặc biệt (Paste Special...)", null, (s, e) =>
+            pasteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Dán đặc biệt (Paste Special...)", "Paste Special..."), null, (s, e) =>
             {
                 calcView.OpenPasteSpecialDialog(parentForm);
                 if (parentForm != null) parentForm.Invalidate();
             });
             cms.Items.Add(pasteMenu);
 
-            cms.Items.Add(CreateMenuItem("Điền nhanh (Flash Fill - Ctrl+E)", null, (s, e) =>
+            cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Điền nhanh (Flash Fill - Ctrl+E)", "Flash Fill (Ctrl+E)"), null, (s, e) =>
             {
                 calcView.FlashFill();
                 if (parentForm != null) parentForm.Invalidate();
             }));
-            cms.Items.Add(CreateMenuItem("Dò tìm mục tiêu (Goal Seek...)", null, (s, e) =>
+            cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Dò tìm mục tiêu (Goal Seek...)", "Goal Seek..."), null, (s, e) =>
             {
                 calcView.OpenGoalSeekDialog(parentForm);
                 if (parentForm != null) parentForm.Invalidate();
@@ -567,7 +567,7 @@ namespace ZenQOffice.UI
             }));
 
             // 5b. Expand & Scroll Viewer
-            cms.Items.Add(CreateMenuItem("Sổ xuống xem nội dung dài... (Expand & Scroll - Alt+Down)", null, (s, e) =>
+            cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Sổ xuống xem nội dung dài... (Expand & Scroll - Alt+Down)", "Expand & Scroll Long Text... (Alt+Down)"), null, (s, e) =>
             {
                 calcView.OpenCellDropdownViewer(parentForm);
             }));
@@ -667,19 +667,19 @@ namespace ZenQOffice.UI
             {
                 CellData cd = calcView.CurrentSheet.GetCell(calcView.SelectedRow, calcView.SelectedCol);
                 string val = cd != null ? (cd.EvaluatedStr ?? cd.RawValue ?? "") : "";
-                ZenQOffice.UI.FluentMessageBox.Show("Đã lọc bảng tính theo giá trị: \"" + val + "\"", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã lọc bảng tính theo giá trị: \"" + val + "\"", "Filtered sheet by value: \"" + val + "\""), "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
             filterMenu.DropDownItems.Add("Filter by Selected Cell's Color", null, (s, e) =>
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Đã lọc theo màu nền ô.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã lọc theo màu nền ô.", "Filtered by cell fill color."), "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
             filterMenu.DropDownItems.Add("Filter by Selected Cell's Font Color", null, (s, e) =>
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Đã lọc theo màu chữ.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã lọc theo màu chữ.", "Filtered by font color."), "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
             filterMenu.DropDownItems.Add("Filter by Selected Cell's Icon", null, (s, e) =>
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Đã lọc theo biểu tượng điều kiện.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã lọc theo biểu tượng điều kiện.", "Filtered by conditional icon."), "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
             cms.Items.Add(filterMenu);
 
@@ -707,7 +707,7 @@ namespace ZenQOffice.UI
             // 13. Insert Comment
             cms.Items.Add(CreateMenuItem("Insert Comment", CreateCommentIcon(), (s, e) =>
             {
-                string comment = PromptInput("Nhập nội dung ghi chú cho ô (" + calcView.SelectedRow + ", " + calcView.SelectedCol + "):", "Insert Comment", "");
+                string comment = PromptInput(ZenQOffice.Core.AppL10n.T("Nhập nội dung ghi chú cho ô (" + calcView.SelectedRow + ", " + calcView.SelectedCol + "):", "Enter comment for cell (" + calcView.SelectedRow + ", " + calcView.SelectedCol + "):"), "Insert Comment", "");
                 if (!string.IsNullOrEmpty(comment))
                 {
                     CellData cd = calcView.CurrentSheet.GetOrCreateCell(calcView.SelectedRow, calcView.SelectedCol);
@@ -763,7 +763,7 @@ namespace ZenQOffice.UI
                 string name = PromptInput("Đặt tên đại diện cho vùng chọn:", "Define Name", "Range1");
                 if (!string.IsNullOrEmpty(name))
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show("Đã gán tên đại diện \"" + name + "\" cho vùng chọn!", "Define Name", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã gán tên đại diện \"" + name + "\" cho vùng chọn!", "Assigned defined name \"" + name + "\" to selection!"), "Define Name", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }));
 
@@ -790,7 +790,7 @@ namespace ZenQOffice.UI
         {
             using (Form form = new Form())
             {
-                form.Text = title;
+                form.Text = ZenQOffice.Core.AppL10n.Tr(title);
                 form.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
                 form.FormBorderStyle = FormBorderStyle.FixedDialog;
                 form.MaximizeBox = false;
@@ -799,7 +799,7 @@ namespace ZenQOffice.UI
                 form.ClientSize = new Size(330, 115);
                 form.BackColor = Color.FromArgb(243, 243, 243);
 
-                Label lbl = new Label() { Text = prompt, Left = 15, Top = 12, Width = 300, Height = 20 };
+                Label lbl = new Label() { Text = ZenQOffice.Core.AppL10n.Tr(prompt), Left = 15, Top = 12, Width = 300, Height = 20 };
                 TextBox txt = new TextBox() { Text = defaultValue, Left = 15, Top = 36, Width = 300 };
                 Button btnOk = new Button() { Text = "OK", Left = 145, Top = 72, Width = 80, Height = 26, DialogResult = DialogResult.OK, FlatStyle = FlatStyle.System };
                 Button btnCancel = new Button() { Text = "Cancel", Left = 235, Top = 72, Width = 80, Height = 26, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.System };

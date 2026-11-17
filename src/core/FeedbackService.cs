@@ -60,13 +60,14 @@ namespace ZenQOffice.Core
                 string screenStr = screen.Width > 0 ? $"{screen.Width}x{screen.Height}" : "N/A";
 
                 string appVer = Application.ProductVersion;
-                if (string.IsNullOrWhiteSpace(appVer)) appVer = "4.0";
+                if (string.IsNullOrWhiteSpace(appVer)) appVer = "6.1";
+                appVer = appVer.TrimStart('v', 'V');
 
-                return $"ZenQ Office v{appVer} | {osName} {arch} | RAM: {ramStr} | Screen: {screenStr} | .NET {Environment.Version}";
+                return $"ZenQ Office v{appVer} | {osName} {arch} | RAM: {ramStr} | {screenStr} | .NET {Environment.Version.Major}.{Environment.Version.Minor}";
             }
             catch
             {
-                return "ZenQ Office 6.0 | Windows";
+                return "ZenQ Office 6.1 | Windows";
             }
         }
 
@@ -77,7 +78,7 @@ namespace ZenQOffice.Core
         {
             if (payload == null)
             {
-                return new FeedbackResult(false, "Dữ liệu phản hồi trống.");
+                return new FeedbackResult(false, AppL10n.T("Dữ liệu phản hồi trống.", "Feedback payload is empty."));
             }
 
             string targetUrl = !string.IsNullOrWhiteSpace(customWebhookUrl) 
@@ -117,20 +118,20 @@ namespace ZenQOffice.Core
 
                 if (response.IsSuccessStatusCode)
                 {
-                    return new FeedbackResult(true, "Báo lỗi đã được tiếp nhận thành công vào hệ thống!");
+                    return new FeedbackResult(true, AppL10n.T("Báo lỗi đã được tiếp nhận thành công vào hệ thống!", "Feedback submitted successfully!"));
                 }
                 else
                 {
-                    return new FeedbackResult(false, $"Máy chủ phản hồi mã {(int)response.StatusCode}: {response.ReasonPhrase}");
+                    return new FeedbackResult(false, string.Format(AppL10n.T("Máy chủ phản hồi mã {0}: {1}", "Server returned status {0}: {1}"), (int)response.StatusCode, response.ReasonPhrase));
                 }
             }
             catch (TaskCanceledException)
             {
-                return new FeedbackResult(false, "Quá thời gian chờ phản hồi (Timeout). Vui lòng kiểm tra lại kết nối mạng.");
+                return new FeedbackResult(false, AppL10n.T("Quá thời gian chờ phản hồi (Timeout). Vui lòng kiểm tra lại kết nối mạng.", "Request timed out. Please check your internet connection."));
             }
             catch (Exception ex)
             {
-                return new FeedbackResult(false, $"Lỗi kết nối: {ex.Message}");
+                return new FeedbackResult(false, AppL10n.T("Lỗi kết nối: ", "Connection error: ") + ex.Message);
             }
         }
     }

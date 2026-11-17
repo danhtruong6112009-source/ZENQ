@@ -30,7 +30,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            Text = _isSectionMode ? "Chèn Thu phóng Phân phần (Insert Section Zoom)" : "Chèn Thu phóng Trang chiếu (Insert Slide Zoom)";
+            Text = _isSectionMode ? AppL10n.T("Chèn Thu phóng Phân phần (Insert Section Zoom)", "Insert Section Zoom") : AppL10n.T("Chèn Thu phóng Trang chiếu (Insert Slide Zoom)", "Insert Slide Zoom");
             Width = 580;
             Height = 480;
             StartPosition = FormStartPosition.CenterParent;
@@ -43,8 +43,8 @@ namespace ZenQOffice.UI
             _lblHeader = new Label
             {
                 Text = _isSectionMode
-                    ? "Chọn một hoặc nhiều phân phần để chèn thẻ thu phóng phân phần vào trang chiếu hiện tại:"
-                    : "Chọn một hoặc nhiều trang chiếu để chèn thẻ thu phóng trực tiếp vào trang chiếu hiện tại:",
+                    ? AppL10n.T("Chọn một hoặc nhiều phân phần để chèn thẻ thu phóng phân phần vào trang chiếu hiện tại:", "Select one or more sections to insert section zoom cards:")
+                    : AppL10n.T("Chọn một hoặc nhiều trang chiếu để chèn thẻ thu phóng trực tiếp vào trang chiếu hiện tại:", "Select one or more slides to insert slide zoom cards:"),
                 Location = new Point(16, 14),
                 Size = new Size(530, 36),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -62,15 +62,15 @@ namespace ZenQOffice.UI
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.White
             };
-            _listView.Columns.Add("Chọn", 50);
+            _listView.Columns.Add(AppL10n.T("Chọn", "Select"), 50);
             _listView.Columns.Add("Slide #", 65);
-            _listView.Columns.Add(_isSectionMode ? "Tên Phân phần (Section)" : "Tiêu đề Trang chiếu (Title)", 300);
-            _listView.Columns.Add("Số đối tượng", 95);
+            _listView.Columns.Add(_isSectionMode ? AppL10n.T("Tên Phân phần (Section)", "Section Name") : AppL10n.T("Tiêu đề Trang chiếu (Title)", "Slide Title"), 300);
+            _listView.Columns.Add(AppL10n.T("Số đối tượng", "Objects"), 95);
             Controls.Add(_listView);
 
             _btnSelectAll = new Button
             {
-                Text = "Chọn tất cả",
+                Text = AppL10n.T("Chọn tất cả", "Select All"),
                 Location = new Point(16, 390),
                 Size = new Size(95, 32),
                 FlatStyle = FlatStyle.Flat,
@@ -88,7 +88,7 @@ namespace ZenQOffice.UI
 
             _btnClearAll = new Button
             {
-                Text = "Bỏ chọn",
+                Text = AppL10n.T("Bỏ chọn", "Deselect All"),
                 Location = new Point(118, 390),
                 Size = new Size(85, 32),
                 FlatStyle = FlatStyle.Flat,
@@ -106,7 +106,7 @@ namespace ZenQOffice.UI
 
             _btnInsert = new Button
             {
-                Text = "Chèn (Insert)",
+                Text = AppL10n.T("Chèn (Insert)", "Insert"),
                 Location = new Point(345, 390),
                 Size = new Size(110, 32),
                 DialogResult = DialogResult.OK,
@@ -128,7 +128,7 @@ namespace ZenQOffice.UI
                 }
                 if (SelectedSlideIndices.Count == 0)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn ít nhất một trang chiếu hoặc phân phần để chèn!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng chọn ít nhất một trang chiếu hoặc phân phần để chèn!", "Please select at least one slide or section to insert!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     DialogResult = DialogResult.None;
                     return;
                 }
@@ -137,7 +137,7 @@ namespace ZenQOffice.UI
 
             _btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(463, 390),
                 Size = new Size(85, 32),
                 DialogResult = DialogResult.Cancel,
@@ -171,7 +171,7 @@ namespace ZenQOffice.UI
                 string slideNum = (i + 1).ToString();
                 string title = !string.IsNullOrEmpty(slide.SectionName)
                     ? slide.SectionName
-                    : (!string.IsNullOrEmpty(slide.Title) ? slide.Title : $"Trang chiếu {i + 1}");
+                    : (!string.IsNullOrEmpty(slide.Title) ? slide.Title : AppL10n.T("Trang chiếu ", "Slide ") + (i + 1));
 
                 int shapeCount = slide.Shapes != null ? slide.Shapes.Count : 0;
 
@@ -179,7 +179,7 @@ namespace ZenQOffice.UI
                 item.Tag = i;
                 item.SubItems.Add(slideNum);
                 item.SubItems.Add(title);
-                item.SubItems.Add(shapeCount + " hình");
+                item.SubItems.Add(shapeCount + AppL10n.T(" hình", " objects"));
 
                 _listView.Items.Add(item);
             }

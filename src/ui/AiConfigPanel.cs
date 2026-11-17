@@ -88,7 +88,7 @@ namespace ZenQOffice.UI
             cboProfiles = new GlassComboInput
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                PlaceholderText = "Chọn bộ lưu API Key..."
+                PlaceholderText = AppL10n.T("Chọn bộ lưu API Key...", "Select API Key profile...")
             };
             cboProfiles.SelectedIndexChanged += (s, e) =>
             {
@@ -105,7 +105,7 @@ namespace ZenQOffice.UI
 
             btnAddProfile = new GlassVectorButton
             {
-                Text = "Thêm Key",
+                Text = AppL10n.T("Thêm Key", "Add Key"),
                 IsPrimary = false,
                 FluentIcon = "/add"
             };
@@ -136,7 +136,7 @@ namespace ZenQOffice.UI
             // ==========================================
             txtKeyName = new GlassTextBox
             {
-                PlaceholderText = "Tên bộ lưu (ví dụ: Google Gemini, OpenAI GPT-4o...)"
+                PlaceholderText = AppL10n.T("Tên bộ lưu (ví dụ: Google Gemini, OpenAI GPT-4o...)", "Profile name (e.g., Google Gemini, OpenAI GPT-4o...)")
             };
             this.Controls.Add(txtKeyName);
 
@@ -144,7 +144,7 @@ namespace ZenQOffice.UI
             {
                 Multiline = true,
                 ScrollBars = ScrollBars.Vertical,
-                PlaceholderText = "Nhập hướng dẫn vai trò, ngữ cảnh và phong cách phản hồi cho AI..."
+                PlaceholderText = AppL10n.T("Nhập hướng dẫn vai trò, ngữ cảnh và phong cách phản hồi cho AI...", "System prompt: role, context, and tone...")
             };
             this.Controls.Add(txtSystemPrompt);
 
@@ -154,7 +154,7 @@ namespace ZenQOffice.UI
             cboProvider = new GlassComboInput
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                PlaceholderText = "Chọn nhà cung cấp AI..."
+                PlaceholderText = AppL10n.T("Chọn nhà cung cấp AI...", "Select AI provider...")
             };
             foreach (AiProviderType p in Enum.GetValues(typeof(AiProviderType)))
             {
@@ -176,7 +176,7 @@ namespace ZenQOffice.UI
             cboModel = new GlassComboInput
             {
                 DropDownStyle = ComboBoxStyle.DropDown,
-                PlaceholderText = "Chọn hoặc gõ tên model rồi nhấn Enter..."
+                PlaceholderText = AppL10n.T("Chọn hoặc gõ tên model rồi nhấn Enter...", "Select or type model name and press Enter...")
             };
             cboModel.SelectedIndexChanged += (s, e) =>
             {
@@ -231,7 +231,7 @@ namespace ZenQOffice.UI
             txtApiKey = new GlassTextBox
             {
                 UseSystemPasswordChar = true,
-                PlaceholderText = "Dán chuỗi API Key của bạn vào đây..."
+                PlaceholderText = AppL10n.T("Dán chuỗi API Key của bạn vào đây...", "Paste your API Key here...")
             };
             txtApiKey.TextChanged += (s, e) =>
             {
@@ -273,7 +273,7 @@ namespace ZenQOffice.UI
             // ==========================================
             btnTest = new GlassVectorButton
             {
-                Text = "Kiểm tra kết nối",
+                Text = AppL10n.T("Kiểm tra kết nối", "Test Connection"),
                 IsPrimary = false,
                 FluentIcon = "/test"
             };
@@ -282,7 +282,7 @@ namespace ZenQOffice.UI
 
             btnSave = new GlassVectorButton
             {
-                Text = "Lưu cấu hình",
+                Text = AppL10n.T("Lưu cấu hình", "Save Settings"),
                 IsPrimary = true,
                 FluentIcon = "/save"
             };
@@ -333,7 +333,7 @@ namespace ZenQOffice.UI
                 else
                 {
                     _currentProfile = _config.CreateDraftProfile();
-                    _currentProfile.Name = "AI Key Mặc định";
+                    _currentProfile.Name = AppL10n.T("AI Key Mặc định", "Default AI Key");
                     _config.ActiveProfileId = _currentProfile.Id;
                 }
             }
@@ -368,9 +368,9 @@ namespace ZenQOffice.UI
                 // ==========================================
                 // 1. THANH TIÊU ĐỀ & CÂY TRƯỢT CHUYỂN CHẾ ĐỘ
                 // ==========================================
-                string modeTitle = _isSimpleMode ? "Thiết lập AI Nhanh" : "Thiết lập AI Nâng cao";
-                string modeSub = _isSimpleMode ? "Chỉ cần dán API Key, hệ thống tự động phát hiện Nhà cung cấp và nạp toàn bộ danh sách Model."
-                                               : "Quản lý nhiều bộ lưu API Key, tùy chỉnh độ sáng tạo và chỉ dẫn hệ thống.";
+                string modeTitle = _isSimpleMode ? AppL10n.T("Thiết lập AI Nhanh", "Quick AI Setup") : AppL10n.T("Thiết lập AI Nâng cao", "Advanced AI Setup");
+                string modeSub = _isSimpleMode ? AppL10n.T("Chỉ cần dán API Key, hệ thống tự động phát hiện Nhà cung cấp và nạp toàn bộ danh sách Model.", "Just paste your API key; ZenQ auto-detects the provider and loads models.")
+                                               : AppL10n.T("Quản lý nhiều bộ lưu API Key, tùy chỉnh độ sáng tạo và chỉ dẫn hệ thống.", "Manage API key profiles, creativity, and system prompts.");
 
                 // Huy hiệu Thử nghiệm nằm giữa đường viền khung kính và nền bên phải (Y = 14 là mép trên khung kính)
                 HomeView.DrawFloatingCardBorderBadge(g, this.ClientSize.Width - padLeft - 118f, 14f);
@@ -413,14 +413,14 @@ namespace ZenQOffice.UI
                         using (SolidBrush inactBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
                         {
                             // Tab Đơn giản
-                            string txtSimple = "Đơn giản";
+                            string txtSimple = AppL10n.T("Đơn giản", "Simple");
                             SizeF szS = g.MeasureString(txtSimple, _isSimpleMode ? tabBoldFont : tabRegFont);
                             g.DrawString(txtSimple, _isSimpleMode ? tabBoldFont : tabRegFont, _isSimpleMode ? actBrush : inactBrush,
                                          _simpleTabRect.X + (_simpleTabRect.Width - szS.Width) / 2f,
                                          _simpleTabRect.Y + (_simpleTabRect.Height - szS.Height) / 2f);
 
                             // Tab Nâng cao
-                            string txtAdv = "Nâng cao";
+                            string txtAdv = AppL10n.T("Nâng cao", "Advanced");
                             SizeF szA = g.MeasureString(txtAdv, !_isSimpleMode ? tabBoldFont : tabRegFont);
                             g.DrawString(txtAdv, !_isSimpleMode ? tabBoldFont : tabRegFont, !_isSimpleMode ? actBrush : inactBrush,
                                          _advancedTabRect.X + (_advancedTabRect.Width - szA.Width) / 2f,
@@ -438,7 +438,7 @@ namespace ZenQOffice.UI
                     int ctlH = 36;
 
                     // Cột Trái: Ô nhập API Key
-                    g.DrawString("Chuỗi API Key:", titleFont, textBrush, leftColX, sRow1Y);
+                    g.DrawString(AppL10n.T("Chuỗi API Key:", "API Key:"), titleFont, textBrush, leftColX, sRow1Y);
 
                     // Huy hiệu Nhận diện Nhà cung cấp (Smart Detection Badge)
                     AiProviderType currentProv = (cboProvider.SelectedIndex >= 0) ? (AiProviderType)cboProvider.SelectedIndex : DetectProviderFromApiKey(txtApiKey.Text);
@@ -457,13 +457,13 @@ namespace ZenQOffice.UI
                             }
 
                             string provDisplayName = AiConfig.GetProviderDisplayName(currentProv);
-                            string badgeTitle = "Đã nhận diện: " + provDisplayName;
-                            if (currentProv == AiProviderType.Groq) badgeTitle = "Đã nhận diện: Groq Cloud";
-                            else if (currentProv == AiProviderType.GoogleAIStudio) badgeTitle = "Đã nhận diện: Google AI Studio";
-                            else if (currentProv == AiProviderType.OpenAI) badgeTitle = "Đã nhận diện: OpenAI";
-                            else if (currentProv == AiProviderType.DeepSeek) badgeTitle = "Đã nhận diện: DeepSeek";
-                            else if (currentProv == AiProviderType.OpenRouter) badgeTitle = "Đã nhận diện: OpenRouter";
-                            else if (currentProv == AiProviderType.Ollama) badgeTitle = "Đã nhận diện: Ollama Local";
+                            string badgeTitle = AppL10n.T("Đã nhận diện: ", "Detected: ") + provDisplayName;
+                            if (currentProv == AiProviderType.Groq) badgeTitle = AppL10n.T("Đã nhận diện: ", "Detected: ") + "Groq Cloud";
+                            else if (currentProv == AiProviderType.GoogleAIStudio) badgeTitle = AppL10n.T("Đã nhận diện: ", "Detected: ") + "Google AI Studio";
+                            else if (currentProv == AiProviderType.OpenAI) badgeTitle = AppL10n.T("Đã nhận diện: ", "Detected: ") + "OpenAI";
+                            else if (currentProv == AiProviderType.DeepSeek) badgeTitle = AppL10n.T("Đã nhận diện: ", "Detected: ") + "DeepSeek";
+                            else if (currentProv == AiProviderType.OpenRouter) badgeTitle = AppL10n.T("Đã nhận diện: ", "Detected: ") + "OpenRouter";
+                            else if (currentProv == AiProviderType.Ollama) badgeTitle = AppL10n.T("Đã nhận diện: ", "Detected: ") + "Ollama Local";
 
                             using (Font bf = new Font("Segoe UI", 9.6f, FontStyle.Bold))
                             using (SolidBrush bbText = new SolidBrush(Color.FromArgb(67, 56, 202)))
@@ -483,13 +483,13 @@ namespace ZenQOffice.UI
                             using (Font bf = new Font("Segoe UI", 9.0f, FontStyle.Italic))
                             using (SolidBrush bbText = new SolidBrush(Color.FromArgb(148, 163, 184)))
                             {
-                                g.DrawString("Nhập hoặc dán API Key để tự động nhận diện nhà cung cấp", bf, bbText, badgeRect.X + 14, badgeRect.Y + (badgeRect.Height - 16) / 2f);
+                                g.DrawString(AppL10n.T("Nhập hoặc dán API Key để tự động nhận diện nhà cung cấp", "Enter or paste an API Key to auto-detect provider"), bf, bbText, badgeRect.X + 14, badgeRect.Y + (badgeRect.Height - 16) / 2f);
                             }
                         }
                     }
 
                     // Cột Phải: Ô chọn / Gõ Model
-                    g.DrawString("Chọn Mô hình AI:", titleFont, textBrush, rightColX, sRow1Y);
+                    g.DrawString(AppL10n.T("Chọn Mô hình AI:", "Select AI Model:"), titleFont, textBrush, rightColX, sRow1Y);
 
                     // Render Model Chips bên phải
                     _chipRects.Clear();
@@ -583,31 +583,31 @@ namespace ZenQOffice.UI
 
                     bool isOllama = (cboProvider != null && cboProvider.SelectedIndex == (int)AiProviderType.Ollama);
 
-                    g.DrawString("Bộ lưu API Key:", titleFont, textBrush, leftColX, row1Y);
+                    g.DrawString(AppL10n.T("Bộ lưu API Key:", "API Key Profile:"), titleFont, textBrush, leftColX, row1Y);
 
                     if (_config.Profiles.Count == 0 || _currentProfile == null)
                     {
                         using (Font hintFont = new Font("Segoe UI", 10.5f, FontStyle.Italic))
                         using (SolidBrush hintBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
                         {
-                            g.DrawString("Chưa có cấu hình nào. Bấm \"+ Thêm Key\" để bắt đầu.", hintFont, hintBrush, leftColX, row2Y + 30);
+                            g.DrawString(AppL10n.T("Chưa có cấu hình nào. Bấm \"+ Thêm Key\" để bắt đầu.", "No profiles yet. Click \"+ Add Key\" to begin."), hintFont, hintBrush, leftColX, row2Y + 30);
                         }
                     }
                     else
                     {
-                        g.DrawString("Tên bộ lưu:", titleFont, labelBrush, leftColX, row2Y);
-                        g.DrawString("Nhà cung cấp AI:", titleFont, labelBrush, leftColX, row3Y);
-                        if (!isOllama) g.DrawString("Chuỗi API Key:", titleFont, labelBrush, leftColX, row4Y);
+                        g.DrawString(AppL10n.T("Tên bộ lưu:", "Profile Name:"), titleFont, labelBrush, leftColX, row2Y);
+                        g.DrawString(AppL10n.T("Nhà cung cấp AI:", "AI Provider:"), titleFont, labelBrush, leftColX, row3Y);
+                        if (!isOllama) g.DrawString(AppL10n.T("Chuỗi API Key:", "API Key:"), titleFont, labelBrush, leftColX, row4Y);
                     }
 
-                    g.DrawString("Độ sáng tạo:", titleFont, labelBrush, rightColX, row1Y);
+                    g.DrawString(AppL10n.T("Độ sáng tạo:", "Temperature:"), titleFont, labelBrush, rightColX, row1Y);
                     float tempVal = trkTemp != null ? trkTemp.Value : 0.7f;
                     g.DrawString(tempVal.ToString("0.0"), valueFont, valueBrush, rightColX + colW - 36, row1Y);
 
-                    g.DrawString("Chỉ dẫn hệ thống:", titleFont, labelBrush, rightColX, row2Y);
+                    g.DrawString(AppL10n.T("Chỉ dẫn hệ thống:", "System Instructions:"), titleFont, labelBrush, rightColX, row2Y);
 
                     int modelLabelY = row2Y + 24 + 110 + 8;
-                    g.DrawString(isOllama ? "Mô hình Ollama trên máy:" : "Mô hình AI:", titleFont, labelBrush, rightColX, modelLabelY);
+                    g.DrawString(isOllama ? AppL10n.T("Mô hình Ollama trên máy:", "Local Ollama Model:") : AppL10n.T("Mô hình AI:", "AI Model:"), titleFont, labelBrush, rightColX, modelLabelY);
 
                     // VẼ MODEL CHIPS TRỰC TIẾP
                     _chipRects.Clear();
@@ -629,7 +629,7 @@ namespace ZenQOffice.UI
                         using (Font hintFont = new Font("Segoe UI", 8.5f, FontStyle.Italic))
                         using (SolidBrush hintBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
                         {
-                            g.DrawString("Chưa có model nào. Chọn hoặc gõ tên rồi nhấn Enter ↑", hintFont, hintBrush, rightColX, chipsStartY + 4);
+                            g.DrawString(AppL10n.T("Chưa có model nào. Chọn hoặc gõ tên rồi nhấn Enter ↑", "No models yet. Select or type a name and press Enter ↑"), hintFont, hintBrush, rightColX, chipsStartY + 4);
                         }
                         curY += 28;
                     }
@@ -959,7 +959,7 @@ namespace ZenQOffice.UI
             for (int i = 0; i < _config.Profiles.Count; i++)
             {
                 var p = _config.Profiles[i];
-                string displayName = !string.IsNullOrEmpty(p.Name) ? p.Name : "(Chưa đặt tên)";
+                string displayName = !string.IsNullOrEmpty(p.Name) ? p.Name : AppL10n.T("(Chưa đặt tên)", "(Untitled)");
                 cboProfiles.Items.Add(displayName);
                 if (_currentProfile != null && p.Id == _config.ActiveProfileId) selIdx = i;
             }
@@ -1083,7 +1083,7 @@ namespace ZenQOffice.UI
             if (prov != AiProviderType.Ollama)
             {
                 cboModel.Text = "";
-                SetStatus("Nhấn 'Kiểm tra kết nối' để kiểm tra chuỗi API Key và đo độ trễ phản hồi.", Color.FromArgb(71, 85, 105));
+                SetStatus(AppL10n.T("Nhấn 'Kiểm tra kết nối' để kiểm tra chuỗi API Key và đo độ trễ phản hồi.", "Click 'Test Connection' to verify your API key and latency."), Color.FromArgb(71, 85, 105));
             }
             RelayoutControls();
             Invalidate();
@@ -1103,7 +1103,7 @@ namespace ZenQOffice.UI
                 cboModel.SelectedIndex = -1;
                 cboModel.Text = "";
 
-                SetStatus("Đang quét danh sách các model Ollama cục bộ có sẵn trên máy...", Color.FromArgb(79, 70, 229));
+                SetStatus(AppL10n.T("Đang quét danh sách các model Ollama cục bộ có sẵn trên máy...", "Scanning local Ollama models..."), Color.FromArgb(79, 70, 229));
 
                 AiService.ScanLocalOllamaModelsAsync((models, err) =>
                 {
@@ -1118,11 +1118,11 @@ namespace ZenQOffice.UI
                             {
                                 cboModel.Items.Add(m);
                             }
-                            SetStatus(string.Format("Đã phát hiện {0} model Ollama trên máy sẵn sàng chạy offline: {1}", models.Count, string.Join(", ", models.ToArray())), Color.FromArgb(22, 163, 74));
+                            SetStatus(AppL10n.T(string.Format("Đã phát hiện {0} model Ollama trên máy sẵn sàng chạy offline: {1}", models.Count, string.Join(", ", models.ToArray())), string.Format("Found {0} local Ollama model(s): {1}", models.Count, string.Join(", ", models.ToArray()))), Color.FromArgb(22, 163, 74));
                         }
                         else
                         {
-                            SetStatus("Chưa thấy model nào đang chạy. Bạn có thể chọn deepseek-r1:7b hoặc gõ tên model rồi bấm Enter.", Color.FromArgb(217, 119, 6));
+                            SetStatus(AppL10n.T("Chưa thấy model nào đang chạy. Bạn có thể chọn deepseek-r1:7b hoặc gõ tên model rồi bấm Enter.", "No running models found. Pick deepseek-r1:7b or type a model name and press Enter."), Color.FromArgb(217, 119, 6));
                         }
                         RebuildModelChips();
                     });
@@ -1252,7 +1252,7 @@ namespace ZenQOffice.UI
             _currentProfile = newProf;
 
             _isBinding = true;
-            cboProfiles.Items.Add("(Chưa đặt tên)");
+            cboProfiles.Items.Add(AppL10n.T("(Chưa đặt tên)", "(Untitled)"));
             cboProfiles.SelectedIndex = cboProfiles.Items.Count - 1;
             _isBinding = false;
 
@@ -1260,28 +1260,27 @@ namespace ZenQOffice.UI
             _currentProfile = newProf;
             BindProfileToUi(newProf);
 
-            SetStatus("Hãy điền đầy đủ thông tin rồi bấm \"Lưu cấu hình\".", Color.FromArgb(79, 70, 229));
+            SetStatus(AppL10n.T("Hãy điền đầy đủ thông tin rồi bấm \"Lưu cấu hình\".", "Fill in all required fields and click \"Save Settings\"."), Color.FromArgb(79, 70, 229));
         }
 
         private void DeleteCurrentKeyProfile()
         {
             if (_currentProfile == null)
             {
-                MessageBox.Show("Không có cấu hình nào để xóa.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không có cấu hình nào để xóa.", "No profile to delete."), "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             var dialog = MessageBox.Show(
-                string.Format("Bạn có chắc chắn muốn xóa cấu hình '{0}'?",
-                    !string.IsNullOrEmpty(_currentProfile.Name) ? _currentProfile.Name : "(Chưa đặt tên)"),
-                "Xác nhận xóa Key", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                AppL10n.T(string.Format("Bạn có chắc chắn muốn xóa cấu hình '{0}'?", !string.IsNullOrEmpty(_currentProfile.Name) ? _currentProfile.Name : "(Chưa đặt tên)"), string.Format("Delete profile '{0}'?", !string.IsNullOrEmpty(_currentProfile.Name) ? _currentProfile.Name : "(Untitled)")),
+                AppL10n.T("Xác nhận xóa Key", "Confirm Delete Key"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (dialog == DialogResult.Yes)
             {
                 _config.RemoveProfile(_currentProfile.Id);
                 _config.Save();
                 ReloadProfilesToUi();
-                SetStatus("Đã xóa cấu hình Key thành công.", Color.FromArgb(220, 38, 38));
+                SetStatus(AppL10n.T("Đã xóa cấu hình Key thành công.", "Deleted key profile."), Color.FromArgb(220, 38, 38));
             }
         }
 
@@ -1290,7 +1289,7 @@ namespace ZenQOffice.UI
             EnsureProfileExistsForSimpleMode();
             if (_currentProfile == null)
             {
-                SetStatus("Chưa có cấu hình nào. Hãy nhập API Key trước.", Color.FromArgb(220, 38, 38));
+                SetStatus(AppL10n.T("Chưa có cấu hình nào. Hãy nhập API Key trước.", "No profile yet. Enter an API key first."), Color.FromArgb(220, 38, 38));
                 return;
             }
 
@@ -1298,12 +1297,12 @@ namespace ZenQOffice.UI
 
             if ((int)_currentProfile.Provider < 0)
             {
-                SetStatus("Chưa xác định Nhà cung cấp AI.", Color.FromArgb(220, 38, 38));
+                SetStatus(AppL10n.T("Chưa xác định Nhà cung cấp AI.", "AI Provider is not selected."), Color.FromArgb(220, 38, 38));
                 return;
             }
             if (string.IsNullOrWhiteSpace(_currentProfile.SelectedModel) && _currentProfile.SavedModels.Count == 0)
             {
-                SetStatus("Chưa chọn Model AI nào.", Color.FromArgb(220, 38, 38));
+                SetStatus(AppL10n.T("Chưa chọn Model AI nào.", "No AI Model selected."), Color.FromArgb(220, 38, 38));
                 return;
             }
             if (string.IsNullOrWhiteSpace(_currentProfile.SelectedModel) && _currentProfile.SavedModels.Count > 0)
@@ -1311,7 +1310,7 @@ namespace ZenQOffice.UI
                 _currentProfile.SelectedModel = _currentProfile.SavedModels[0];
             }
 
-            SetStatus("Đang gửi yêu cầu kiểm tra kết nối tới " + _currentProfile.SelectedModel + "...", Color.FromArgb(79, 70, 229));
+            SetStatus(AppL10n.T("Đang gửi yêu cầu kiểm tra kết nối tới ", "Testing connection to ") + _currentProfile.SelectedModel + "...", Color.FromArgb(79, 70, 229));
             btnTest.Enabled = false;
 
             AiService.TestConnectionAsync(_config, (success, latencyMs, message) =>
@@ -1322,7 +1321,7 @@ namespace ZenQOffice.UI
                     btnTest.Enabled = true;
                     if (success)
                     {
-                        SetStatus(string.Format("Kết nối thành công! Phản hồi sau {0} ms từ {1}.", latencyMs, _currentProfile.SelectedModel), Color.FromArgb(22, 163, 74));
+                        SetStatus(AppL10n.T(string.Format("Kết nối thành công! Phản hồi sau {0} ms từ {1}.", latencyMs, _currentProfile.SelectedModel), string.Format("Connected! Response in {0} ms from {1}.", latencyMs, _currentProfile.SelectedModel)), Color.FromArgb(22, 163, 74));
                     }
                     else
                     {
@@ -1337,7 +1336,7 @@ namespace ZenQOffice.UI
             EnsureProfileExistsForSimpleMode();
             if (_currentProfile == null)
             {
-                MessageBox.Show("Không có cấu hình nào để lưu.\nHãy nhập API Key trước.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không có cấu hình nào để lưu.\nHãy nhập API Key trước.", "No profile to save.\nPlease enter an API key first."), "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -1351,12 +1350,12 @@ namespace ZenQOffice.UI
             var errors = _currentProfile.Validate();
             if (errors.Count > 0)
             {
-                string errorMsg = "Không thể lưu! Vui lòng khắc phục các lỗi sau:\n\n";
+                string errorMsg = AppL10n.T("Không thể lưu! Vui lòng khắc phục các lỗi sau:\n\n", "Cannot save! Please fix the following:\n\n");
                 for (int i = 0; i < errors.Count; i++)
                 {
                     errorMsg += "• " + errors[i] + "\n";
                 }
-                MessageBox.Show(errorMsg, "Lỗi cấu hình", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ZenQOffice.UI.FluentMessageBox.Show(errorMsg, AppL10n.T("Lỗi cấu hình", "Configuration Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 SetStatus(string.Join(" | ", errors.ToArray()), Color.FromArgb(220, 38, 38));
                 return;
             }
@@ -1374,7 +1373,7 @@ namespace ZenQOffice.UI
             for (int i = 0; i < _config.Profiles.Count; i++)
             {
                 var p = _config.Profiles[i];
-                cboProfiles.Items.Add(!string.IsNullOrEmpty(p.Name) ? p.Name : "(Chưa đặt tên)");
+                cboProfiles.Items.Add(!string.IsNullOrEmpty(p.Name) ? p.Name : AppL10n.T("(Chưa đặt tên)", "(Untitled)"));
                 if (p.Id == _currentProfile.Id)
                 {
                     cboProfiles.SelectedIndex = i;
@@ -1384,8 +1383,8 @@ namespace ZenQOffice.UI
 
             if (showPrompt)
             {
-                SetStatus("Đã lưu thiết lập thành công! Model: " + _currentProfile.SelectedModel, Color.FromArgb(22, 163, 74));
-                MessageBox.Show("Đã lưu thiết lập AI thành công!\nBạn có thể sử dụng ngay trên tất cả các thẻ làm việc.", "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                SetStatus(AppL10n.T("Đã lưu thiết lập thành công! Model: ", "Settings saved! Model: ") + _currentProfile.SelectedModel, Color.FromArgb(22, 163, 74));
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã lưu thiết lập AI thành công!\nBạn có thể sử dụng ngay trên tất cả các thẻ làm việc.", "AI settings saved!\nYou can start using AI across all tabs."), "ZENQ AI", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             if (_appForm != null)
             {

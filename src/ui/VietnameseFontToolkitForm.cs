@@ -1,645 +1,508 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
+    /// <summary>
+    /// Cửa sổ Quản lý Phông chữ & Sửa lỗi Tiếng Việt cho ZenQ Office.
+    /// Thiết kế chuẩn Win11 đồng bộ với Trợ lý AI (AiConfigDialog):
+    /// - Giao diện thanh lịch, sạch sẽ, bo góc mượt mà.
+    /// - Render chữ xem trước siêu nét với ClearType / DirectWrite.
+    /// - Sửa lỗi và thay thế phông chữ TRỰC TIẾP trên Slide/Văn bản đang mở, không cần lưu sang file khác.
+    /// </summary>
     public class VietnameseFontToolkitForm : Form
     {
-        private Label lblCurrentDoc;
-        private Button btnBrowse;
-        private Button btnUseCurrent;
-        private DataGridView dgvFonts;
-        
-        // Header Status Badges
+        // Shell & Containers
+        private TableLayoutPanel _shell;
+        private Panel pnlHeader;
+        private Panel pnlContent;
+        private Panel pnlToolbar;
+        private Panel pnlTableCard;
+        private Panel pnlPreviewCard;
+        private Panel pnlFooter;
+
+        // Header controls
+        private Label lblTitle;
+        private Label lblSubtitle;
+        private FlowLayoutPanel pnlBadges;
         private Label badgeTotalFonts;
         private Label badgeViStatus;
         private Label badgeEmbedded;
 
+        // Toolbar controls
+        private Label lblDocIcon;
+        private Label lblCurrentDoc;
+        private SettingsActionButton btnBrowse;
+        private FluentComboBox cmbFilter;
+        private SettingsInputFrame searchFrame;
+        private TextBox txtSearch;
+
+        // Table
+        private FontToolkitD2DTable dgvFonts;
+
         // Preview Section
-        private Label lblPreviewHeader;
-        private Button btnPresetDoc;
-        private Button btnPresetSentence;
-        private Button btnPresetDiacritics;
+        private Label lblPreviewTitle;
+        private Label lblPreviewFontBadge;
+        private SettingsActionButton btnReplaceCurrentFont;
+        private FlowLayoutPanel pnlPresetButtons;
+        private FontSamplePresetButton btnPresetDoc;
+        private FontSamplePresetButton btnPresetSentence;
+        private FontSamplePresetButton btnPresetDiacritics;
         private TextBox txtPreviewSample;
-        private PictureBox pbFontPreview;
-        private Panel pnlDiagnosticBanner;
+        private FontToolkitPreviewSurface pbFontPreview;
         private Label lblDiagnosticInfo;
+        private float currentPreviewFontSize = 18.0f;
 
         // Footer Actions
-        private Label lblFooterHint;
-        private Button btnExportFonts;
-        private Button btnInstallFonts;
-        private Button btnFixDocument;
-        private Button btnClose;
+        private SettingsActionButton btnExportFonts;
+        private SettingsActionButton btnInstallFonts;
+        private SettingsActionButton btnFixDirectly;
+        private SettingsActionButton btnClose;
 
+        // Data
         private List<ExtractedFontInfo> currentFontList = new List<ExtractedFontInfo>();
+        private List<ExtractedFontInfo> displayedFontList = new List<ExtractedFontInfo>();
         private ExtractedFontInfo selectedFont = null;
         private string activeDocumentPath = "";
         private string openEditorFilePath = "";
         private string docSampleText = "";
+        private bool isLiveSlideMode = false;
 
         public VietnameseFontToolkitForm(string currentDocPath = null)
         {
             this.openEditorFilePath = currentDocPath;
             InitializeComponent();
-
-            if (!string.IsNullOrEmpty(currentDocPath) && File.Exists(currentDocPath))
-            {
-                LoadDocumentFile(currentDocPath);
-            }
+            LoadActiveOrSpecifiedDocument(currentDocPath);
         }
 
         private void InitializeComponent()
         {
-            this.Text = "Quản lý Phông chữ & Sửa lỗi Tiếng Việt | ZenQ Office";
-            this.Size = new Size(980, 700);
-            this.MinimumSize = new Size(880, 600);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.BackColor = Color.FromArgb(248, 250, 252);
-            this.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
-            this.AllowDrop = true;
-            this.DragEnter += Form_DragEnter;
-            this.DragDrop += Form_DragDrop;
+            Text = AppL10n.T("Quản lý Phông chữ & Tiếng Việt", "Fonts & Vietnamese Toolkit");
+            ClientSize = new Size(820, 650);
+            MinimumSize = new Size(720, 580);
+            StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            ShowInTaskbar = false;
+            BackColor = Color.FromArgb(244, 247, 252);
+            Font = new Font("Segoe UI", 9.5f);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96, 96);
 
-            // 1. TOP HEADER (Modern Light Fluent Design)
-            Panel pnlHeader = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 68,
-                BackColor = Color.White,
-                Padding = new Padding(20, 10, 20, 10)
-            };
-            pnlHeader.Paint += (s, e) =>
-            {
-                using (Pen p = new Pen(Color.FromArgb(226, 232, 240), 1))
-                {
-                    e.Graphics.DrawLine(p, 0, pnlHeader.Height - 1, pnlHeader.Width, pnlHeader.Height - 1);
-                }
-            };
-            this.Controls.Add(pnlHeader);
+            // Cho phép kéo thả tệp tài liệu
+            AllowDrop = true;
+            DragEnter += Form_DragEnter;
+            DragDrop += Form_DragDrop;
 
-            // Icon Typography - Windows 11 Fluent Font Icon (\uE8D2)
-            PictureBox pbHeaderIcon = new PictureBox
+            // 1. Shell TableLayoutPanel
+            _shell = new TableLayoutPanel
             {
-                Location = new Point(20, 14),
-                Size = new Size(40, 40),
-                BackColor = Color.Transparent
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Margin = Padding.Empty,
+                BackColor = Color.FromArgb(244, 247, 252)
             };
-            pbHeaderIcon.Paint += (s, e) =>
-            {
-                Graphics g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                using (GraphicsPath path = GetRoundedRectangle(new Rectangle(0, 0, 39, 39), 8))
-                using (LinearGradientBrush lgb = new LinearGradientBrush(new Rectangle(0, 0, 40, 40), Color.FromArgb(37, 99, 235), Color.FromArgb(79, 70, 229), 45f))
-                {
-                    g.FillPath(lgb, path);
-                }
-                FluentIconRenderer.DrawGlyph(g, '\uE8D2', new Rectangle(0, 0, 40, 40), Color.White, 22f);
-            };
-            pnlHeader.Controls.Add(pbHeaderIcon);
+            _shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));   // Header
+            _shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));    // Content
+            _shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));    // Footer
+            Controls.Add(_shell);
 
-            Label lblTitle = new Label
+            // ==========================================
+            // A. HEADER (Giống hệt phong cách AiConfigDialog)
+            // ==========================================
+            pnlHeader = new Panel
             {
-                Text = "Quản lý Phông chữ & Sửa lỗi Tiếng Việt",
-                Font = new Font("Segoe UI", 12.0f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(15, 23, 42),
-                Location = new Point(68, 12),
+                Dock = DockStyle.Fill,
+                Padding = new Padding(28, 16, 28, 6),
+                BackColor = Color.FromArgb(244, 247, 252)
+            };
+
+            lblTitle = new Label
+            {
+                Text = AppL10n.T("Quản lý Phông chữ & Tiếng Việt", "Fonts & Vietnamese Toolkit"),
+                Font = new Font("Segoe UI", 16.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(28, 37, 52),
+                Location = new Point(28, 14),
                 AutoSize = true
             };
             pnlHeader.Controls.Add(lblTitle);
 
-            Label lblSubtitle = new Label
+            lblSubtitle = new Label
             {
-                Text = "Kiểm tra mức độ tương thích tiếng Việt, trích xuất phông nhúng và tự động sửa lỗi vỡ font / bảng mã TCVN3, VNI.",
-                Font = new Font("Segoe UI", 8.8f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(70, 36),
+                Text = AppL10n.T("Kiểm tra độ tương thích tiếng Việt, trích xuất phông nhúng và sửa lỗi trực tiếp trên Slide.", "Check Vietnamese glyph support, extract embedded fonts, and fix slides in place."),
+                Font = new Font("Segoe UI", 9f),
+                ForeColor = Color.FromArgb(100, 110, 125),
+                Location = new Point(28, 49),
                 AutoSize = true
             };
             pnlHeader.Controls.Add(lblSubtitle);
 
-            // Badges Panel on Right
-            FlowLayoutPanel pnlBadges = new FlowLayoutPanel
+            // Badges góc trên bên phải
+            pnlBadges = new FlowLayoutPanel
             {
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Location = new Point(530, 16),
-                Size = new Size(430, 36),
-                FlowDirection = FlowDirection.RightToLeft,
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false,
+                Location = new Point(ClientSize.Width - 360, 20),
                 BackColor = Color.Transparent
             };
+
+            badgeTotalFonts = CreateHeaderPill(AppL10n.T("0 phông", "0 fonts"), Color.FromArgb(238, 242, 255), Color.FromArgb(79, 70, 229));
+            badgeViStatus = CreateHeaderPill(AppL10n.T("Chưa nạp tệp", "No file loaded"), Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105));
+            badgeEmbedded = CreateHeaderPill(AppL10n.T("0 nhúng", "0 embedded"), Color.FromArgb(243, 232, 255), Color.FromArgb(126, 34, 206));
+
+            pnlBadges.Controls.Add(badgeTotalFonts);
+            pnlBadges.Controls.Add(badgeViStatus);
+            pnlBadges.Controls.Add(badgeEmbedded);
             pnlHeader.Controls.Add(pnlBadges);
 
-            badgeEmbedded = CreateStatusBadge("0 phông nhúng", Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105));
-            badgeViStatus = CreateStatusBadge("Chưa nạp tệp", Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105));
-            badgeTotalFonts = CreateStatusBadge("0 phông chữ", Color.FromArgb(241, 245, 249), Color.FromArgb(71, 85, 105));
+            _shell.Controls.Add(pnlHeader, 0, 0);
 
-            pnlBadges.Controls.Add(badgeEmbedded);
-            pnlBadges.Controls.Add(badgeViStatus);
-            pnlBadges.Controls.Add(badgeTotalFonts);
+            // ==========================================
+            // B. CONTENT (Scrollable / Tabular Layout)
+            // ==========================================
+            pnlContent = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(28, 2, 28, 8),
+                BackColor = Color.FromArgb(244, 247, 252)
+            };
+            _shell.Controls.Add(pnlContent, 0, 1);
 
-            // 2. DOCUMENT BAR (Clean File Path & Actions)
-            Panel pnlFile = new Panel
+            TableLayoutPanel bodyLayout = new TableLayoutPanel
             {
-                Dock = DockStyle.Top,
-                Height = 46,
-                BackColor = Color.FromArgb(248, 250, 252),
-                Padding = new Padding(20, 8, 20, 8)
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Margin = Padding.Empty
             };
-            pnlFile.Paint += (s, e) =>
-            {
-                using (Pen p = new Pen(Color.FromArgb(226, 232, 240), 1))
-                {
-                    e.Graphics.DrawLine(p, 0, pnlFile.Height - 1, pnlFile.Width, pnlFile.Height - 1);
-                }
-                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE8A5', new Rectangle(18, 15, 16, 16), Color.FromArgb(51, 65, 85), 14f);
-            };
-            this.Controls.Add(pnlFile);
+            bodyLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));  // Toolbar
+            bodyLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // Table
+            bodyLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 148)); // Preview Card
+            pnlContent.Controls.Add(bodyLayout);
 
-            Label lblDocPrompt = new Label
+            // 1. Toolbar
+            pnlToolbar = new Panel
             {
-                Text = "Tài liệu:",
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                Location = new Point(38, 14),
-                AutoSize = true
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 0, 8),
+                BackColor = Color.FromArgb(244, 247, 252)
             };
-            pnlFile.Controls.Add(lblDocPrompt);
+            bodyLayout.Controls.Add(pnlToolbar, 0, 0);
+
+            lblDocIcon = new Label
+            {
+                Text = "📄",
+                Font = new Font("Segoe UI Emoji", 10.5f),
+                Location = new Point(0, 8),
+                Size = new Size(20, 20),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            pnlToolbar.Controls.Add(lblDocIcon);
 
             lblCurrentDoc = new Label
             {
-                Text = "Chưa có tài liệu nào được chọn. Kéo thả tệp hoặc bấm 'Chọn tệp...' để bắt đầu.",
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                Text = AppL10n.T("Slide đang mở trong ZenQ Office", "Open presentation in ZenQ Office"),
+                Font = new Font("Segoe UI", 9.2f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(96, 14),
-                Size = new Size(572, 20),
-                AutoEllipsis = true
+                Location = new Point(24, 8),
+                Size = new Size(250, 24),
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft
             };
-            pnlFile.Controls.Add(lblCurrentDoc);
+            pnlToolbar.Controls.Add(lblCurrentDoc);
 
-            btnUseCurrent = new Button
+            btnBrowse = new SettingsActionButton
             {
-                Text = "Dùng tệp đang mở",
-                Size = new Size(160, 30),
-                BackColor = Color.White,
-                ForeColor = Color.FromArgb(30, 41, 59),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.8f, FontStyle.Regular),
-                Cursor = Cursors.Hand,
-                Enabled = !string.IsNullOrEmpty(openEditorFilePath) && File.Exists(openEditorFilePath),
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE8A5', 14, 14, Color.FromArgb(30, 41, 59)),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(6, 0, 6, 0)
+                Text = AppL10n.T("Chọn tệp...", "Browse..."),
+                Size = new Size(88, 30),
+                Location = new Point(282, 5),
+                Font = new Font("Segoe UI", 8.5f)
             };
-            btnUseCurrent.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-            btnUseCurrent.Click += (s, e) =>
-            {
-                if (!string.IsNullOrEmpty(openEditorFilePath) && File.Exists(openEditorFilePath))
-                {
-                    LoadDocumentFile(openEditorFilePath);
-                }
-            };
-            pnlFile.Controls.Add(btnUseCurrent);
-
-            btnBrowse = new Button
-            {
-                Text = "Chọn tệp khác...",
-                Size = new Size(140, 30),
-                BackColor = Color.White,
-                ForeColor = Color.FromArgb(30, 41, 59),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.8f, FontStyle.Regular),
-                Cursor = Cursors.Hand,
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE838', 14, 14, Color.FromArgb(30, 41, 59)),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(6, 0, 6, 0)
-            };
-            btnBrowse.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnBrowse.Click += (s, e) => BrowseAndOpenFile();
-            pnlFile.Controls.Add(btnBrowse);
+            pnlToolbar.Controls.Add(btnBrowse);
 
-            pnlFile.Resize += (s, e) =>
+            txtSearch = new TextBox
             {
-                int rx = pnlFile.ClientSize.Width - 20;
-                btnBrowse.Location = new Point(rx - btnBrowse.Width, 8);
-                btnUseCurrent.Location = new Point(btnBrowse.Left - btnUseCurrent.Width - 8, 8);
-                lblCurrentDoc.Width = Math.Max(100, btnUseCurrent.Left - lblCurrentDoc.Left - 16);
-            };
-
-            // 3. BOTTOM FOOTER BAR
-            Panel pnlBottom = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 56,
-                BackColor = Color.FromArgb(248, 250, 252),
-                Padding = new Padding(20, 10, 20, 10)
-            };
-            pnlBottom.Paint += (s, e) =>
-            {
-                using (Pen p = new Pen(Color.FromArgb(226, 232, 240), 1))
-                {
-                    e.Graphics.DrawLine(p, 0, 0, pnlBottom.Width, 0);
-                }
-            };
-            this.Controls.Add(pnlBottom);
-
-            lblFooterHint = new Label
-            {
-                Text = "Mẹo: Nhấn chọn phông chữ trong danh sách để xem trước và nhận gợi ý chuẩn hóa.",
-                Font = new Font("Segoe UI", 8.8f, FontStyle.Italic),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(20, 18),
-                AutoSize = true
-            };
-            pnlBottom.Controls.Add(lblFooterHint);
-
-            btnClose = new Button
-            {
-                Text = "Đóng",
-                Size = new Size(100, 34),
-                BackColor = Color.White,
-                ForeColor = Color.FromArgb(51, 65, 85),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
-                Cursor = Cursors.Hand,
-                DialogResult = DialogResult.Cancel,
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 14, 14, Color.FromArgb(51, 65, 85)),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(6, 0, 6, 0)
-            };
-            btnClose.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-            btnClose.Click += (s, e) => this.Close();
-            pnlBottom.Controls.Add(btnClose);
-
-            btnFixDocument = new Button
-            {
-                Text = "Sửa lỗi Tiếng Việt & Chuyển mã...",
-                Size = new Size(255, 34),
-                BackColor = Color.FromArgb(37, 99, 235), // Primary Blue
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE90F', 16, 16, Color.White),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(8, 0, 8, 0)
-            };
-            btnFixDocument.FlatAppearance.BorderSize = 0;
-            btnFixDocument.Click += (s, e) => DoFixDocument();
-            pnlBottom.Controls.Add(btnFixDocument);
-
-            btnExportFonts = new Button
-            {
-                Text = "Trích xuất Font nhúng",
-                Size = new Size(185, 34),
-                BackColor = Color.White,
-                ForeColor = Color.FromArgb(37, 99, 235),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                Visible = false,
-                Image = FluentIconRenderer.GetGlyphBitmap('\uEDE1', 16, 16, Color.FromArgb(37, 99, 235)),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(8, 0, 8, 0)
-            };
-            btnExportFonts.FlatAppearance.BorderColor = Color.FromArgb(191, 219, 254);
-            btnExportFonts.Click += (s, e) => DoExportFonts();
-            pnlBottom.Controls.Add(btnExportFonts);
-
-            btnInstallFonts = new Button
-            {
-                Text = "Cài vào ZenQ Office",
-                Size = new Size(175, 34),
-                BackColor = Color.White,
-                ForeColor = Color.FromArgb(16, 185, 129),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                Visible = false,
-                Image = FluentIconRenderer.GetGlyphBitmap('\uE896', 16, 16, Color.FromArgb(16, 185, 129)),
-                ImageAlign = ContentAlignment.MiddleLeft,
-                TextAlign = ContentAlignment.MiddleCenter,
-                TextImageRelation = TextImageRelation.ImageBeforeText,
-                Padding = new Padding(8, 0, 8, 0)
-            };
-            btnInstallFonts.FlatAppearance.BorderColor = Color.FromArgb(167, 243, 208);
-            btnInstallFonts.Click += (s, e) => DoInstallFontToApp();
-            pnlBottom.Controls.Add(btnInstallFonts);
-
-            pnlBottom.Resize += (s, e) =>
-            {
-                int rx = pnlBottom.ClientSize.Width - 20;
-                btnClose.Location = new Point(rx - btnClose.Width, 11);
-                btnFixDocument.Location = new Point(btnClose.Left - btnFixDocument.Width - 10, 11);
-                
-                int nextLeft = btnFixDocument.Left;
-                if (btnInstallFonts.Visible)
-                {
-                    btnInstallFonts.Location = new Point(nextLeft - btnInstallFonts.Width - 10, 11);
-                    nextLeft = btnInstallFonts.Left;
-                }
-                if (btnExportFonts.Visible)
-                {
-                    btnExportFonts.Location = new Point(nextLeft - btnExportFonts.Width - 10, 11);
-                    nextLeft = btnExportFonts.Left;
-                }
-                lblFooterHint.Width = Math.Max(100, nextLeft - lblFooterHint.Left - 10);
-            };
-
-            // 4. MAIN SPLIT VIEW (Font List & Preview Card)
-            SplitContainer split = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                BackColor = Color.FromArgb(226, 232, 240),
-                SplitterWidth = 5
-            };
-            this.Controls.Add(split);
-            split.BringToFront();
-
-            this.Shown += (s, e) =>
-            {
-                try
-                {
-                    split.Panel1MinSize = 120;
-                    split.Panel2MinSize = 160;
-                    int targetDist = 280;
-                    int maxDist = split.Height - split.Panel2MinSize;
-                    if (targetDist > maxDist) targetDist = Math.Max(split.Panel1MinSize, maxDist - 10);
-                    if (targetDist >= split.Panel1MinSize && targetDist <= split.Height - split.Panel2MinSize)
-                    {
-                        split.SplitterDistance = targetDist;
-                    }
-                }
-                catch { }
-            };
-
-            // PANEL 1: MODERN DATAGRIDVIEW
-            dgvFonts = new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.None,
-                RowHeadersVisible = false,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                MultiSelect = false,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                ReadOnly = true,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                RowTemplate = { Height = 38 },
-                EnableHeadersVisualStyles = false,
-                GridColor = Color.FromArgb(241, 245, 249)
+                PlaceholderText = AppL10n.T("Tìm phông chữ...", "Search fonts..."),
+                Font = new Font("Segoe UI", 9f)
             };
-            dgvFonts.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-            dgvFonts.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(71, 85, 105);
-            dgvFonts.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
-            dgvFonts.ColumnHeadersDefaultCellStyle.Padding = new Padding(8, 0, 8, 0);
-            dgvFonts.ColumnHeadersHeight = 36;
-            dgvFonts.DefaultCellStyle.SelectionBackColor = Color.FromArgb(239, 246, 255);
-            dgvFonts.DefaultCellStyle.SelectionForeColor = Color.FromArgb(30, 58, 138);
-            dgvFonts.DefaultCellStyle.Padding = new Padding(8, 0, 8, 0);
-            dgvFonts.SelectionChanged += DgvFonts_SelectionChanged;
-            dgvFonts.CellPainting += DgvFonts_CellPainting;
+            txtSearch.TextChanged += (s, e) => ApplyFilter();
+            searchFrame = new SettingsInputFrame(txtSearch)
+            {
+                Size = new Size(205, 30),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Location = new Point(pnlContent.Width - 205 - 48, 4)
+            };
+            pnlToolbar.Controls.Add(searchFrame);
 
-            var colTypeface = dgvFonts.Columns.Add("Typeface", "Tên Phông chữ");
-            dgvFonts.Columns[colTypeface].FillWeight = 28;
-            var colVi = dgvFonts.Columns.Add("Vietnamese", "Tương thích Tiếng Việt");
-            dgvFonts.Columns[colVi].FillWeight = 26;
-            var colSource = dgvFonts.Columns.Add("Source", "Nguồn phông");
-            dgvFonts.Columns[colSource].FillWeight = 18;
-            var colFormat = dgvFonts.Columns.Add("Format", "Định dạng");
-            dgvFonts.Columns[colFormat].FillWeight = 13;
-            var colSuggestion = dgvFonts.Columns.Add("Suggestion", "Gợi ý khắc phục");
-            dgvFonts.Columns[colSuggestion].FillWeight = 20;
+            cmbFilter = new FluentComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Size = new Size(146, 30),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Location = new Point(pnlContent.Width - 367 - 48, 4),
+                Font = new Font("Segoe UI", 8.5f)
+            };
+            cmbFilter.Items.AddRange(new object[] { AppL10n.T("Tất cả phông", "All fonts"), AppL10n.T("Phông cần sửa", "Needs fix"), AppL10n.T("Phông nhúng", "Embedded") });
+            cmbFilter.SelectedIndex = 0;
+            cmbFilter.SelectedIndexChanged += (s, e) => ApplyFilter();
+            pnlToolbar.Controls.Add(cmbFilter);
 
-            split.Panel1.Controls.Add(dgvFonts);
-
-            // PANEL 2: PREVIEW & DIAGNOSTICS CARD
-            Panel pnlPreview = new Panel
+            // 2. Table DataGridView Frame
+            pnlTableCard = new Panel
             {
                 Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 0, 12),
                 BackColor = Color.White,
-                Padding = new Padding(20, 12, 20, 12)
+                Padding = new Padding(1)
             };
-            split.Panel2.Controls.Add(pnlPreview);
+            bodyLayout.Controls.Add(pnlTableCard, 0, 1);
 
-            // Top Row: Preview Label & Quick Presets
-            lblPreviewHeader = new Label
+            dgvFonts = new FontToolkitD2DTable { Dock = DockStyle.Fill, Margin = new Padding(0), BackColor = Color.White };
+            dgvFonts.SelectionChanged += DgvFonts_SelectionChanged;
+            pnlTableCard.Controls.Add(dgvFonts);
+
+            // 3. Preview Card (Thiết kế bo tròn thẻ card sạch đẹp)
+            pnlPreviewCard = new Panel
             {
-                Text = "XEM TRƯỚC VĂN BẢN VỚI PHÔNG ĐANG CHỌN:",
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(71, 85, 105),
-                Location = new Point(40, 14),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0),
+                BackColor = Color.White,
+                Padding = new Padding(16, 12, 16, 10)
+            };
+            bodyLayout.Controls.Add(pnlPreviewCard, 0, 2);
+
+            lblPreviewTitle = new Label
+            {
+                Text = AppL10n.T("Xem trước:", "Preview:"),
+                Font = new Font("Segoe UI", 8.8f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                Location = new Point(16, 12),
                 AutoSize = true
             };
-            pnlPreview.Paint += (s, e) =>
-            {
-                FluentIconRenderer.DrawGlyph(e.Graphics, '\uE890', new Rectangle(18, 14, 16, 16), Color.FromArgb(71, 85, 105), 14f);
-            };
-            pnlPreview.Controls.Add(lblPreviewHeader);
+            pnlPreviewCard.Controls.Add(lblPreviewTitle);
 
-            btnPresetDoc = CreatePresetButton("Trích từ tài liệu", 20, '\uE8A5');
-            btnPresetDoc.Click += (s, e) =>
+            lblPreviewFontBadge = new Label
             {
-                if (!string.IsNullOrEmpty(docSampleText)) txtPreviewSample.Text = docSampleText;
+                Text = "Segoe UI",
+                Font = new Font("Segoe UI", 9.2f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(79, 70, 229),
+                Location = new Point(86, 11),
+                AutoSize = true
             };
-            pnlPreview.Controls.Add(btnPresetDoc);
+            pnlPreviewCard.Controls.Add(lblPreviewFontBadge);
 
-            btnPresetSentence = CreatePresetButton("Câu văn tự nhiên", 170, '\uE8BD');
-            btnPresetSentence.Click += (s, e) =>
+            // Nút thay thế tức thì 1 phông vào Slide
+            btnReplaceCurrentFont = new SettingsActionButton
             {
-                txtPreviewSample.Text = "Hoàng hôn buông xuống trên vịnh biển tuyệt đẹp, sóng vỗ êm đềm.";
+                Text = AppL10n.T("⚡ Thay thế vào Slide", "⚡ Replace in Slide"),
+                Primary = true,
+                Size = new Size(154, 28),
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                Location = new Point(206, 7),
+                Visible = false
             };
-            pnlPreview.Controls.Add(btnPresetSentence);
+            btnReplaceCurrentFont.Click += (s, e) => DoReplaceSelectedFontDirectly();
+            pnlPreviewCard.Controls.Add(btnReplaceCurrentFont);
 
-            btnPresetDiacritics = CreatePresetButton("Đầy đủ dấu thanh", 320, '\uE8D2');
-            btnPresetDiacritics.Click += (s, e) =>
+            pnlPresetButtons = new FlowLayoutPanel
             {
-                txtPreviewSample.Text = "A Ă Â E Ê I O Ô Ơ U Ư Y • á à ả ã ạ / ắ ằ ẳ ẵ ặ / ấ ầ ẩ ẫ ậ / đ";
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                AutoSize = true,
+                Location = new Point(pnlContent.Width - 260 - 48, 5),
+                BackColor = Color.Transparent
             };
-            pnlPreview.Controls.Add(btnPresetDiacritics);
 
-            // Preview Text Input
+            btnPresetDoc = CreateSmallToggleBtn(AppL10n.T("Nội dung", "Document"));
+            btnPresetDoc.Click += (s, e) => { txtPreviewSample.Text = !string.IsNullOrEmpty(docSampleText) ? docSampleText : "Tiếng Việt thân yêu"; pbFontPreview.Invalidate(); };
+
+            btnPresetSentence = CreateSmallToggleBtn(AppL10n.T("Câu mẫu", "Sentence"));
+            btnPresetSentence.Click += (s, e) => { txtPreviewSample.Text = "Hoàng tử bé bước đi trong ánh chiều tà rực rỡ, nhìn đàn chim én chao liệng."; pbFontPreview.Invalidate(); };
+
+            btnPresetDiacritics = CreateSmallToggleBtn(AppL10n.T("Dấu thanh", "Diacritics"));
+            btnPresetDiacritics.Click += (s, e) => { txtPreviewSample.Text = "a á à ả ã ạ ă ắ ằ ẳ ẵ ặ â ấ ầ ẩ ẫ ậ e é è ẻ ẽ ẹ ê ế ề ể ễ ệ o ó ò ỏ õ ọ ô ố ồ ổ ỗ ộ ơ ớ ờ ở ỡ ợ u ú ù ủ ũ ụ ư ứ ừ ử ữ ự i í ì ỉ ĩ ị y ý ỳ ỷ ỹ ỵ đ Đ"; pbFontPreview.Invalidate(); };
+
+            pnlPresetButtons.Controls.Add(btnPresetDoc);
+            pnlPresetButtons.Controls.Add(btnPresetSentence);
+            pnlPresetButtons.Controls.Add(btnPresetDiacritics);
+            pnlPreviewCard.Controls.Add(pnlPresetButtons);
+
             txtPreviewSample = new TextBox
             {
-                Location = new Point(18, 42),
-                Size = new Size(920, 26),
-                Font = new Font("Segoe UI", 9.5f),
-                BackColor = Color.White
+                Text = "Tiếng Việt thân yêu",
+                Visible = false
             };
-            txtPreviewSample.TextChanged += (s, e) => pbFontPreview.Invalidate();
-            pnlPreview.Controls.Add(txtPreviewSample);
+            txtPreviewSample.TextChanged += (s, e) => pbFontPreview.SampleText = txtPreviewSample.Text;
+            pnlPreviewCard.Controls.Add(txtPreviewSample);
 
-            // Preview Canvas (Sharp ClearType, Wrapped & Centered)
-            pbFontPreview = new PictureBox
+            // Canvas hiển thị chữ mượt mà, sắc nét
+            pbFontPreview = new FontToolkitPreviewSurface
             {
-                Location = new Point(18, 76),
-                Height = 76,
-                BackColor = Color.FromArgb(248, 250, 252),
-                BorderStyle = BorderStyle.None
+                Location = new Point(16, 42),
+                Size = new Size(pnlContent.Width - 80, 76),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.White,
+                SampleText = "Tiếng Việt thân yêu",
+                PreviewFontName = "Segoe UI",
+                PreviewFontSize = currentPreviewFontSize
             };
-            pbFontPreview.Paint += PbFontPreview_Paint;
-            pnlPreview.Controls.Add(pbFontPreview);
-
-            // Diagnostic Alert Banner Card
-            pnlDiagnosticBanner = new Panel
-            {
-                Location = new Point(18, 160),
-                Height = 44,
-                BackColor = Color.FromArgb(240, 253, 244), // Soft Green default
-                Padding = new Padding(12, 6, 12, 6)
-            };
-            pnlDiagnosticBanner.Paint += (s, e) =>
-            {
-                Color borderCol = selectedFont == null ? Color.FromArgb(226, 232, 240) :
-                    (selectedFont.HasVietnameseSupport ? Color.FromArgb(187, 247, 208) :
-                    ((selectedFont.Format.Contains("TCVN3") || selectedFont.Format.Contains("VNI")) ? Color.FromArgb(254, 240, 138) : Color.FromArgb(254, 202, 202)));
-                using (Pen p = new Pen(borderCol, 1))
-                {
-                    e.Graphics.DrawRectangle(p, 0, 0, pnlDiagnosticBanner.Width - 1, pnlDiagnosticBanner.Height - 1);
-                }
-
-                char diagGlyph = selectedFont == null ? '\uE946' :
-                    (selectedFont.HasVietnameseSupport ? '\uE73E' : '\uE7BA');
-                Color diagColor = selectedFont == null ? Color.FromArgb(100, 116, 139) :
-                    (selectedFont.HasVietnameseSupport ? Color.FromArgb(22, 101, 52) :
-                    ((selectedFont.Format.Contains("TCVN3") || selectedFont.Format.Contains("VNI")) ? Color.FromArgb(180, 83, 9) : Color.FromArgb(185, 28, 28)));
-                FluentIconRenderer.DrawGlyph(e.Graphics, diagGlyph, new Rectangle(12, 12, 20, 20), diagColor, 16f);
-            };
-            pnlPreview.Controls.Add(pnlDiagnosticBanner);
+            pnlPreviewCard.Controls.Add(pbFontPreview);
 
             lblDiagnosticInfo = new Label
             {
-                Text = "Chọn một phông chữ ở danh sách phía trên để xem trước và kiểm tra độ tương thích tiếng Việt.",
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(22, 101, 52),
-                Location = new Point(38, 6),
-                Size = new Size(880, 32),
+                Location = new Point(16, 124),
+                Size = new Size(pnlContent.Width - 80, 34),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                Font = new Font("Segoe UI", 8.8f),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                TextAlign = ContentAlignment.MiddleLeft,
                 AutoEllipsis = true
             };
-            pnlDiagnosticBanner.Controls.Add(lblDiagnosticInfo);
+            pnlPreviewCard.Controls.Add(lblDiagnosticInfo);
 
-            pnlPreview.Resize += (s, e) =>
+            // ==========================================
+            // C. FOOTER ACTIONS (Giống phong cách AiConfigDialog)
+            // ==========================================
+            pnlFooter = new Panel
             {
-                int w = pnlPreview.ClientSize.Width - 36;
-                txtPreviewSample.Width = w;
-                pbFontPreview.Width = w;
-                pnlDiagnosticBanner.Width = w;
-                lblDiagnosticInfo.Width = Math.Max(100, w - 46);
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 14, 24, 18),
+                BackColor = Color.FromArgb(244, 247, 252)
+            };
+            _shell.Controls.Add(pnlFooter, 0, 2);
 
-                int rx = pnlPreview.ClientSize.Width - 18;
-                btnPresetDiacritics.Location = new Point(rx - btnPresetDiacritics.Width, 10);
-                btnPresetSentence.Location = new Point(btnPresetDiacritics.Left - btnPresetSentence.Width - 6, 10);
-                btnPresetDoc.Location = new Point(btnPresetSentence.Left - btnPresetDoc.Width - 6, 10);
+            var actionsTable = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 5,
+                RowCount = 1,
+                Margin = Padding.Empty
+            };
+            actionsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130)); // Trích xuất
+            actionsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); // Cài vào
+            actionsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));  // Spacer
+            actionsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84));  // Đóng
+            actionsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200)); // Sửa trực tiếp
+            pnlFooter.Controls.Add(actionsTable);
+
+            btnExportFonts = new SettingsActionButton
+            {
+                Text = AppL10n.T("Trích xuất phông", "Extract Fonts"),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 8, 0),
+                Font = new Font("Segoe UI", 9f)
+            };
+            btnExportFonts.Click += (s, e) => DoExportFonts();
+            actionsTable.Controls.Add(btnExportFonts, 0, 0);
+
+            btnInstallFonts = new SettingsActionButton
+            {
+                Text = AppL10n.T("Cài vào máy", "Install"),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 8, 0),
+                Font = new Font("Segoe UI", 9f)
+            };
+            btnInstallFonts.Click += (s, e) => DoInstallFonts();
+            actionsTable.Controls.Add(btnInstallFonts, 1, 0);
+
+            btnClose = new SettingsActionButton
+            {
+                Text = AppL10n.T("Đóng", "Close"),
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 8, 0),
+                Font = new Font("Segoe UI", 9.2f),
+                DialogResult = DialogResult.Cancel
+            };
+            btnClose.Click += (s, e) => Close();
+            actionsTable.Controls.Add(btnClose, 3, 0);
+
+            btnFixDirectly = new SettingsActionButton
+            {
+                Text = AppL10n.T("⚡ Sửa lỗi vào Slide", "⚡ Fix in Slide"),
+                Primary = true,
+                Dock = DockStyle.Fill,
+                Margin = Padding.Empty,
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold)
+            };
+            btnFixDirectly.Click += (s, e) => DoFixDirectly();
+            actionsTable.Controls.Add(btnFixDirectly, 4, 0);
+
+            CancelButton = btnClose;
+            AcceptButton = btnFixDirectly;
+
+            Shown += (s, e) =>
+            {
+                FluentUi.RoundWindow(this);
+                btnClose.Focus();
             };
         }
 
-        private Label CreateStatusBadge(string text, Color bg, Color fg)
+        private Label CreateHeaderPill(string text, Color bg, Color fg)
         {
-            Label lbl = new Label
+            var lbl = new Label
             {
                 Text = text,
-                Font = new Font("Segoe UI", 8.8f, FontStyle.Bold),
-                BackColor = bg,
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
                 ForeColor = fg,
+                BackColor = bg,
+                Padding = new Padding(8, 4, 8, 4),
+                Margin = new Padding(3, 0, 3, 0),
                 AutoSize = true,
-                Margin = new Padding(4, 3, 4, 3),
-                Padding = new Padding(8, 4, 8, 4)
+                TextAlign = ContentAlignment.MiddleCenter
             };
             lbl.Paint += (s, e) =>
             {
-                using (GraphicsPath path = GetRoundedRectangle(new Rectangle(0, 0, lbl.Width - 1, lbl.Height - 1), 6))
-                using (Pen p = new Pen(Color.FromArgb(226, 232, 240), 1))
+                using (var pen = new Pen(Color.FromArgb(50, fg), 1))
                 {
-                    e.Graphics.DrawPath(p, path);
+                    e.Graphics.DrawRectangle(pen, 0, 0, lbl.Width - 1, lbl.Height - 1);
                 }
             };
             return lbl;
         }
 
-        private Button CreatePresetButton(string text, int left, char glyph = '\0')
+        private FontSamplePresetButton CreateSmallToggleBtn(string text)
         {
-            Button btn = new Button
+            return new FontSamplePresetButton
             {
                 Text = text,
-                Location = new Point(left, 10),
-                Size = new Size(140, 26),
-                BackColor = Color.FromArgb(241, 245, 249),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8.2f, FontStyle.Regular),
-                Cursor = Cursors.Hand
+                Size = new Size(76, 28),
+                Margin = new Padding(3, 0, 3, 0),
+                Font = new Font("Segoe UI", 8.5f)
             };
-            btn.FlatAppearance.BorderSize = 0;
-            if (glyph != '\0')
-            {
-                btn.Image = FluentIconRenderer.GetGlyphBitmap(glyph, 13, 13, Color.FromArgb(51, 65, 85));
-                btn.ImageAlign = ContentAlignment.MiddleLeft;
-                btn.TextAlign = ContentAlignment.MiddleCenter;
-                btn.TextImageRelation = TextImageRelation.ImageBeforeText;
-                btn.Padding = new Padding(4, 0, 4, 0);
-            }
-            return btn;
-        }
-
-        private GraphicsPath GetRoundedRectangle(Rectangle bounds, int radius)
-        {
-            GraphicsPath path = new GraphicsPath();
-            int diameter = radius * 2;
-            Rectangle arc = new Rectangle(bounds.Location, new Size(diameter, diameter));
-
-            path.AddArc(arc, 180, 90);
-            arc.X = bounds.Right - diameter;
-            path.AddArc(arc, 270, 90);
-            arc.Y = bounds.Bottom - diameter;
-            path.AddArc(arc, 0, 90);
-            arc.X = bounds.Left;
-            path.AddArc(arc, 90, 90);
-            path.CloseFigure();
-            return path;
         }
 
         private void Form_DragEnter(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                e.Effect = DragDropEffects.Copy;
-            }
+            if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy;
         }
 
         private void Form_DragDrop(object sender, DragEventArgs e)
         {
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            if (files != null && files.Length > 0)
-            {
-                LoadDocumentFile(files[0]);
-            }
+            if (files != null && files.Length > 0) LoadDocumentFile(files[0]);
         }
 
         private void BrowseAndOpenFile()
         {
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                ofd.Filter = "Tệp Office & Font (*.docx;*.pptx;*.ttf;*.otf)|*.docx;*.pptx;*.ttf;*.otf|Văn bản Word (*.docx)|*.docx|Bài thuyết trình PowerPoint (*.pptx)|*.pptx|Phông chữ TrueType / OpenType (*.ttf;*.otf)|*.ttf;*.otf|Tất cả tệp (*.*)|*.*";
-                ofd.Title = "Chọn tệp cần kiểm tra phông chữ và sửa tiếng Việt";
+                ofd.Filter = AppL10n.T("Tệp Office & Phông chữ (*.pptx;*.docx;*.ttf;*.otf)|*.pptx;*.docx;*.ttf;*.otf|Bài thuyết trình PowerPoint (*.pptx)|*.pptx|Văn bản Word (*.docx)|*.docx|Phông chữ TrueType / OpenType (*.ttf;*.otf)|*.ttf;*.otf|Tất cả tệp (*.*)|*.*", "Office & Font Files (*.pptx;*.docx;*.ttf;*.otf)|*.pptx;*.docx;*.ttf;*.otf|PowerPoint (*.pptx)|*.pptx|Word (*.docx)|*.docx|Fonts (*.ttf;*.otf)|*.ttf;*.otf|All Files (*.*)|*.*");
+                ofd.Title = AppL10n.T("Chọn tệp cần kiểm tra phông chữ", "Select File to Check Fonts");
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
                     LoadDocumentFile(ofd.FileName);
@@ -647,533 +510,674 @@ namespace ZenQOffice.UI
             }
         }
 
-        public void LoadDocumentFile(string path)
+        private void LoadActiveOrSpecifiedDocument(string specifiedPath)
+        {
+            var app = AppForm.Instance;
+
+            // 1. Nếu có Presentation đang mở trên Slide Canvas trong ZenQ Office -> Nạp trực tiếp!
+            if (app != null && app.SlidesView?.Presentation != null && app.SlidesView.Presentation.Slides.Count > 0)
+            {
+                isLiveSlideMode = true;
+                btnFixDirectly.Text = AppL10n.T("⚡ Sửa lỗi vào Slide", "⚡ Fix in Slide");
+                if (app.Ribbon != null && app.Ribbon.ActiveDocIndex >= 0 && app.Ribbon.ActiveDocIndex < app.Ribbon.DocTabs.Count)
+                {
+                    var tab = app.Ribbon.DocTabs[app.Ribbon.ActiveDocIndex];
+                    lblCurrentDoc.Text = !string.IsNullOrEmpty(tab.Title) ? tab.Title : AppL10n.T("Slide đang mở", "Open Slide");
+                    activeDocumentPath = tab.FilePath ?? "";
+                }
+                else
+                {
+                    lblCurrentDoc.Text = AppL10n.T("Bài trình chiếu đang mở", "Open Presentation");
+                    activeDocumentPath = specifiedPath ?? "";
+                }
+                LoadFromActivePresentation(app.SlidesView.Presentation);
+                return;
+            }
+
+            // 2. Nếu có đường dẫn truyền vào hoặc tệp lưu trên ổ đĩa
+            if (!string.IsNullOrEmpty(specifiedPath) && File.Exists(specifiedPath))
+            {
+                LoadDocumentFile(specifiedPath);
+                return;
+            }
+
+            lblCurrentDoc.Text = AppL10n.T("Chưa có tài liệu nào", "No document loaded");
+            badgeTotalFonts.Text = AppL10n.T("0 phông", "0 fonts");
+            badgeViStatus.Text = AppL10n.T("Chưa nạp tệp", "No file loaded");
+            badgeEmbedded.Text = AppL10n.T("0 nhúng", "0 embedded");
+            btnFixDirectly.Enabled = false;
+        }
+
+        private void LoadFromActivePresentation(PresentationRoot pres)
+        {
+            if (pres == null) return;
+            try
+            {
+                currentFontList = VietnameseFontToolkit.AnalyzePresentationModel(pres, activeDocumentPath);
+                docSampleText = VietnameseFontToolkit.ExtractPresentationSampleText(pres, 120);
+                if (string.IsNullOrEmpty(docSampleText)) docSampleText = "Tiếng Việt thân yêu";
+                txtPreviewSample.Text = docSampleText;
+
+                UpdateBadgesAndDisplay();
+            }
+            catch (Exception ex)
+            {
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Lỗi khi đọc phông từ Slide: ", "Error reading fonts from Slide: ") + ex.Message, AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void LoadDocumentFile(string path)
         {
             if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
-
-            activeDocumentPath = path;
-            lblCurrentDoc.Text = Path.GetFileName(path) + " (" + path + ")";
-            dgvFonts.Rows.Clear();
-
-            // 1. Trích xuất đoạn văn thực tế từ tài liệu để xem trước
-            docSampleText = VietnameseFontToolkit.ExtractDocumentSampleText(path);
-            if (!string.IsNullOrEmpty(docSampleText))
+            try
             {
+                activeDocumentPath = path;
+                string fname = Path.GetFileName(path);
+                lblCurrentDoc.Text = fname;
+
+                var app = AppForm.Instance;
+                isLiveSlideMode = (app != null && app.Ribbon != null && app.Ribbon.CurrentMode == OfficeAppMode.Slides && app.SlidesView?.Presentation != null);
+                btnFixDirectly.Text = isLiveSlideMode ? AppL10n.T("⚡ Sửa lỗi vào Slide", "⚡ Fix in Slide") : AppL10n.T("⚡ Sửa lỗi trực tiếp", "⚡ Fix Directly");
+
+                currentFontList = VietnameseFontToolkit.AnalyzeDocumentFonts(path);
+                docSampleText = VietnameseFontToolkit.ExtractDocumentSampleText(path, 120);
+                if (string.IsNullOrEmpty(docSampleText)) docSampleText = "Tiếng Việt thân yêu";
                 txtPreviewSample.Text = docSampleText;
-                btnPresetDoc.Enabled = true;
+
+                UpdateBadgesAndDisplay();
             }
-            else
+            catch (Exception ex)
             {
-                txtPreviewSample.Text = "Hoàng hôn buông xuống trên vịnh biển tuyệt đẹp, sóng vỗ êm đềm.";
-                btnPresetDoc.Enabled = false;
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể đọc phông từ tệp: ", "Unable to read fonts from file: ") + ex.Message, AppL10n.T("Lỗi đọc tệp", "Read Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
 
-            // 2. Phân tích danh sách phông chữ trong tệp
-            currentFontList = VietnameseFontToolkit.AnalyzeDocumentFonts(path);
-
+        private void UpdateBadgesAndDisplay()
+        {
             int total = currentFontList.Count;
-            int embedded = 0;
-            int problem = 0;
+            int needsFix = currentFontList.Count(f => !f.HasVietnameseSupport || (f.Format != null && (f.Format.Contains("TCVN3") || f.Format.Contains("VNI"))));
+            int embedded = currentFontList.Count(f => f.IsEmbedded);
 
-            foreach (var f in currentFontList)
+            badgeTotalFonts.Text = AppL10n.T($"{total} phông", $"{total} fonts");
+            badgeEmbedded.Text = AppL10n.T($"{embedded} font nhúng", $"{embedded} embedded");
+
+            if (needsFix > 0)
             {
-                if (f.IsEmbedded) embedded++;
-                if (!f.HasVietnameseSupport) problem++;
-
-                string viStatus;
-                if (f.Format.Contains("TCVN3"))
-                {
-                    viStatus = "⚠ Mã cũ TCVN3 (ABC)";
-                }
-                else if (f.Format.Contains("VNI"))
-                {
-                    viStatus = "⚠ Mã cũ VNI-Windows";
-                }
-                else if (f.HasVietnameseSupport)
-                {
-                    viStatus = "✓ Chuẩn Unicode (100%)";
-                }
-                else
-                {
-                    viStatus = $"⚠ Thiếu {f.MissingVietnameseChars.Count} dấu";
-                }
-
-                string sourceStr;
-                if (f.IsEmbedded)
-                {
-                    sourceStr = f.FileSize > 0 ? $"Nhúng ({f.FileSize / 1024:N0} KB)" : "Nhúng trong tệp";
-                }
-                else if (f.IsInstalledOnSystem)
-                {
-                    sourceStr = "Đã có trên máy";
-                }
-                else
-                {
-                    sourceStr = "Chưa có trên máy";
-                }
-
-                string typefaceDisplay = f.IsUsedInDocumentBody ? $"{f.Typeface} (Nội dung)" : f.Typeface;
-
-                dgvFonts.Rows.Add(
-                    typefaceDisplay,
-                    viStatus,
-                    sourceStr,
-                    f.Format,
-                    f.HasVietnameseSupport ? "--" : f.SuggestedVietnameseFont
-                );
-            }
-
-            // 3. Cập nhật Badge Trạng thái
-            badgeTotalFonts.Text = $"{total} phông chữ";
-            
-            if (problem == 0)
-            {
-                badgeViStatus.Text = "100% Chuẩn Tiếng Việt";
-                badgeViStatus.BackColor = Color.FromArgb(220, 252, 231);
-                badgeViStatus.ForeColor = Color.FromArgb(22, 101, 52);
-                btnFixDocument.BackColor = Color.FromArgb(241, 245, 249);
-                btnFixDocument.ForeColor = Color.FromArgb(51, 65, 85);
+                badgeViStatus.Text = AppL10n.T($"{needsFix} cần sửa", $"{needsFix} need fix");
+                badgeViStatus.BackColor = Color.FromArgb(254, 242, 242);
+                badgeViStatus.ForeColor = Color.FromArgb(220, 38, 38);
             }
             else
             {
-                badgeViStatus.Text = $"{problem} phông cần chuyển mã";
-                badgeViStatus.BackColor = Color.FromArgb(254, 243, 199);
-                badgeViStatus.ForeColor = Color.FromArgb(146, 64, 14);
-                btnFixDocument.BackColor = Color.FromArgb(37, 99, 235);
-                btnFixDocument.ForeColor = Color.White;
+                badgeViStatus.Text = AppL10n.T("100% Tiếng Việt", "100% Vietnamese");
+                badgeViStatus.BackColor = Color.FromArgb(240, 253, 244);
+                badgeViStatus.ForeColor = Color.FromArgb(22, 163, 74);
             }
 
-            if (embedded > 0)
+            btnExportFonts.Text = AppL10n.T($"Trích xuất ({embedded})", $"Extract ({embedded})");
+            btnExportFonts.Enabled = embedded > 0;
+            btnInstallFonts.Enabled = embedded > 0;
+            btnFixDirectly.Enabled = total > 0;
+
+            ApplyFilter();
+        }
+
+        private void ApplyFilter()
+        {
+            string keyword = txtSearch.Text?.Trim().ToLowerInvariant() ?? "";
+            int filterMode = cmbFilter.SelectedIndex; // 0: All, 1: Needs fix, 2: Embedded
+
+            displayedFontList = currentFontList.FindAll(f =>
             {
-                badgeEmbedded.Text = $"{embedded} font nhúng";
-                badgeEmbedded.BackColor = Color.FromArgb(219, 234, 254);
-                badgeEmbedded.ForeColor = Color.FromArgb(30, 64, 175);
-                btnExportFonts.Visible = true;
-                btnInstallFonts.Visible = true;
-            }
-            else
+                if (filterMode == 1 && (f.HasVietnameseSupport && !(f.Format != null && (f.Format.Contains("TCVN3") || f.Format.Contains("VNI"))))) return false;
+                if (filterMode == 2 && !f.IsEmbedded) return false;
+
+                if (!string.IsNullOrEmpty(keyword))
+                {
+                    bool matchName = f.Typeface != null && f.Typeface.ToLowerInvariant().Contains(keyword);
+                    bool matchSuggest = f.SuggestedVietnameseFont != null && f.SuggestedVietnameseFont.ToLowerInvariant().Contains(keyword);
+                    if (!matchName && !matchSuggest) return false;
+                }
+                return true;
+            });
+
+            var rows = new List<FontToolkitD2DTable.Row>();
+            foreach (var f in displayedFontList)
             {
-                badgeEmbedded.Text = "Hệ thống (Không nhúng font)";
-                badgeEmbedded.BackColor = Color.FromArgb(241, 245, 249);
-                badgeEmbedded.ForeColor = Color.FromArgb(100, 116, 139);
-                btnExportFonts.Visible = false;
-                btnInstallFonts.Visible = false;
+                string statusText = (f.Format != null && (f.Format.Contains("TCVN3") || f.Format.Contains("VNI")))
+                    ? AppL10n.T($"⚠ Mã {f.Format}", $"⚠ {f.Format} Encoding")
+                    : (f.HasVietnameseSupport
+                        ? AppL10n.T("✓ Chuẩn Unicode", "✓ Unicode Ready")
+                        : AppL10n.T($"⚠ Thiếu {(f.MissingVietnameseChars != null ? f.MissingVietnameseChars.Count : 0)} dấu", $"⚠ Missing {(f.MissingVietnameseChars != null ? f.MissingVietnameseChars.Count : 0)} glyphs"));
+                string srcText = f.IsEmbedded
+                    ? AppL10n.T($"Nhúng ({f.FileSize / 1024} KB)", $"Embedded ({f.FileSize / 1024} KB)")
+                    : AppL10n.T("Đã có trên máy", "System Installed");
+                string sugText = !f.HasVietnameseSupport && !string.IsNullOrEmpty(f.SuggestedVietnameseFont) ? $"➔ {f.SuggestedVietnameseFont}" : "--";
+                rows.Add(new FontToolkitD2DTable.Row(f, statusText, srcText, sugText));
             }
 
-            // 4. Chọn dòng đầu tiên
-            if (dgvFonts.Rows.Count > 0)
+            dgvFonts.SetRows(rows);
+            if (displayedFontList.Count > 0)
             {
-                dgvFonts.Rows[0].Selected = true;
-                selectedFont = currentFontList[0];
-                UpdateDiagnosticPanel();
+                selectedFont = displayedFontList[0];
             }
             else
             {
                 selectedFont = null;
-                UpdateDiagnosticPanel();
+            }
+            UpdatePreviewCard();
+        }
+
+        private void DgvFonts_SelectionChanged(object sender, EventArgs e)
+        {
+            int idx = dgvFonts.SelectedIndex;
+            if (idx >= 0 && idx < displayedFontList.Count)
+            {
+                selectedFont = displayedFontList[idx];
+                UpdatePreviewCard();
+            }
+        }
+
+        private void UpdatePreviewCard()
+        {
+            if (selectedFont == null)
+            {
+                lblPreviewFontBadge.Text = "--";
+                btnReplaceCurrentFont.Visible = false;
+                lblDiagnosticInfo.Text = AppL10n.T("Chọn một phông chữ trong bảng phía trên để xem trước.", "Select a font from the table above to preview.");
+                pbFontPreview.PreviewFontName = "Segoe UI";
+                pbFontPreview.Invalidate();
+                return;
+            }
+
+            lblPreviewFontBadge.Text = selectedFont.Typeface;
+            pbFontPreview.PreviewFontName = selectedFont.Typeface;
+
+            // Nếu phông bị thiếu dấu -> Hiện nút thay thế 1-click vào Slide!
+            if (!selectedFont.HasVietnameseSupport && !string.IsNullOrEmpty(selectedFont.SuggestedVietnameseFont))
+            {
+                btnReplaceCurrentFont.Text = AppL10n.T($"⚡ Thay sang {selectedFont.SuggestedVietnameseFont}", $"⚡ Switch to {selectedFont.SuggestedVietnameseFont}");
+                btnReplaceCurrentFont.Visible = isLiveSlideMode;
+                lblDiagnosticInfo.Text = AppL10n.T($"⚠ Phông '{selectedFont.Typeface}' thiếu {(selectedFont.MissingVietnameseChars != null ? selectedFont.MissingVietnameseChars.Count : 0)} dấu tiếng Việt. Bấm nút phía trên để tự động đổi sang '{selectedFont.SuggestedVietnameseFont}'.", $"⚠ Font '{selectedFont.Typeface}' is missing {(selectedFont.MissingVietnameseChars != null ? selectedFont.MissingVietnameseChars.Count : 0)} Vietnamese glyphs. Click above to replace with '{selectedFont.SuggestedVietnameseFont}'.");
+                lblDiagnosticInfo.ForeColor = Color.FromArgb(220, 38, 38);
+            }
+            else if ((selectedFont.Format != null && (selectedFont.Format.Contains("TCVN3") || selectedFont.Format.Contains("VNI"))))
+            {
+                btnReplaceCurrentFont.Visible = false;
+                lblDiagnosticInfo.Text = AppL10n.T($"⚠ Phông đang dùng bảng mã cũ {selectedFont.Format}. Bấm 'Sửa lỗi vào Slide' để chuyển toàn bộ sang Unicode.", $"⚠ Font uses legacy {selectedFont.Format} encoding. Click 'Fix in Slide' to convert to Unicode.");
+                lblDiagnosticInfo.ForeColor = Color.FromArgb(217, 119, 6);
+            }
+            else
+            {
+                btnReplaceCurrentFont.Visible = false;
+                lblDiagnosticInfo.Text = AppL10n.T($"✓ Phông '{selectedFont.Typeface}' hỗ trợ đầy đủ 100% tiếng Việt chuẩn Unicode, nét chữ rõ ràng và mượt mà.", $"✓ Font '{selectedFont.Typeface}' has 100% Unicode Vietnamese support.");
+                lblDiagnosticInfo.ForeColor = Color.FromArgb(22, 163, 74);
             }
 
             pbFontPreview.Invalidate();
         }
 
-        private void DgvFonts_SelectionChanged(object sender, EventArgs e)
+        /// <summary>
+        /// Thay thế tức thì 1 phông chữ đang chọn trên toàn bộ Slide
+        /// </summary>
+        private void DoReplaceSelectedFontDirectly()
         {
-            if (dgvFonts.SelectedRows.Count > 0)
+            if (selectedFont == null || string.IsNullOrEmpty(selectedFont.SuggestedVietnameseFont)) return;
+
+            var app = AppForm.Instance;
+            if (app?.SlidesView?.Presentation == null)
             {
-                int idx = dgvFonts.SelectedRows[0].Index;
-                if (idx >= 0 && idx < currentFontList.Count)
-                {
-                    selectedFont = currentFontList[idx];
-                    UpdateDiagnosticPanel();
-                    pbFontPreview.Invalidate();
-                }
-            }
-        }
-
-        private void DgvFonts_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
-        {
-            if (e.RowIndex < 0) return;
-
-            // Cột 1: Tình trạng Tiếng Việt (Render Soft Pill Badge với Fluent Icon)
-            if (e.ColumnIndex == 1 && e.Value != null)
-            {
-                e.PaintBackground(e.ClipBounds, (e.State & DataGridViewElementStates.Selected) != 0);
-
-                string rawStatus = e.Value.ToString();
-                string cleanText = rawStatus.TrimStart('✓', '⚠', ' ', '\t');
-                bool isSuccess = rawStatus.StartsWith("✓") || rawStatus.Contains("100%");
-                bool isLegacyCode = rawStatus.Contains("TCVN3") || rawStatus.Contains("VNI");
-
-                Color pillBg;
-                Color pillFg;
-
-                if (isSuccess)
-                {
-                    pillBg = Color.FromArgb(222, 247, 236); // Green 100
-                    pillFg = Color.FromArgb(3, 84, 63);     // Green 800
-                }
-                else if (isLegacyCode)
-                {
-                    pillBg = Color.FromArgb(254, 240, 138); // Yellow 200
-                    pillFg = Color.FromArgb(133, 77, 14);   // Yellow 900
-                }
-                else
-                {
-                    pillBg = Color.FromArgb(254, 226, 226); // Red 100
-                    pillFg = Color.FromArgb(153, 27, 27);   // Red 800
-                }
-
-                Graphics g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-
-                using (Font font = new Font("Segoe UI", 8.2f, FontStyle.Bold))
-                {
-                    SizeF sz = g.MeasureString(cleanText, font);
-                    int pillW = (int)sz.Width + 28;
-                    int pillH = 22;
-                    int pillX = e.CellBounds.Left + 8;
-                    int pillY = e.CellBounds.Top + (e.CellBounds.Height - pillH) / 2;
-
-                    Rectangle pillRect = new Rectangle(pillX, pillY, pillW, pillH);
-                    using (GraphicsPath path = GetRoundedRectangle(pillRect, 6))
-                    using (SolidBrush bBg = new SolidBrush(pillBg))
-                    using (SolidBrush bFg = new SolidBrush(pillFg))
-                    {
-                        g.FillPath(bBg, path);
-
-                        // Draw genuine Windows 11 Fluent Icon
-                        char glyph = isSuccess ? '\uE73E' : '\uE7BA';
-                        FluentIconRenderer.DrawGlyph(g, glyph, new Rectangle(pillX + 6, pillY + (pillH - 12) / 2, 12, 12), pillFg, 10f);
-
-                        StringFormat sf = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
-                        Rectangle textRect = new Rectangle(pillX + 21, pillY, pillW - 22, pillH);
-                        g.DrawString(cleanText, font, bFg, textRect, sf);
-                    }
-                }
-
-                e.Handled = true;
-            }
-        }
-
-        private void UpdateDiagnosticPanel()
-        {
-            if (selectedFont == null)
-            {
-                lblPreviewHeader.Text = "XEM TRƯỚC VĂN BẢN VỚI PHÔNG ĐANG CHỌN:";
-                pnlDiagnosticBanner.BackColor = Color.FromArgb(248, 250, 252);
-                lblDiagnosticInfo.Text = "Chọn một phông chữ trong danh sách phía trên để xem trước và kiểm tra độ tương thích tiếng Việt.";
-                lblDiagnosticInfo.ForeColor = Color.FromArgb(100, 116, 139);
-                pnlDiagnosticBanner.Invalidate();
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không tìm thấy bài thuyết trình đang mở.", "No open presentation found."), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            lblPreviewHeader.Text = $"XEM TRƯỚC VĂN BẢN VỚI PHÔNG: {selectedFont.Typeface.ToUpperInvariant()}";
+            string oldFont = selectedFont.Typeface;
+            string newFont = selectedFont.SuggestedVietnameseFont;
 
-            if (selectedFont.Format.Contains("TCVN3"))
+            int count = VietnameseFontToolkit.ReplaceSingleFontInPresentation(app.SlidesView.Presentation, oldFont, newFont);
+
+            if (count > 0)
             {
-                pnlDiagnosticBanner.BackColor = Color.FromArgb(254, 252, 232); // Amber 50
-                lblDiagnosticInfo.Text = $"CẢNH BÁO BẢNG MÃ TCVN3 (ABC): Phông '{selectedFont.Typeface}' sử dụng mã 1-byte cũ, gây lỗi dấu khi mở trên máy khác.\nNhấn nút 'Sửa lỗi Tiếng Việt & Chuyển mã' để tự động chuyển toàn bộ văn bản sang Unicode chuẩn (Times New Roman).";
-                lblDiagnosticInfo.ForeColor = Color.FromArgb(146, 64, 14);
-            }
-            else if (selectedFont.Format.Contains("VNI"))
-            {
-                pnlDiagnosticBanner.BackColor = Color.FromArgb(254, 252, 232); // Amber 50
-                lblDiagnosticInfo.Text = $"CẢNH BÁO BẢNG MÃ VNI: Phông '{selectedFont.Typeface}' sử dụng mã VNI-Windows cũ, không tương thích tiêu chuẩn hiện đại.\nNhấn nút 'Sửa lỗi Tiếng Việt & Chuyển mã' để tự động chuyển toàn bộ văn bản sang Unicode chuẩn.";
-                lblDiagnosticInfo.ForeColor = Color.FromArgb(146, 64, 14);
-            }
-            else if (selectedFont.HasVietnameseSupport)
-            {
-                pnlDiagnosticBanner.BackColor = Color.FromArgb(240, 253, 244); // Green 50
-                lblDiagnosticInfo.Text = $"Phông chữ '{selectedFont.Typeface}' hỗ trợ đầy đủ 100% tiếng Việt chuẩn Unicode.\nVăn bản sử dụng phông chữ này hiển thị rõ nét, mượt mà và an toàn trên mọi thiết bị.";
-                lblDiagnosticInfo.ForeColor = Color.FromArgb(22, 101, 52);
+                if (app.Ribbon != null && app.Ribbon.ActiveDocIndex >= 0)
+                {
+                    app.Ribbon.DocTabs[app.Ribbon.ActiveDocIndex].IsModified = true;
+                }
+
+                // Cập nhật tệp trên đĩa nếu có
+                if (!string.IsNullOrEmpty(activeDocumentPath) && File.Exists(activeDocumentPath))
+                {
+                    try { Format.PptxHandler.SavePptx(activeDocumentPath, app.SlidesView.Presentation); } catch { }
+                }
+
+                app.SlidesView.Invalidate();
+                app.Invalidate();
+
+                LoadFromActivePresentation(app.SlidesView.Presentation);
+
+                ZenQOffice.UI.FluentMessageBox.Show(this,
+                    AppL10n.T($"Đã thay thế thành công phông '{oldFont}' thành '{newFont}' tại {count} vị trí trên toàn bộ các slide!", $"Replaced font '{oldFont}' with '{newFont}' across {count} location(s)."),
+                    AppL10n.T("Thay thế phông hoàn tất", "Font Replaced"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             }
             else
             {
-                pnlDiagnosticBanner.BackColor = Color.FromArgb(254, 242, 242); // Red 50
-                lblDiagnosticInfo.Text = $"CẢNH BÁO VỠ PHÔNG: Phông '{selectedFont.Typeface}' thiếu {selectedFont.MissingVietnameseChars.Count} ký tự có dấu tiếng Việt.\nKhuyến nghị: Thay thế bằng phông '{selectedFont.SuggestedVietnameseFont}' có kiểu dáng tương đương và đầy đủ dấu.";
-                lblDiagnosticInfo.ForeColor = Color.FromArgb(153, 27, 27);
+                ZenQOffice.UI.FluentMessageBox.Show(this,
+                    AppL10n.T($"Không tìm thấy văn bản nào đang sử dụng phông '{oldFont}'.", $"No text found using font '{oldFont}'."),
+                    AppL10n.T("Thông báo", "Notice"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             }
-
-            pnlDiagnosticBanner.Invalidate();
         }
 
-        private void PbFontPreview_Paint(object sender, PaintEventArgs e)
+        /// <summary>
+        /// Sửa lỗi tiếng Việt và thay thế toàn bộ phông lỗi TRỰC TIẾP trên Slide/Tài liệu đang mở (Không lưu sang file khác!)
+        /// </summary>
+        private void DoFixDirectly()
         {
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+            var app = AppForm.Instance;
 
-            // Draw Background and subtle border
-            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(248, 250, 252)))
+            // Tuỳ chọn chuẩn hóa
+            FontFixOptions options = new FontFixOptions
             {
-                g.FillRectangle(bgBrush, pbFontPreview.ClientRectangle);
-            }
-            using (Pen borderPen = new Pen(Color.FromArgb(226, 232, 240), 1))
+                ConvertTcvn3 = true,
+                ConvertVni = true,
+                NormalizeNfc = true,
+                ReplaceUnsupportedFonts = true
+            };
+
+            // 1. Nếu đang mở Slide trong ZenQ Office -> Sửa trực tiếp trên Presentation trong RAM!
+            if (app != null && app.SlidesView?.Presentation != null && app.SlidesView.Presentation.Slides.Count > 0)
             {
-                g.DrawRectangle(borderPen, 0, 0, pbFontPreview.Width - 1, pbFontPreview.Height - 1);
-            }
+                var report = VietnameseFontToolkit.FixPresentationModel(app.SlidesView.Presentation, options);
 
-            string text = txtPreviewSample.Text;
-            if (string.IsNullOrEmpty(text)) text = "Tiếng Việt thân yêu";
-
-            string fontName = (selectedFont != null && !string.IsNullOrEmpty(selectedFont.Typeface)) ? selectedFont.Typeface : "Segoe UI";
-
-            float fontSize = text.Length > 60 ? 13.5f : 16.0f;
-
-            using (Font f = SlideFontManager.CreateFont(fontName, fontSize, FontStyle.Regular, GraphicsUnit.Point))
-            using (SolidBrush b = new SolidBrush(Color.FromArgb(15, 23, 42)))
-            {
-                RectangleF layoutRect = new RectangleF(16, 10, pbFontPreview.Width - 32, pbFontPreview.Height - 20);
-                StringFormat sf = new StringFormat
+                if (report != null && report.Success)
                 {
-                    Alignment = StringAlignment.Near,
-                    LineAlignment = StringAlignment.Center,
-                    Trimming = StringTrimming.EllipsisWord,
-                    FormatFlags = StringFormatFlags.NoClip
-                };
-                g.DrawString(text, f, b, layoutRect, sf);
+                    // Đánh dấu tài liệu đã sửa
+                    if (app.Ribbon != null && app.Ribbon.ActiveDocIndex >= 0)
+                    {
+                        app.Ribbon.DocTabs[app.Ribbon.ActiveDocIndex].IsModified = true;
+                    }
+
+                    // Đánh dấu làm mới ảnh thu nhỏ của toàn bộ Slide để cập nhật ngay trên thanh bên trái
+                    foreach (var sl in app.SlidesView.Presentation.Slides)
+                    {
+                        if (sl != null) sl.IsThumbnailDirty = true;
+                    }
+                    try { ZenQOffice.UI.D2DGraphics.ClearFontCache(); } catch { }
+
+                    // Tự động ghi đè tệp làm việc tạm/gốc trên đĩa nếu có để bảo toàn
+                    if (!string.IsNullOrEmpty(activeDocumentPath) && File.Exists(activeDocumentPath))
+                    {
+                        try { Format.PptxHandler.SavePptx(activeDocumentPath, app.SlidesView.Presentation); } catch { }
+                    }
+
+                    // Vẽ lại Slide Canvas ngay lập tức
+                    app.SlidesView.Invalidate();
+                    app.Invalidate();
+
+                    // Cập nhật lại danh sách phông trên hộp thoại
+                    LoadFromActivePresentation(app.SlidesView.Presentation);
+
+                    string repDetail = report.Message;
+                    if (report.ReplacedFonts.Count > 0)
+                    {
+                        repDetail += AppL10n.T("\n\nCác phông đã được thay thế đẹp mắt:\n- ", "\n\nFonts replaced cleanly:\n- ") + string.Join("\n- ", report.ReplacedFonts);
+                    }
+
+                    ZenQOffice.UI.FluentMessageBox.Show(this,
+                        repDetail + AppL10n.T("\n\nToàn bộ phông chữ lỗi đã được cập nhật trực tiếp trên Slide của bạn!", "\n\nAll incompatible fonts have been updated directly on your slides!"),
+                        AppL10n.T("Sửa lỗi trực tiếp thành công", "Fix Complete"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+                else
+                {
+                    ZenQOffice.UI.FluentMessageBox.Show(this, report?.Message ?? AppL10n.T("Có lỗi khi xử lý bài trình chiếu.", "An error occurred while processing the presentation."), AppL10n.T("Lỗi", "Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
+            }
+
+            // 2. Nếu người dùng chọn tệp ngoài từ ổ đĩa (không mở trong tab)
+            if (!string.IsNullOrEmpty(activeDocumentPath) && File.Exists(activeDocumentPath))
+            {
+                string ext = Path.GetExtension(activeDocumentPath).ToLowerInvariant();
+                string dir = Path.GetDirectoryName(activeDocumentPath);
+                string nameNoExt = Path.GetFileNameWithoutExtension(activeDocumentPath);
+                string defaultOut = Path.Combine(dir, $"{nameNoExt}_Fixed_Vietnamese{ext}");
+
+                using (SaveFileDialog sfd = new SaveFileDialog())
+                {
+                    sfd.FileName = Path.GetFileName(defaultOut);
+                    sfd.Filter = ext == ".pptx" ? AppL10n.T("Bài thuyết trình PowerPoint (*.pptx)|*.pptx", "PowerPoint Presentation (*.pptx)|*.pptx") : AppL10n.T("Văn bản Word (*.docx)|*.docx", "Word Document (*.docx)|*.docx");
+                    sfd.Title = AppL10n.T("Chọn nơi lưu tệp đã chuẩn hóa tiếng Việt", "Save Fixed File");
+                    if (sfd.ShowDialog(this) == DialogResult.OK)
+                    {
+                        DocumentFixReport report = (ext == ".pptx")
+                            ? VietnameseFontToolkit.FixPresentationVietnamese(activeDocumentPath, sfd.FileName, options)
+                            : VietnameseFontToolkit.FixDocxVietnamese(activeDocumentPath, sfd.FileName, options);
+
+                        if (report != null && report.Success)
+                        {
+                            ZenQOffice.UI.FluentMessageBox.Show(this,
+                                AppL10n.T($"{report.Message}\n\nTệp đã lưu tại:\n{sfd.FileName}", $"{report.Message}\n\nSaved to:\n{sfd.FileName}"),
+                                AppL10n.T("Hoàn tất chuẩn hóa", "Normalization Complete"),
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                            LoadDocumentFile(sfd.FileName);
+                        }
+                    }
+                }
             }
         }
 
         private void DoExportFonts()
         {
-            if (currentFontList.Count == 0)
+            List<ExtractedFontInfo> embeddedOnly = currentFontList.FindAll(f => f.Data != null && f.Data.Length > 0);
+
+            if (embeddedOnly.Count == 0 && SlideFontManager.EmbeddedFontFiles.Count > 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng mở một tệp PPTX hoặc DOCX có chứa phông chữ trước khi trích xuất.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
+                foreach (var kvp in SlideFontManager.EmbeddedFontFiles)
+                {
+                    string tf = null;
+                    SlideFontManager.EmbeddedFontTypefaces.TryGetValue(kvp.Key, out tf);
+                    if (string.IsNullOrEmpty(tf)) tf = Path.GetFileNameWithoutExtension(kvp.Key);
+
+                    embeddedOnly.Add(new ExtractedFontInfo
+                    {
+                        Typeface = tf,
+                        FileName = $"{tf.Replace(' ', '_')}.ttf",
+                        Data = kvp.Value,
+                        IsEmbedded = true
+                    });
+                }
             }
 
-            List<ExtractedFontInfo> embeddedOnly = currentFontList.FindAll(f => f.Data != null && f.Data.Length > 0);
             if (embeddedOnly.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Tệp này không chứa tệp phông chữ nhúng trực tiếp. Các phông chữ hiển thị hiện đang lấy từ máy tính.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Tài liệu này không chứa tệp phông chữ nhúng bên trong.", "This document contains no embedded fonts."), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             using (FolderBrowserDialog fbd = new FolderBrowserDialog())
             {
-                fbd.Description = "Chọn thư mục để lưu các tệp phông chữ được trích xuất (.ttf / .otf):";
+                fbd.Description = AppL10n.T("Chọn thư mục để trích xuất các tệp phông chữ TrueType / OpenType (.ttf, .otf)", "Choose folder to extract TrueType / OpenType fonts (.ttf, .otf)");
                 fbd.UseDescriptionForTitle = true;
-                if (fbd.ShowDialog() == DialogResult.OK)
+                if (fbd.ShowDialog(this) == DialogResult.OK)
                 {
-                    string msg;
-                    bool ok = VietnameseFontToolkit.ExportFonts(embeddedOnly, fbd.SelectedPath, out msg);
-                    if (ok)
+                    int exported = 0;
+                    foreach (var f in embeddedOnly)
                     {
-                        var res = ZenQOffice.UI.FluentMessageBox.Show(msg + "\n\nBạn có muốn mở thư mục vừa lưu không?", "Trích xuất hoàn tất", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                        if (res == DialogResult.Yes)
+                        if (f.Data != null && f.Data.Length > 0)
                         {
-                            try { Process.Start("explorer.exe", fbd.SelectedPath); } catch { }
+                            string safeName = Path.GetInvalidFileNameChars().Aggregate(f.FileName ?? $"{f.Typeface}.ttf", (current, c) => current.Replace(c, '_'));
+                            string outPath = Path.Combine(fbd.SelectedPath, safeName);
+                            try
+                            {
+                                File.WriteAllBytes(outPath, f.Data);
+                                exported++;
+                            }
+                            catch { }
                         }
                     }
-                    else
+
+                    var res = ZenQOffice.UI.FluentMessageBox.Show(this,
+                        AppL10n.T($"Đã trích xuất thành công {exported} phông chữ vào thư mục:\n{fbd.SelectedPath}\n\nBạn có muốn mở thư mục này ngay bây giờ không?", $"Extracted {exported} font(s) to:\n{fbd.SelectedPath}\n\nOpen this folder now?"),
+                        AppL10n.T("Trích xuất phông chữ thành công", "Extraction Complete"),
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Information);
+
+                    if (res == DialogResult.Yes)
                     {
-                        ZenQOffice.UI.FluentMessageBox.Show(msg, "Lỗi trích xuất", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        try { Process.Start(new ProcessStartInfo("explorer.exe", fbd.SelectedPath) { UseShellExecute = true }); } catch { }
                     }
                 }
             }
         }
 
-        private void DoInstallFontToApp()
+        private void DoInstallFonts()
         {
-            if (selectedFont == null || selectedFont.Data == null)
+            List<ExtractedFontInfo> embeddedOnly = currentFontList.FindAll(f => f.Data != null && f.Data.Length > 0);
+            if (embeddedOnly.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn một phông chữ nhúng trong danh sách để nạp vào ZenQ Office.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không có tệp phông chữ nhúng nào trong tài liệu để cài đặt.", "No embedded fonts available to install."), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            string msg;
-            bool ok = VietnameseFontToolkit.InstallFontToApp(selectedFont, out msg);
-            if (ok)
+            var confirm = ZenQOffice.UI.FluentMessageBox.Show(this,
+                AppL10n.T($"Bạn có muốn cài đặt {embeddedOnly.Count} phông chữ nhúng này vào hệ thống Windows không?\nSau khi cài, phông chữ sẽ sẵn sàng cho mọi phần mềm trên máy tính.", $"Install {embeddedOnly.Count} embedded font(s) for ZenQ Office?\nThey will be available for all presentations and documents."),
+                AppL10n.T("Cài đặt phông chữ", "Install Fonts"),
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (confirm != DialogResult.Yes) return;
+
+            string localFontsDir = SlideFontManager.GetAppFontsDirectory();
+            int installedCount = 0;
+
+            foreach (var f in embeddedOnly)
             {
-                ZenQOffice.UI.FluentMessageBox.Show(msg, "Cài đặt thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (f.Data != null && f.Data.Length > 0)
+                {
+                    string safeName = Path.GetInvalidFileNameChars().Aggregate(f.FileName ?? $"{f.Typeface}.ttf", (current, c) => current.Replace(c, '_'));
+                    string destPath = Path.Combine(localFontsDir, safeName);
+                    try
+                    {
+                        File.WriteAllBytes(destPath, f.Data);
+                        
+                        installedCount++;
+                    }
+                    catch { }
+                }
+            }
+
+            ZenQOffice.UI.FluentMessageBox.Show(this,
+                AppL10n.T($"Đã cài đặt thành công {installedCount} phông chữ vào hệ thống!", $"Successfully installed {installedCount} font(s)!"),
+                AppL10n.T("Cài đặt hoàn tất", "Installation Complete"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+
+            // Nạp lại dữ liệu
+            if (isLiveSlideMode && AppForm.Instance?.SlidesView?.Presentation != null)
+            {
+                LoadFromActivePresentation(AppForm.Instance.SlidesView.Presentation);
+            }
+            else if (!string.IsNullOrEmpty(activeDocumentPath))
+            {
                 LoadDocumentFile(activeDocumentPath);
             }
-            else
-            {
-                ZenQOffice.UI.FluentMessageBox.Show(msg, "Lỗi nạp phông chữ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
+        }
+    }
+
+    /// <summary>Font table drawn on a Direct2D WARP surface; input and selection stay native WinForms.</summary>
+    internal sealed class FontToolkitD2DTable : AiGpuControl
+    {
+        internal sealed class Row
+        {
+            public readonly ExtractedFontInfo Font;
+            public readonly string Status, Source, Suggestion;
+            public Row(ExtractedFontInfo font, string status, string source, string suggestion)
+            { Font = font; Status = status; Source = source; Suggestion = suggestion; }
         }
 
-        private void DoFixDocument()
+        private readonly List<Row> _rows = new List<Row>();
+        private int _scrollOffset;
+        public int SelectedIndex { get; private set; } = -1;
+        public event EventHandler SelectionChanged;
+        private const int HeaderHeight = 42, RowHeight = 48;
+
+        public FontToolkitD2DTable()
         {
-            if (string.IsNullOrEmpty(activeDocumentPath) || !File.Exists(activeDocumentPath))
+            SetStyle(ControlStyles.Selectable, true);
+            TabStop = true;
+        }
+
+        public void SetRows(IList<Row> rows)
+        {
+            _rows.Clear();
+            if (rows != null) _rows.AddRange(rows);
+            SelectedIndex = _rows.Count == 0 ? -1 : 0;
+            _scrollOffset = 0;
+            Invalidate();
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            using (var frame = AiGpuPaint.Begin(this, e))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn tệp PPTX hoặc DOCX cần sửa trước.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
+                var g = frame.Graphics;
+                int w = Math.Max(1, Width), h = Math.Max(1, Height);
+                using (var white = new SolidBrush(Color.White)) g.FillRectangle(white, 0, 0, w, h);
+                using (var header = new SolidBrush(Color.FromArgb(248, 250, 253))) g.FillRectangle(header, 0, 0, w, HeaderHeight);
+                using (var line = new Pen(Color.FromArgb(230, 235, 243), 1))
+                    g.DrawLine(line, 0, HeaderHeight - 1, w, HeaderHeight - 1);
 
-            string ext = Path.GetExtension(activeDocumentPath).ToLowerInvariant();
-            if (ext != ".pptx" && ext != ".docx")
-            {
-                ZenQOffice.UI.FluentMessageBox.Show("Tính năng sửa lỗi tiếng Việt tự động hiện hỗ trợ các tệp trình chiếu PowerPoint (.pptx) và văn bản Word (.docx).", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
+                float nameX = 20, statusX = w * .42f, sourceX = w * .67f, suggestX = w * .84f;
+                DrawLabel(g, AppL10n.T("PHÔNG CHỮ", "FONT"), nameX, 13, 9f, Color.FromArgb(111, 124, 145), true);
+                DrawLabel(g, AppL10n.T("TIẾNG VIỆT", "VIETNAMESE"), statusX, 13, 9f, Color.FromArgb(111, 124, 145), true);
+                DrawLabel(g, AppL10n.T("NGUỒN", "SOURCE"), sourceX, 13, 9f, Color.FromArgb(111, 124, 145), true);
+                DrawLabel(g, AppL10n.T("GỢI Ý", "SUGGESTION"), suggestX, 13, 9f, Color.FromArgb(111, 124, 145), true);
 
-            using (Form optDlg = new Form())
-            {
-                optDlg.Text = "Tùy chọn Sửa lỗi Tiếng Việt & Chuyển mã";
-                optDlg.Size = new Size(540, 360);
-                optDlg.StartPosition = FormStartPosition.CenterParent;
-                optDlg.FormBorderStyle = FormBorderStyle.FixedDialog;
-                optDlg.MaximizeBox = false;
-                optDlg.MinimizeBox = false;
-                optDlg.BackColor = Color.White;
-
-                Label lblOptTitle = new Label
+                int visible = Math.Max(0, (h - HeaderHeight) / RowHeight);
+                int end = Math.Min(_rows.Count, _scrollOffset + visible + 1);
+                for (int i = _scrollOffset; i < end; i++)
                 {
-                    Text = "Chọn các tác vụ sửa lỗi tiếng Việt cần áp dụng:",
-                    Font = new Font("Segoe UI", 10.0f, FontStyle.Bold),
-                    ForeColor = Color.FromArgb(15, 23, 42),
-                    Location = new Point(20, 18),
-                    AutoSize = true
-                };
-                optDlg.Controls.Add(lblOptTitle);
-
-                CheckBox chkTcvn3 = new CheckBox
-                {
-                    Text = "Tự động chuyển mã TCVN3 (ABC: .VnTime, .VnArial) sang Unicode chuẩn",
-                    Checked = true,
-                    Location = new Point(24, 55),
-                    Size = new Size(480, 24),
-                    Font = new Font("Segoe UI", 9.0f)
-                };
-                optDlg.Controls.Add(chkTcvn3);
-
-                CheckBox chkVni = new CheckBox
-                {
-                    Text = "Tự động chuyển mã VNI-Windows (VNI-Times, v.v.) sang Unicode chuẩn",
-                    Checked = true,
-                    Location = new Point(24, 85),
-                    Size = new Size(480, 24),
-                    Font = new Font("Segoe UI", 9.0f)
-                };
-                optDlg.Controls.Add(chkVni);
-
-                CheckBox chkNfc = new CheckBox
-                {
-                    Text = "Chuẩn hóa Unicode Tổ Hợp (NFD) sang Unicode Dựng Sẵn (NFC)",
-                    Checked = true,
-                    Location = new Point(24, 115),
-                    Size = new Size(480, 24),
-                    Font = new Font("Segoe UI", 9.0f)
-                };
-                optDlg.Controls.Add(chkNfc);
-
-                CheckBox chkReplaceFonts = new CheckBox
-                {
-                    Text = "Tự động thay thế các phông thiếu tiếng Việt bằng phông Việt hóa tương đương",
-                    Checked = true,
-                    Location = new Point(24, 145),
-                    Size = new Size(480, 24),
-                    Font = new Font("Segoe UI", 9.0f)
-                };
-                optDlg.Controls.Add(chkReplaceFonts);
-
-                Label lblSavePrompt = new Label
-                {
-                    Text = "Tệp sau khi sửa sẽ được lưu thành bản sao mới để bảo toàn dữ liệu gốc của bạn.",
-                    Font = new Font("Segoe UI", 8.5f, FontStyle.Italic),
-                    ForeColor = Color.FromArgb(100, 116, 139),
-                    Location = new Point(24, 185),
-                    Size = new Size(480, 40)
-                };
-                optDlg.Controls.Add(lblSavePrompt);
-
-                Button btnRunFix = new Button
-                {
-                    Text = "Bắt đầu Sửa lỗi",
-                    Location = new Point(230, 260),
-                    Size = new Size(165, 36),
-                    BackColor = Color.FromArgb(37, 99, 235),
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat,
-                    Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-                    DialogResult = DialogResult.OK,
-                    Cursor = Cursors.Hand,
-                    Image = FluentIconRenderer.GetGlyphBitmap('\uE90F', 16, 16, Color.White),
-                    ImageAlign = ContentAlignment.MiddleLeft,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    TextImageRelation = TextImageRelation.ImageBeforeText,
-                    Padding = new Padding(8, 0, 8, 0)
-                };
-                btnRunFix.FlatAppearance.BorderSize = 0;
-                optDlg.Controls.Add(btnRunFix);
-
-                Button btnCancel = new Button
-                {
-                    Text = "Hủy bỏ",
-                    Location = new Point(405, 260),
-                    Size = new Size(100, 36),
-                    BackColor = Color.White,
-                    ForeColor = Color.FromArgb(51, 65, 85),
-                    FlatStyle = FlatStyle.Flat,
-                    DialogResult = DialogResult.Cancel,
-                    Cursor = Cursors.Hand,
-                    Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 14, 14, Color.FromArgb(51, 65, 85)),
-                    ImageAlign = ContentAlignment.MiddleLeft,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    TextImageRelation = TextImageRelation.ImageBeforeText,
-                    Padding = new Padding(6, 0, 6, 0)
-                };
-                btnCancel.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
-                optDlg.Controls.Add(btnCancel);
-
-                if (optDlg.ShowDialog(this) == DialogResult.OK)
-                {
-                    string dir = Path.GetDirectoryName(activeDocumentPath);
-                    string nameNoExt = Path.GetFileNameWithoutExtension(activeDocumentPath);
-                    string defaultOut = Path.Combine(dir, $"{nameNoExt}_Fixed_Vietnamese{ext}");
-
-                    using (SaveFileDialog sfd = new SaveFileDialog())
+                    int y = HeaderHeight + (i - _scrollOffset) * RowHeight;
+                    var row = _rows[i];
+                    if (i == SelectedIndex)
                     {
-                        sfd.FileName = Path.GetFileName(defaultOut);
-                        sfd.Filter = ext == ".pptx" ? "Bài thuyết trình PowerPoint (*.pptx)|*.pptx" : "Văn bản Word (*.docx)|*.docx";
-                        sfd.Title = "Chọn nơi lưu tệp đã sửa lỗi Tiếng Việt";
-                        if (sfd.ShowDialog() == DialogResult.OK)
-                        {
-                            FontFixOptions options = new FontFixOptions
-                            {
-                                ConvertTcvn3 = chkTcvn3.Checked,
-                                ConvertVni = chkVni.Checked,
-                                NormalizeNfc = chkNfc.Checked,
-                                ReplaceUnsupportedFonts = chkReplaceFonts.Checked
-                            };
-
-                            DocumentFixReport report = null;
-                            if (ext == ".pptx")
-                            {
-                                report = VietnameseFontToolkit.FixPresentationVietnamese(activeDocumentPath, sfd.FileName, options);
-                            }
-                            else
-                            {
-                                report = VietnameseFontToolkit.FixDocxVietnamese(activeDocumentPath, sfd.FileName, options);
-                            }
-
-                            if (report != null && report.Success)
-                            {
-                                string repDetail = $"{report.Message}\n\nTệp đã lưu tại:\n{sfd.FileName}";
-                                if (report.ReplacedFonts.Count > 0)
-                                {
-                                    repDetail += "\n\nCác phông chữ đã được thay thế đẹp mắt:\n- " + string.Join("\n- ", report.ReplacedFonts);
-                                }
-
-                                var res = ZenQOffice.UI.FluentMessageBox.Show(repDetail + "\n\nBạn có muốn mở tệp vừa sửa ngay bây giờ không?", "Hoàn tất sửa lỗi", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                                if (res == DialogResult.Yes)
-                                {
-                                    try { Process.Start(new ProcessStartInfo(sfd.FileName) { UseShellExecute = true }); } catch { }
-                                }
-
-                                LoadDocumentFile(sfd.FileName);
-                            }
-                            else
-                            {
-                                ZenQOffice.UI.FluentMessageBox.Show(report?.Message ?? "Có lỗi xảy ra khi xử lý tệp.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            }
-                        }
+                        using (var selected = new SolidBrush(Color.FromArgb(242, 246, 255)))
+                            g.FillRoundedRectangle(selected, new RectangleF(6, y + 3, w - 18, RowHeight - 6), 8);
+                        using (var accent = new SolidBrush(Color.FromArgb(86, 91, 245)))
+                            g.FillRoundedRectangle(accent, new RectangleF(7, y + 12, 3, RowHeight - 24), 2);
                     }
+                    using (var separator = new Pen(Color.FromArgb(239, 242, 247), 1))
+                        g.DrawLine(separator, 16, y + RowHeight - 1, w - 12, y + RowHeight - 1);
+
+                    DrawLabel(g, row.Font?.Typeface ?? AppL10n.T("(không tên)", "(unnamed)"), nameX, y + 5, 10.2f, Color.FromArgb(28, 39, 57), true, Math.Max(70, statusX - nameX - 20));
+                    DrawLabel(g, row.Status, statusX, y + 5, 9f, row.Font != null && row.Font.HasVietnameseSupport ? Color.FromArgb(19, 139, 88) : Color.FromArgb(194, 91, 30), false, Math.Max(70, sourceX - statusX - 10));
+                    DrawLabel(g, row.Source, sourceX, y + 5, 9f, row.Font != null && row.Font.IsEmbedded ? Color.FromArgb(83, 75, 207) : Color.FromArgb(104, 117, 137), false, Math.Max(60, suggestX - sourceX - 10));
+                    DrawLabel(g, row.Suggestion, suggestX, y + 5, 9f, row.Font != null && !string.IsNullOrEmpty(row.Font.SuggestedVietnameseFont) ? Color.FromArgb(77, 79, 196) : Color.FromArgb(153, 163, 178), false, Math.Max(45, w - suggestX - 24));
+                }
+
+                if (_rows.Count == 0)
+                {
+                    DrawLabel(g, AppL10n.T("Chưa tìm thấy phông chữ phù hợp", "No matching fonts found"), 20, HeaderHeight + 18, 10f, Color.FromArgb(125, 137, 155), false, w - 40);
+                }
+
+                if (_rows.Count > visible && visible > 0)
+                {
+                    float trackH = h - HeaderHeight - 8;
+                    float thumbH = Math.Max(24, trackH * visible / _rows.Count);
+                    float thumbY = HeaderHeight + 4 + (trackH - thumbH) * _scrollOffset / Math.Max(1, _rows.Count - visible);
+                    using (var track = new SolidBrush(Color.FromArgb(246, 248, 251))) g.FillRoundedRectangle(track, new RectangleF(w - 8, HeaderHeight + 4, 4, trackH), 2);
+                    using (var thumb = new SolidBrush(Color.FromArgb(197, 207, 223))) g.FillRoundedRectangle(thumb, new RectangleF(w - 8, thumbY, 4, thumbH), 2);
                 }
             }
+            base.OnPaint(e);
         }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            Focus();
+            int index = _scrollOffset + (e.Y - HeaderHeight) / RowHeight;
+            if (e.Y >= HeaderHeight && index >= 0 && index < _rows.Count && SelectedIndex != index)
+            {
+                SelectedIndex = index;
+                Invalidate();
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            int visible = Math.Max(1, (Height - HeaderHeight) / RowHeight);
+            int delta = Math.Sign(e.Delta) * Math.Max(1, Math.Abs(e.Delta) / 120);
+            _scrollOffset = Math.Max(0, Math.Min(Math.Max(0, _rows.Count - visible), _scrollOffset - delta * 3));
+            Invalidate();
+            base.OnMouseWheel(e);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            int next = SelectedIndex;
+            if (e.KeyCode == Keys.Down) next++;
+            else if (e.KeyCode == Keys.Up) next--;
+            else { base.OnKeyDown(e); return; }
+
+            if (_rows.Count > 0)
+            {
+                SelectedIndex = Math.Max(0, Math.Min(_rows.Count - 1, next));
+                int visible = Math.Max(1, (Height - HeaderHeight) / RowHeight);
+                if (SelectedIndex < _scrollOffset) _scrollOffset = SelectedIndex;
+                else if (SelectedIndex >= _scrollOffset + visible) _scrollOffset = SelectedIndex - visible + 1;
+                Invalidate();
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+            }
+            e.Handled = true;
+            base.OnKeyDown(e);
+        }
+
+        private static void DrawLabel(D2DGraphics g, string text, float x, float y, float size, Color color, bool bold, float width = 500)
+        {
+            using (var font = new Font("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Point))
+            using (var brush = new SolidBrush(color))
+            using (var format = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                g.DrawString(text ?? string.Empty, font, brush, new RectangleF(x, y, Math.Max(1, width), RowHeight - 10), format);
+        }
+    }
+
+    /// <summary>DirectWrite font specimen rendered through the same GPU/WARP surface as the table.</summary>
+    internal sealed class FontToolkitPreviewSurface : AiGpuControl
+    {
+        private string _sampleText = "Tiếng Việt thân yêu";
+        private string _previewFontName = "Segoe UI";
+        private float _previewFontSize = 22f;
+        public string SampleText { get => _sampleText; set { _sampleText = value; Invalidate(); } }
+        public string PreviewFontName { get => _previewFontName; set { _previewFontName = value; Invalidate(); } }
+        public float PreviewFontSize { get => _previewFontSize; set { _previewFontSize = value; Invalidate(); } }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            using (var frame = AiGpuPaint.Begin(this, e))
+            {
+                var g = frame.Graphics;
+                using (var fill = new SolidBrush(Color.FromArgb(250, 251, 254))) g.FillRoundedRectangle(fill, new RectangleF(0, 0, Width, Height), 10);
+                using (var border = new Pen(Color.FromArgb(231, 235, 243), 1)) g.DrawRoundedRectangle(border, new RectangleF(.5f, .5f, Math.Max(1, Width - 1), Math.Max(1, Height - 1)), 10);
+                string name = string.IsNullOrWhiteSpace(PreviewFontName) ? "Segoe UI" : PreviewFontName;
+                var style = name.IndexOf("Bold", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("Heavy", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("Black", StringComparison.OrdinalIgnoreCase) >= 0 ? FontStyle.Bold : FontStyle.Regular;
+                using (var font = SlideFontManager.CreateFont(name, Math.Max(12, Math.Min(PreviewFontSize, 38)), style, GraphicsUnit.Point))
+                using (var brush = new SolidBrush(Color.FromArgb(22, 31, 49)))
+                using (var format = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                    g.DrawString(string.IsNullOrWhiteSpace(SampleText) ? "Tiếng Việt thân yêu" : SampleText, font, brush, new RectangleF(20, 8, Math.Max(1, Width - 40), Math.Max(1, Height - 16)), format);
+            }
+            base.OnPaint(e);
+        }
+    }
+
+    internal sealed class FontSamplePresetButton : AiGpuButton
+    {
+        public FontSamplePresetButton() { BackColor = Color.Transparent; ForeColor = Color.FromArgb(55, 65, 81); FlatStyle = FlatStyle.Flat; }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            using (var frame = AiGpuPaint.Begin(this, e))
+            {
+                var g = frame.Graphics;
+                var bg = _pressed ? Color.FromArgb(232, 237, 249) : (_hovered ? Color.FromArgb(239, 243, 255) : Color.FromArgb(250, 251, 254));
+                using (var fill = new SolidBrush(bg)) g.FillRoundedRectangle(fill, new RectangleF(0, 0, Width, Height), 7);
+                using (var line = new Pen(_hovered ? Color.FromArgb(164, 174, 255) : Color.FromArgb(224, 230, 240), 1)) g.DrawRoundedRectangle(line, new RectangleF(.5f,.5f,Width-1,Height-1),7);
+                using (var font = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+                using (var brush = new SolidBrush(ForeColor))
+                using (var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                    g.DrawString(Text, font, brush, new RectangleF(3, 1, Width-6, Height-2), fmt);
+            }
+        }
+        private bool _hovered, _pressed;
+        protected override void OnMouseEnter(EventArgs e) { _hovered=true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { _hovered=false; _pressed=false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { _pressed=true; Invalidate(); base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { _pressed=false; Invalidate(); base.OnMouseUp(e); }
     }
 }

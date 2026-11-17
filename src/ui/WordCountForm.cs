@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice
 {
@@ -9,7 +10,7 @@ namespace ZenQOffice
     {
         public WordCountForm(int pages, int words, int charsNoSpaces, int charsWithSpaces, int paragraphs, int lines)
         {
-            this.Text = "Thống kê số từ (Word Count)";
+            this.Text = AppL10n.T("Thống kê số từ (Word Count)", "Word Count");
             this.Size = new Size(360, 320);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -27,15 +28,15 @@ namespace ZenQOffice
             mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65f));
             mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35f));
 
-            AddStatRow(mainPanel, "Số trang (Pages):", pages.ToString("N0"), 0);
-            AddStatRow(mainPanel, "Số từ (Words):", words.ToString("N0"), 1);
-            AddStatRow(mainPanel, "Ký tự (không khoảng trắng):", charsNoSpaces.ToString("N0"), 2);
-            AddStatRow(mainPanel, "Ký tự (có khoảng trắng):", charsWithSpaces.ToString("N0"), 3);
-            AddStatRow(mainPanel, "Số đoạn văn (Paragraphs):", paragraphs.ToString("N0"), 4);
-            AddStatRow(mainPanel, "Số dòng (Lines):", lines.ToString("N0"), 5);
+            AddStatRow(mainPanel, AppL10n.T("Số trang (Pages):", "Pages:"), pages.ToString("N0"), 0);
+            AddStatRow(mainPanel, AppL10n.T("Số từ (Words):", "Words:"), words.ToString("N0"), 1);
+            AddStatRow(mainPanel, AppL10n.T("Ký tự (không khoảng trắng):", "Characters (no spaces):"), charsNoSpaces.ToString("N0"), 2);
+            AddStatRow(mainPanel, AppL10n.T("Ký tự (có khoảng trắng):", "Characters (with spaces):"), charsWithSpaces.ToString("N0"), 3);
+            AddStatRow(mainPanel, AppL10n.T("Số đoạn văn (Paragraphs):", "Paragraphs:"), paragraphs.ToString("N0"), 4);
+            AddStatRow(mainPanel, AppL10n.T("Số dòng (Lines):", "Lines:"), lines.ToString("N0"), 5);
 
             CheckBox chkInclude = new CheckBox();
-            chkInclude.Text = "Tính cả hộp văn bản và chú thích";
+            chkInclude.Text = AppL10n.T("Tính cả hộp văn bản và chú thích", "Include textboxes, footnotes and endnotes");
             chkInclude.Checked = true;
             chkInclude.AutoSize = true;
             chkInclude.ForeColor = Color.FromArgb(71, 85, 105);
@@ -45,7 +46,7 @@ namespace ZenQOffice
             Panel bottomPanel = new Panel();
             bottomPanel.Dock = DockStyle.Fill;
             Button btnClose = new Button();
-            btnClose.Text = "Đóng";
+            btnClose.Text = AppL10n.T("Đóng", "Close");
             btnClose.Size = new Size(88, 30);
             btnClose.Location = new Point(bottomPanel.Width - 90, 2);
             btnClose.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;

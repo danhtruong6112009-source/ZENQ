@@ -170,7 +170,7 @@ namespace ZenQOffice.UI
                 using (Font emptyFont = new Font("Segoe UI", 9f, FontStyle.Italic))
                 using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
                 {
-                    g.DrawString("Không tìm thấy lệnh phù hợp...", emptyFont, textBrush, new PointF(16, 12));
+                    g.DrawString(AppL10n.T("Không tìm thấy lệnh phù hợp...", "No matching commands found..."), emptyFont, textBrush, new PointF(16, 12));
                 }
                 return;
             }

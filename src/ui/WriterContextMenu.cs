@@ -138,7 +138,7 @@ namespace ZenQOffice.UI
 
             using (Font fHdr = new Font("Segoe UI", 9f, FontStyle.Bold))
             {
-                g.DrawString("Style Gallery (Mẫu phong cách)", fHdr, Brushes.DimGray, 8, 6);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("Style Gallery (Mẫu phong cách)"), fHdr, Brushes.DimGray, 8, 6);
             }
 
             int startY = 32;
@@ -164,8 +164,9 @@ namespace ZenQOffice.UI
                 using (Pen sp = new Pen(Color.FromArgb(209, 213, 219), 1f)) g.DrawRectangle(sp, sampleBox);
 
                 using (SolidBrush textBrush = new SolidBrush(_styles[i].TextColor))
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
                 {
-                    TextRenderer.DrawText(g, "AaBbCc", _styles[i].PreviewFont, sampleBox, _styles[i].TextColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    g.DrawString("AaBbCc", _styles[i].PreviewFont, textBrush, sampleBox, sf);
                 }
 
                 // Style Name & Subtext
@@ -173,7 +174,7 @@ namespace ZenQOffice.UI
                 using (Font fSub = new Font("Segoe UI", 8f, FontStyle.Regular))
                 {
                     g.DrawString(_styles[i].Name, fTitle, Brushes.Black, cardRect.Left + 86, cardRect.Top + 4);
-                    g.DrawString(_styles[i].Subtext, fSub, Brushes.Gray, cardRect.Left + 86, cardRect.Top + 22);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr(_styles[i].Subtext), fSub, Brushes.Gray, cardRect.Left + 86, cardRect.Top + 22);
                 }
             }
         }
@@ -267,7 +268,7 @@ namespace ZenQOffice.UI
                 g.FillRectangle(hdrBg, 1, 1, Width - 2, 24);
 
             using (Font fHdr = new Font("Segoe UI", 8.5f, FontStyle.Bold))
-                g.DrawString("Bullet Library (Dấu đầu dòng)", fHdr, Brushes.DimGray, 6, 4);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("Bullet Library (Dấu đầu dòng)"), fHdr, Brushes.DimGray, 6, 4);
 
             int startX = 8, startY = 30;
             for (int i = 0; i < 6; i++)
@@ -424,7 +425,7 @@ namespace ZenQOffice.UI
                 g.FillRectangle(hdrBg, 1, 1, Width - 2, 24);
 
             using (Font fHdr = new Font("Segoe UI", 8.5f, FontStyle.Bold))
-                g.DrawString("Numbering Library (Đánh số)", fHdr, Brushes.DimGray, 6, 4);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("Numbering Library (Đánh số)"), fHdr, Brushes.DimGray, 6, 4);
 
             int startX = 8, startY = 30;
             for (int i = 0; i < 6; i++)
@@ -585,6 +586,17 @@ namespace ZenQOffice.UI
             }
         }
 
+        private static void DrawMiniText(D2DGraphics g, string text, Font font, Color color, Rectangle rect, StringAlignment align, bool ellipsis = false)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            using (SolidBrush brush = new SolidBrush(color))
+            using (StringFormat sf = new StringFormat { Alignment = align, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+            {
+                if (ellipsis) sf.Trimming = StringTrimming.EllipsisCharacter;
+                g.DrawString(text, font, brush, rect, sf);
+            }
+        }
+
         private void DrawButtonContent(D2DGraphics g, int idx, Rectangle r, string curFont, float curSize, bool isHover, bool isActive)
         {
             Color iconCol = Color.FromArgb(51, 51, 51);
@@ -602,49 +614,49 @@ namespace ZenQOffice.UI
                             g.FillRectangle(boxBg, r.X, r.Y + 2, r.Width, r.Height - 4);
                             g.DrawRectangle(boxPen, r.X, r.Y + 2, r.Width - 1, r.Height - 5);
                         }
-                        TextRenderer.DrawText(g, curFont ?? "", fRegular, new Rectangle(r.X + 2, r.Y + 3, r.Width - 14, r.Height - 6), Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                        DrawMiniText(g, curFont ?? "", fRegular, Color.Black, new Rectangle(r.X + 4, r.Y + 2, r.Width - 18, r.Height - 4), StringAlignment.Near, true);
                         DrawArrowDown(g, r.Right - 10, r.Y + r.Height / 2, Color.FromArgb(107, 114, 128));
                         break;
 
                     case 1: // Font Size Combo
-                        string sizeText = curSize > 0 ? curSize.ToString() : "";
+                        string sizeText = curSize > 0 ? curSize.ToString("0.#") : "";
                         using (SolidBrush boxBg = new SolidBrush(Color.White))
                         using (Pen boxPen = new Pen(Color.FromArgb(209, 213, 219)))
                         {
                             g.FillRectangle(boxBg, r.X, r.Y + 2, r.Width, r.Height - 4);
                             g.DrawRectangle(boxPen, r.X, r.Y + 2, r.Width - 1, r.Height - 5);
                         }
-                        TextRenderer.DrawText(g, sizeText, fRegular, new Rectangle(r.X + 2, r.Y + 3, r.Width - 12, r.Height - 6), Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                        DrawMiniText(g, sizeText, fRegular, Color.Black, new Rectangle(r.X + 4, r.Y + 2, r.Width - 15, r.Height - 4), StringAlignment.Near, false);
                         DrawArrowDown(g, r.Right - 9, r.Y + r.Height / 2, Color.FromArgb(107, 114, 128));
                         break;
 
                     case 2: // A^ (Increase font)
-                        TextRenderer.DrawText(g, "A", fBold, new Rectangle(r.X, r.Y + 2, 13, r.Height - 4), Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-                        DrawArrowUp(g, r.X + 14, r.Y + 7, Color.FromArgb(16, 124, 65));
+                        DrawMiniText(g, "A", fBold, Color.Black, new Rectangle(r.X, r.Y + 2, 14, r.Height - 4), StringAlignment.Center);
+                        DrawArrowUp(g, r.X + 15, r.Y + 7, Color.FromArgb(16, 124, 65));
                         break;
 
                     case 3: // Av (Decrease font)
-                        TextRenderer.DrawText(g, "A", fRegular, new Rectangle(r.X, r.Y + 3, 12, r.Height - 5), Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-                        DrawArrowDown(g, r.X + 13, r.Y + 13, Color.FromArgb(239, 68, 68));
+                        DrawMiniText(g, "A", fRegular, Color.Black, new Rectangle(r.X, r.Y + 3, 13, r.Height - 5), StringAlignment.Center);
+                        DrawArrowDown(g, r.X + 14, r.Y + 13, Color.FromArgb(239, 68, 68));
                         break;
 
-                    case 4: // 🧹 Format Painter / Clear formatting
+                    case 4: // Format Painter / Clear formatting
                         DrawBrushIcon(g, r.X + 4, r.Y + 4, 16);
                         break;
 
-                    case 5: // Styles ▾ (A with blue glow + Styles)
+                    case 5: // Styles (A with blue glow + Styles)
                         using (Font fStyles = new Font("Segoe UI", 9f, FontStyle.Bold))
                         {
-                            TextRenderer.DrawText(g, "A", fStyles, new Rectangle(r.X + 1, r.Y + 2, 14, 18), Color.FromArgb(16, 110, 190), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                            DrawMiniText(g, "A", fStyles, Color.FromArgb(16, 110, 190), new Rectangle(r.X + 1, r.Y + 2, 14, r.Height - 4), StringAlignment.Center);
                         }
                         using (Font fStyleLabel = new Font("Segoe UI", 7f, FontStyle.Regular))
                         {
-                            TextRenderer.DrawText(g, "Styles", fStyleLabel, new Rectangle(r.X + 14, r.Y + 3, 24, 18), Color.FromArgb(55, 65, 81), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                            DrawMiniText(g, "Styles", fStyleLabel, Color.FromArgb(55, 65, 81), new Rectangle(r.X + 13, r.Y + 2, 32, r.Height - 4), StringAlignment.Near);
                         }
                         DrawArrowDown(g, r.Right - 6, r.Y + r.Height / 2, Color.FromArgb(107, 114, 128));
                         break;
 
-                    case 6: // 💬+ New Comment
+                    case 6: // New Comment
                         DrawCommentIcon(g, r.X + 2, r.Y + 3, 16);
                         using (Font fComment = new Font("Segoe UI", 6.5f, FontStyle.Regular))
                         {
@@ -654,32 +666,32 @@ namespace ZenQOffice.UI
                         break;
 
                     case 7: // B
-                        TextRenderer.DrawText(g, "B", fBold, r, Color.Black, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                        DrawMiniText(g, "B", fBold, Color.Black, r, StringAlignment.Center);
                         break;
 
                     case 8: // I
                         using (Font fItalic = new Font("Segoe UI", 9f, FontStyle.Italic | FontStyle.Bold))
                         {
-                            TextRenderer.DrawText(g, "I", fItalic, r, Color.Black, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                            DrawMiniText(g, "I", fItalic, Color.Black, r, StringAlignment.Center);
                         }
                         break;
 
                     case 9: // U
                         using (Font fUnder = new Font("Segoe UI", 9f, FontStyle.Underline | FontStyle.Bold))
                         {
-                            TextRenderer.DrawText(g, "U", fUnder, r, Color.Black, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                            DrawMiniText(g, "U", fUnder, Color.Black, r, StringAlignment.Center);
                         }
                         break;
 
-                    case 10: // Highlight ✏️ ▾
+                    case 10: // Highlight
                         FluentIconRenderer.DrawGlyph(g, "\uE7E6", new Rectangle(r.X + 4, r.Y + 2, 16, 15), Color.FromArgb(55, 65, 81), 10.5f);
                         Color hlCol = (_ribbon != null && _ribbon.CurrentHighlightColor != Color.Empty && _ribbon.CurrentHighlightColor != Color.Transparent) ? _ribbon.CurrentHighlightColor : Color.Yellow;
                         using (SolidBrush b = new SolidBrush(hlCol)) g.FillRectangle(b, r.X + 4, r.Bottom - 5, 16, 3);
                         DrawArrowDown(g, r.Right - 7, r.Y + r.Height / 2, Color.FromArgb(107, 114, 128));
                         break;
 
-                    case 11: // Font Color A ▾
-                        TextRenderer.DrawText(g, "A", fBold, new Rectangle(r.X + 2, r.Y + 1, 18, 16), Color.Black, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    case 11: // Font Color A
+                        DrawMiniText(g, "A", fBold, Color.Black, new Rectangle(r.X + 2, r.Y + 1, 18, 16), StringAlignment.Center);
                         Color fontCol = (_ribbon != null && _ribbon.CurrentFontColor != Color.Empty && _ribbon.CurrentFontColor != Color.Transparent) ? _ribbon.CurrentFontColor : Color.Red;
                         using (SolidBrush b = new SolidBrush(fontCol)) g.FillRectangle(b, r.X + 4, r.Bottom - 5, 16, 3);
                         DrawArrowDown(g, r.Right - 7, r.Y + r.Height / 2, Color.FromArgb(107, 114, 128));
@@ -868,7 +880,7 @@ namespace ZenQOffice.UI
                     if (!string.IsNullOrEmpty(comment))
                     {
                         _writerView.ApplyHighlightToSelectionOrTyping(Color.FromArgb(254, 240, 138));
-                        ZenQOffice.UI.FluentMessageBox.Show("Đã thêm ghi chú: \"" + comment + "\"", "New Comment", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(ZenQOffice.Core.AppL10n.T("Đã thêm ghi chú: \"" + comment + "\"", "Added comment: \"" + comment + "\""), "New Comment", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         if (_parentForm != null) _parentForm.Invalidate();
                     }
                     break;
@@ -955,10 +967,10 @@ namespace ZenQOffice.UI
 
                 case 14: // Align ≡ ▾
                     ContextMenuStrip aMenu = new ZenQOffice.UI.FluentContextMenuStrip();
-                    aMenu.Items.Add("Căn trái (Left: Ctrl+L)", null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(0); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    aMenu.Items.Add("Căn giữa (Center: Ctrl+E)", null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(1); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    aMenu.Items.Add("Căn phải (Right: Ctrl+R)", null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(2); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
-                    aMenu.Items.Add("Căn đều 2 bên (Justify: Ctrl+J)", null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(3); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    aMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Căn trái (Left: Ctrl+L)", "Align Left (Ctrl+L)"), null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(0); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    aMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Căn giữa (Center: Ctrl+E)", "Center (Ctrl+E)"), null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(1); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    aMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Căn phải (Right: Ctrl+R)", "Align Right (Ctrl+R)"), null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(2); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
+                    aMenu.Items.Add(ZenQOffice.Core.AppL10n.T("Căn đều 2 bên (Justify: Ctrl+J)", "Justify (Ctrl+J)"), null, (s, e) => { _writerView.ApplyAlignmentToSelectionOrParagraph(3); if (_ribbon != null) _writerView.UpdateRibbonState(_ribbon); Invalidate(); if (_parentForm != null) _parentForm.Invalidate(); });
                     aMenu.Closed += (s, e) => { if (_floatingParentPopup != null) _floatingParentPopup.IsSubMenuOpen = false; };
                     aMenu.Show(this.PointToScreen(new Point(_btnRects[14].Left, _btnRects[14].Bottom)));
                     break;
@@ -1165,6 +1177,13 @@ namespace ZenQOffice.UI
 
             cms.Items.Add(new ToolStripSeparator());
 
+            if (writerView.FindTableCellAtPoint(screenX, screenY, out int tblIdx, out int rowIdx, out int colIdx))
+            {
+                writerView.FocusCellForContextMenuIfNeeded(tblIdx, rowIdx, colIdx);
+                AppendTableContextMenuItems(cms, tblIdx, rowIdx, colIdx, writerView, ribbon, parentForm);
+                cms.Items.Add(new ToolStripSeparator());
+            }
+
             // 5. Font... (Ctrl+D)
             cms.Items.Add(CreateMenuItem("Font...", CreateFontIcon(), (s, e) =>
             {
@@ -1181,20 +1200,10 @@ namespace ZenQOffice.UI
                 fDlg.Show();
             }));
 
-            // 6. Paragraph...
+            // 6. Paragraph... (Word 365 full tabbed Paragraph dialog)
             cms.Items.Add(CreateMenuItem("Paragraph...", CreateParagraphIcon(), (s, e) =>
             {
-                ContextMenuStrip pMenu = new ZenQOffice.UI.FluentContextMenuStrip();
-                pMenu.Items.Add("Căn trái (Left: Ctrl+L)", null, (ps, pe) => { writerView.ApplyAlignmentToSelectionOrParagraph(0); if (parentForm != null) parentForm.Invalidate(); });
-                pMenu.Items.Add("Căn giữa (Center: Ctrl+E)", null, (ps, pe) => { writerView.ApplyAlignmentToSelectionOrParagraph(1); if (parentForm != null) parentForm.Invalidate(); });
-                pMenu.Items.Add("Căn phải (Right: Ctrl+R)", null, (ps, pe) => { writerView.ApplyAlignmentToSelectionOrParagraph(2); if (parentForm != null) parentForm.Invalidate(); });
-                pMenu.Items.Add("Căn đều 2 bên (Justify: Ctrl+J)", null, (ps, pe) => { writerView.ApplyAlignmentToSelectionOrParagraph(3); if (parentForm != null) parentForm.Invalidate(); });
-                pMenu.Items.Add(new ToolStripSeparator());
-                pMenu.Items.Add("Khoảng cách dòng 1.0 (Single)", null, (ps, pe) => { writerView.SetLineSpacing(1.0f); if (parentForm != null) parentForm.Invalidate(); });
-                pMenu.Items.Add("Khoảng cách dòng 1.15 (Standard)", null, (ps, pe) => { writerView.SetLineSpacing(1.15f); if (parentForm != null) parentForm.Invalidate(); });
-                pMenu.Items.Add("Khoảng cách dòng 1.5 (1.5 lines)", null, (ps, pe) => { writerView.SetLineSpacing(1.5f); if (parentForm != null) parentForm.Invalidate(); });
-                pMenu.Items.Add("Khoảng cách dòng 2.0 (Double)", null, (ps, pe) => { writerView.SetLineSpacing(2.0f); if (parentForm != null) parentForm.Invalidate(); });
-                pMenu.Show(parentForm, new Point(screenX, screenY));
+                WriterParagraphDialogHelper.Show(writerView, ribbon, parentForm);
             }));
 
             cms.Items.Add(new ToolStripSeparator());
@@ -1213,7 +1222,7 @@ namespace ZenQOffice.UI
 
             // 8. Synonyms >
             ToolStripMenuItem synMenu = new ToolStripMenuItem("Synonyms");
-            synMenu.DropDownItems.Add("Tra cứu từ điển (Thesaurus)...", null, (s, e) =>
+            synMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Tra cứu từ điển (Thesaurus)...", "Thesaurus..."), null, (s, e) =>
             {
                 if (!string.IsNullOrEmpty(selText))
                 {
@@ -1243,6 +1252,106 @@ namespace ZenQOffice.UI
             }));
 
             cms.Show(parentForm, new Point(screenX, screenY));
+        }
+
+        private static Image CreateFluentMenuIcon(string glyph, Color color)
+        {
+            Bitmap bmp = new Bitmap(16, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                FluentIconRenderer.DrawGlyph(g, glyph, new Rectangle(0, 0, 16, 16), color, 11.5f);
+            }
+            return bmp;
+        }
+
+        private static void AppendTableContextMenuItems(ContextMenuStrip cms, int tblIdx, int rowIdx, int colIdx, WriterView writerView, RibbonBar ribbon, Form parentForm)
+        {
+            Action refresh = () =>
+            {
+                if (ribbon != null) writerView.UpdateRibbonState(ribbon);
+                writerView.Invalidate();
+                if (parentForm != null) parentForm.Invalidate();
+            };
+
+            Color accentBlue = Color.FromArgb(16, 110, 190);
+            Color dangerRed = Color.FromArgb(196, 43, 28);
+            Color neutralGray = Color.FromArgb(64, 68, 75);
+
+            // Chèn (Insert)
+            ToolStripMenuItem insertMenu = new ToolStripMenuItem(ZenQOffice.Core.AppL10n.T("Chèn (Insert)", "Insert"), CreateFluentMenuIcon("\uE710", accentBlue));
+            insertMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chèn cột bên trái", "Insert Columns to the Left"), CreateFluentMenuIcon("\uE72B", accentBlue), (s, e) => { writerView.InsertTableColumn(tblIdx, colIdx); refresh(); });
+            insertMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chèn cột bên phải", "Insert Columns to the Right"), CreateFluentMenuIcon("\uE72A", accentBlue), (s, e) => { writerView.InsertTableColumn(tblIdx, colIdx + 1); refresh(); });
+            insertMenu.DropDownItems.Add(new ToolStripSeparator());
+            insertMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chèn hàng phía trên", "Insert Rows Above"), CreateFluentMenuIcon("\uE74A", accentBlue), (s, e) => { writerView.InsertTableRow(tblIdx, rowIdx); refresh(); });
+            insertMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chèn hàng phía dưới", "Insert Rows Below"), CreateFluentMenuIcon("\uE74B", accentBlue), (s, e) => { writerView.InsertTableRow(tblIdx, rowIdx + 1); refresh(); });
+            cms.Items.Add(insertMenu);
+
+            // Xóa (Delete)
+            ToolStripMenuItem deleteMenu = new ToolStripMenuItem(ZenQOffice.Core.AppL10n.T("Xóa (Delete)", "Delete"), CreateFluentMenuIcon("\uE74D", dangerRed));
+            deleteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Xóa nội dung ô (Clear Cell)", "Clear Cell Contents"), CreateFluentMenuIcon("\uE75C", neutralGray), (s, e) => { writerView.ClearTableCell(tblIdx, rowIdx, colIdx); refresh(); });
+            deleteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Xóa hàng này (Delete Row)", "Delete Row"), CreateFluentMenuIcon("\uE894", dangerRed), (s, e) => { writerView.DeleteSelectedTableRowsOrTarget(tblIdx, rowIdx); refresh(); });
+            deleteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Xóa cột này (Delete Column)", "Delete Column"), CreateFluentMenuIcon("\uE894", dangerRed), (s, e) => { writerView.DeleteSelectedTableColumnsOrTarget(tblIdx, colIdx); refresh(); });
+            deleteMenu.DropDownItems.Add(new ToolStripSeparator());
+            deleteMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Xóa toàn bộ bảng (Delete Table)", "Delete Entire Table"), CreateFluentMenuIcon("\uE74D", dangerRed), (s, e) => { writerView.DeleteTable(tblIdx); refresh(); });
+            cms.Items.Add(deleteMenu);
+
+            // 1-click Delete Table right in context menu like Word 365
+            cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Xóa bảng (Delete Table)", "Delete Table"), CreateFluentMenuIcon("\uE74D", dangerRed), (s, e) => { writerView.DeleteTable(tblIdx); refresh(); }));
+
+            // Hợp nhất / Tách ô
+            cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Hợp nhất ô (Merge Cells)", "Merge Cells"), CreateFluentMenuIcon("\uE8B9", neutralGray), (s, e) => { writerView.MergeCellsAtCursor(); refresh(); }));
+            cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Tách ô (Split Cells)", "Split Cells"), CreateFluentMenuIcon("\uE89F", neutralGray), (s, e) => { writerView.SplitCellsAtCursor(2); refresh(); }));
+            if (rowIdx > 0)
+            {
+                cms.Items.Add(CreateMenuItem(ZenQOffice.Core.AppL10n.T("Tách bảng (Split Table)", "Split Table"), CreateFluentMenuIcon("\uE8F9", neutralGray), (s, e) => { writerView.SplitTableAtCursor(); refresh(); }));
+            }
+
+            // Chọn (Select)
+            ToolStripMenuItem selectMenu = new ToolStripMenuItem(ZenQOffice.Core.AppL10n.T("Chọn (Select)", "Select"), CreateFluentMenuIcon("\uE8B3", accentBlue));
+            selectMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chọn ô hiện tại", "Select Cell"), null, (s, e) => { writerView.SelectTableCell(tblIdx, rowIdx, colIdx); refresh(); });
+            selectMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chọn cột ", "Select Column ") + (colIdx + 1), null, (s, e) => { writerView.SelectTableColumn(tblIdx, colIdx); refresh(); });
+            selectMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chọn hàng ", "Select Row ") + (rowIdx + 1), null, (s, e) => { writerView.SelectTableRow(tblIdx, rowIdx); refresh(); });
+            selectMenu.DropDownItems.Add(new ToolStripSeparator());
+            selectMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chọn toàn bộ bảng", "Select Table"), null, (s, e) => { writerView.SelectEntireTable(tblIdx); refresh(); });
+            cms.Items.Add(selectMenu);
+
+            // Tự khớp (AutoFit)
+            ToolStripMenuItem autoFitMenu = new ToolStripMenuItem(ZenQOffice.Core.AppL10n.T("Tự khớp (AutoFit)", "AutoFit"), CreateFluentMenuIcon("\uE9A6", neutralGray));
+            autoFitMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Tự khớp theo nội dung (AutoFit Contents)", "AutoFit to Contents"), null, (s, e) => { writerView.AutoFitTableToContents(); refresh(); });
+            autoFitMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Tự khớp theo trang giấy (AutoFit Window)", "AutoFit to Window"), null, (s, e) => { writerView.AutoFitTableToWindow(); refresh(); });
+            autoFitMenu.DropDownItems.Add(new ToolStripSeparator());
+            autoFitMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chia đều chiều cao hàng", "Distribute Rows Evenly"), null, (s, e) => { writerView.DistributeTableRows(); refresh(); });
+            autoFitMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Chia đều độ rộng cột", "Distribute Columns Evenly"), null, (s, e) => { writerView.DistributeTableColumns(); refresh(); });
+            cms.Items.Add(autoFitMenu);
+
+            // Căn chỉnh & Thuộc tính bảng
+            ToolStripMenuItem propsMenu = new ToolStripMenuItem(ZenQOffice.Core.AppL10n.T("Thuộc tính bảng (Table Properties)", "Table Properties"), CreateFluentMenuIcon("\uE8A9", neutralGray));
+            propsMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Căn lề trái bảng", "Align Table Left"), null, (s, e) => { writerView.SetActiveTableAlignment(0); refresh(); });
+            propsMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Căn giữa bảng", "Center Table"), null, (s, e) => { writerView.SetActiveTableAlignment(1); refresh(); });
+            propsMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Căn lề phải bảng", "Align Table Right"), null, (s, e) => { writerView.SetActiveTableAlignment(2); refresh(); });
+            propsMenu.DropDownItems.Add(new ToolStripSeparator());
+            int curWrap = writerView.TableWrapModes.ContainsKey(tblIdx) ? writerView.TableWrapModes[tblIdx] : 0;
+            ToolStripMenuItem wrapInline = new ToolStripMenuItem(ZenQOffice.Core.AppL10n.T("Ngắt dòng: Cùng dòng (In Line with Text)", "Text Wrapping: None (In Line)"), null, (s, e) => { writerView.TableWrapModes[tblIdx] = 0; writerView.InvalidateLayout(); refresh(); });
+            wrapInline.Checked = (curWrap == 0);
+            ToolStripMenuItem wrapAround = new ToolStripMenuItem(ZenQOffice.Core.AppL10n.T("Ngắt dòng: Xung quanh (Around)", "Text Wrapping: Around"), null, (s, e) => { writerView.TableWrapModes[tblIdx] = 1; writerView.InvalidateLayout(); refresh(); });
+            wrapAround.Checked = (curWrap == 1);
+            propsMenu.DropDownItems.Add(wrapInline);
+            propsMenu.DropDownItems.Add(wrapAround);
+            propsMenu.DropDownItems.Add(new ToolStripSeparator());
+            propsMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Lặp hàng tiêu đề (Repeat Header Row)", "Repeat Header Rows"), null, (s, e) => { writerView.ToggleRepeatHeaderRows(); refresh(); });
+            propsMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Bật/tắt đường lưới (View Gridlines)", "View Gridlines"), null, (s, e) => { writerView.ToggleTableGridlines(); refresh(); });
+            propsMenu.DropDownItems.Add(new ToolStripSeparator());
+            propsMenu.DropDownItems.Add(ZenQOffice.Core.AppL10n.T("Hộp thoại Thuộc tính bảng...", "Table Properties Dialog..."), null, (s, e) =>
+            {
+                using (TablePropertiesForm tpDlg = new TablePropertiesForm(writerView, tblIdx, rowIdx, colIdx))
+                {
+                    tpDlg.ShowDialog(parentForm);
+                    refresh();
+                }
+            });
+            cms.Items.Add(propsMenu);
         }
 
         private static ToolStripMenuItem CreateMenuItem(string text, Image icon, EventHandler onClick)

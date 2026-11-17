@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -178,7 +179,7 @@ namespace ZenQOffice.UI
                     DrawWrapIcon(g, iconRect, i);
 
                     // Text
-                    g.DrawString(_wrapTitles[i], titleFont, textBrush, 42, itemY + 8);
+                    g.DrawString(AppL10n.Tr(_wrapTitles[i]), titleFont, textBrush, 42, itemY + 8);
                 }
             }
         }
@@ -264,7 +265,7 @@ namespace ZenQOffice.UI
             using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Regular))
             using (Brush b = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("Tùy chọn bố cục khác (More Layout Options)...", f, b, 34, 9);
+                g.DrawString(AppL10n.Tr("Tùy chọn bố cục khác (More Layout Options)..."), f, b, 34, 9);
             }
         }
 

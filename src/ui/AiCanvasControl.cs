@@ -137,7 +137,7 @@ namespace ZenQOffice.UI
             {
                 using (SolidBrush emptyBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
                 {
-                    g.DrawString("Chưa có nội dung đề bài trên Canvas.\nHãy gõ /canvas [yêu cầu] trong khung chat để tạo đề thi tương tác.", _qTextFont, emptyBrush, new RectangleF(30, 60, w - 60, 100));
+                    g.DrawString(AppL10n.T("Chưa có nội dung đề bài trên Canvas.\nHãy gõ /canvas [yêu cầu] trong khung chat để tạo đề thi tương tác.", "No quiz content on Canvas yet.\nType /canvas [topic] in the AI chat to generate interactive exercises."), _qTextFont, emptyBrush, new RectangleF(30, 60, w - 60, 100));
                 }
                 return;
             }
@@ -173,7 +173,7 @@ namespace ZenQOffice.UI
             }
 
             // Tiêu đề đề bài
-            string titleStr = QuizData.Title ?? "Đề ôn tập tương tác";
+            string titleStr = QuizData.Title ?? AppL10n.T("Đề ôn tập tương tác", "Interactive Practice");
             using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
                 RectangleF titleRect = new RectangleF(24, 13, w - 80, 26);
@@ -237,15 +237,15 @@ namespace ZenQOffice.UI
             int curY = subY + 34;
 
             // Nhãn số thứ tự câu hỏi + Badge phân loại câu
-            string qNumText = string.Format("Câu hỏi {0}", currentQ.Number > 0 ? currentQ.Number : (CurrentIndex + 1));
+            string qNumText = AppL10n.T(string.Format("Câu hỏi {0}", currentQ.Number > 0 ? currentQ.Number : (CurrentIndex + 1)), string.Format("Question {0}", currentQ.Number > 0 ? currentQ.Number : (CurrentIndex + 1)));
             using (SolidBrush qNumBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
                 g.DrawString(qNumText, _qNumFont, qNumBrush, 24, curY);
             }
 
-            string typeBadge = currentQ.Type == CanvasQuestionType.TrueFalse ? "Đúng / Sai" :
-                               currentQ.Type == CanvasQuestionType.FillBlank ? "Điền khuyết" :
-                               currentQ.Type == CanvasQuestionType.Essay ? "Tự luận" : "Trắc nghiệm 4 lựa chọn";
+            string typeBadge = currentQ.Type == CanvasQuestionType.TrueFalse ? AppL10n.T("Đúng / Sai", "True / False") :
+                               currentQ.Type == CanvasQuestionType.FillBlank ? AppL10n.T("Điền khuyết", "Fill in the Blank") :
+                               currentQ.Type == CanvasQuestionType.Essay ? AppL10n.T("Tự luận", "Essay") : AppL10n.T("Trắc nghiệm 4 lựa chọn", "Multiple Choice");
 
             int typeBadgeW = 130;
             Rectangle typeRect = new Rectangle(120, curY - 1, typeBadgeW, 20);
@@ -385,7 +385,7 @@ namespace ZenQOffice.UI
                 {
                     g.FillRoundedRectangle(bBg, boxRect, 8f);
                     g.DrawRoundedRectangle(bPen, boxRect, 8f);
-                    string fillHint = currentQ.IsAnswered ? ("Đáp án chuẩn: " + currentQ.CorrectAnswerText) : "Hãy suy nghĩ đáp án để điền vào chỗ trống...";
+                    string fillHint = currentQ.IsAnswered ? (AppL10n.T("Đáp án chuẩn: ", "Answer: ") + currentQ.CorrectAnswerText) : AppL10n.T("Hãy suy nghĩ đáp án để điền vào chỗ trống...", "Type your answer to fill in the blank...");
                     g.DrawString(fillHint, _optFont, bTxt, boxRect.X + 14, boxRect.Y + 14);
                 }
 
@@ -396,7 +396,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush chkTxt = new SolidBrush(Color.White))
                 {
                     g.FillRoundedRectangle(chkBg, _btnCheckFillBlankRect, 6f);
-                    g.DrawString("Kiểm tra đáp án", _btnFont, chkTxt, _btnCheckFillBlankRect.X + 18, _btnCheckFillBlankRect.Y + 7);
+                    g.DrawString(AppL10n.T("Kiểm tra đáp án", "Check Answer"), _btnFont, chkTxt, _btnCheckFillBlankRect.X + 18, _btnCheckFillBlankRect.Y + 7);
                 }
 
                 curY += 40;
@@ -410,7 +410,7 @@ namespace ZenQOffice.UI
                 {
                     g.FillRoundedRectangle(bBg, essayBox, 8f);
                     g.DrawRoundedRectangle(bPen, essayBox, 8f);
-                    g.DrawString("Khu vực viết câu trả lời / dàn ý cho bài thi tự luận...", _optFont, bTxt, essayBox.X + 14, essayBox.Y + 12);
+                    g.DrawString(AppL10n.T("Khu vực viết câu trả lời / dàn ý cho bài thi tự luận...", "Write your essay answer or outline here..."), _optFont, bTxt, essayBox.X + 14, essayBox.Y + 12);
                 }
 
                 curY += 98;
@@ -420,7 +420,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush chkTxt = new SolidBrush(Color.White))
                 {
                     g.FillRoundedRectangle(chkBg, _btnShowEssayAnsRect, 6f);
-                    g.DrawString("Xem gợi ý & biểu điểm", _btnFont, chkTxt, _btnShowEssayAnsRect.X + 14, _btnShowEssayAnsRect.Y + 7);
+                    g.DrawString(AppL10n.T("Xem gợi ý & biểu điểm", "Show Answer Key"), _btnFont, chkTxt, _btnShowEssayAnsRect.X + 14, _btnShowEssayAnsRect.Y + 7);
                 }
 
                 curY += 40;
@@ -442,9 +442,9 @@ namespace ZenQOffice.UI
                     g.FillRoundedRectangle(expBg, expRect, 8f);
                     g.DrawRoundedRectangle(expPen, expRect, 8f);
 
-                    g.DrawString("💡 Lời giải chi tiết:", _badgeFont, expTitleBrush, expRect.X + 12, expRect.Y + 8);
+                    g.DrawString(AppL10n.T("💡 Lời giải chi tiết:", "💡 Explanation:"), _badgeFont, expTitleBrush, expRect.X + 12, expRect.Y + 8);
                     string expStr = !string.IsNullOrEmpty(currentQ.Explanation) ? currentQ.Explanation :
-                                    (!string.IsNullOrEmpty(currentQ.CorrectAnswerText) ? ("Gợi ý: " + currentQ.CorrectAnswerText) : "Đáp án chính xác dựa theo kiến thức của bài học.");
+                                    (!string.IsNullOrEmpty(currentQ.CorrectAnswerText) ? (AppL10n.T("Gợi ý: ", "Hint: ") + currentQ.CorrectAnswerText) : AppL10n.T("Đáp án chính xác dựa theo kiến thức của bài.", "Based on the lesson content."));
                     g.DrawString(expStr, _expFont, expTextBrush, new RectangleF(expRect.X + 12, expRect.Y + 28, expRect.Width - 24, expRect.Height - 32));
                 }
             }
@@ -482,7 +482,7 @@ namespace ZenQOffice.UI
             {
                 g.FillRoundedRectangle(pBg, _btnPrevRect, 17f);
                 g.DrawRoundedRectangle(pBorder, _btnPrevRect, 17f);
-                string prevText = "‹ Quay lại";
+                string prevText = AppL10n.T("‹ Quay lại", "‹ Back");
                 SizeF sPrev = g.MeasureString(prevText, _btnFont);
                 g.DrawString(prevText, _btnFont, pTxt, _btnPrevRect.X + (_btnPrevRect.Width - sPrev.Width) / 2f, _btnPrevRect.Y + (_btnPrevRect.Height - sPrev.Height) / 2f);
             }
@@ -493,7 +493,7 @@ namespace ZenQOffice.UI
             using (SolidBrush nTxt = new SolidBrush(Color.White))
             {
                 g.FillRoundedRectangle(nBg, _btnNextRect, 17f);
-                string nextText = isLast ? "Hoàn thành 🎉" : "Tiếp theo ›";
+                string nextText = isLast ? AppL10n.T("Hoàn thành 🎉", "Finish 🎉") : AppL10n.T("Tiếp theo ›", "Next ›");
                 SizeF sNext = g.MeasureString(nextText, _btnFont);
                 g.DrawString(nextText, _btnFont, nTxt, _btnNextRect.X + (_btnNextRect.Width - sNext.Width) / 2f, _btnNextRect.Y + (_btnNextRect.Height - sNext.Height) / 2f);
             }
@@ -535,7 +535,7 @@ namespace ZenQOffice.UI
                 g.DrawLine(closePen, cx + 4, cy - 4, cx - 4, cy + 4);
             }
 
-            string titleStr = QuizData != null ? (QuizData.Title ?? "Đề ôn tập") : "Kết quả bài làm";
+            string titleStr = QuizData != null ? (QuizData.Title ?? AppL10n.T("Đề ôn tập", "Practice")) : AppL10n.T("Kết quả bài làm", "Results");
             using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
                 g.DrawString(titleStr, _titleFont, titleBrush, new RectangleF(24, 13, w - 80, 26));
@@ -545,7 +545,7 @@ namespace ZenQOffice.UI
             float centerX = w / 2f;
             using (SolidBrush headBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                string headerLabel = "Điểm";
+                string headerLabel = AppL10n.T("Điểm", "Score");
                 SizeF sHead = g.MeasureString(headerLabel, _resHeaderFont);
                 g.DrawString(headerLabel, _resHeaderFont, headBrush, centerX - sHead.Width / 2f, 54);
             }
@@ -585,7 +585,7 @@ namespace ZenQOffice.UI
             // Nhãn "Chính xác"
             using (SolidBrush accBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
             {
-                string accStr = "Chính xác";
+                string accStr = AppL10n.T("Chính xác", "Accuracy");
                 SizeF sAcc = g.MeasureString(accStr, _gaugeLabelFont);
                 g.DrawString(accStr, _gaugeLabelFont, accBrush, centerX - sAcc.Width / 2f, gaugeCenterY + 4);
             }
@@ -593,33 +593,33 @@ namespace ZenQOffice.UI
             // 5. Chú thích bên dưới: "Đã bỏ qua 0 câu hỏi • X câu trả lời chưa chính xác"
             using (SolidBrush subBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
             {
-                string subStr = string.Format("Đã hoàn thành {0} câu hỏi  •  {1} câu trả lời chưa chính xác", total, WrongCount);
+                string subStr = AppL10n.T(string.Format("Đã hoàn thành {0} câu hỏi  •  {1} câu trả lời chưa chính xác", total, WrongCount), string.Format("Completed {0} question(s)  •  {1} incorrect", total, WrongCount));
                 SizeF sSub = g.MeasureString(subStr, _resSubFont);
                 g.DrawString(subStr, _resSubFont, subBrush, centerX - sSub.Width / 2f, gaugeCenterY + 42);
             }
 
             // 6. Tiêu đề đánh giá năng lực
             int evalY = (int)gaugeCenterY + 76;
-            string evalHeading = (correctRatio >= 0.85f) ? "Xuất sắc! Còn một vài điểm cần xem lại." :
-                                 (correctRatio >= 0.65f) ? "Khá tốt! Bạn đã nắm vững phần lớn kiến thức." :
-                                 "Cần cố gắng thêm! Hãy xem lại các câu chưa chính xác.";
+            string evalHeading = (correctRatio >= 0.85f) ? AppL10n.T("Xuất sắc! Còn một vài điểm cần xem lại.", "Excellent! A few items to review.") :
+                                 (correctRatio >= 0.65f) ? AppL10n.T("Khá tốt! Bạn đã nắm vững phần lớn kiến thức.", "Good job! You mastered most concepts.") :
+                                 AppL10n.T("Cần cố gắng thêm! Hãy xem lại các câu chưa chính xác.", "Keep practicing! Review the missed questions.");
 
             using (SolidBrush evalBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
                 g.DrawString(evalHeading, _resHeadingFont, evalBrush, 32, evalY);
             }
 
-            // 7. Nhận xét phân tích "Điểm mạnh"
+            // 7. Nhận xét phân tích AppL10n.T("Điểm mạnh", "Strengths")
             evalY += 38;
             using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                g.DrawString("Điểm mạnh", _resSectionFont, secBrush, 32, evalY);
+                g.DrawString(AppL10n.T("Điểm mạnh", "Strengths"), _resSectionFont, secBrush, 32, evalY);
             }
 
             evalY += 24;
             using (SolidBrush bodyBrush = new SolidBrush(Color.FromArgb(51, 65, 85)))
             {
-                string b1 = string.Format("◦ Nắm vững kiến thức trọng tâm: Bạn đã hoàn thành tốt {0} câu hỏi trong bài kiểm tra ôn tập.", CorrectCount);
+                string b1 = AppL10n.T(string.Format("◦ Nắm vững kiến thức trọng tâm: Bạn đã hoàn thành tốt {0} câu hỏi trong bài kiểm tra ôn tập.", CorrectCount), string.Format("◦ Core mastery: You answered {0} question(s) correctly.", CorrectCount));
                 g.DrawString(b1, _resBodyFont, bodyBrush, new RectangleF(32, evalY, w - 64, 40));
             }
 
@@ -628,13 +628,13 @@ namespace ZenQOffice.UI
                 evalY += 44;
                 using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 {
-                    g.DrawString("Điểm cần xem lại", _resSectionFont, secBrush, 32, evalY);
+                    g.DrawString(AppL10n.T("Điểm cần xem lại", "Areas to Review"), _resSectionFont, secBrush, 32, evalY);
                 }
 
                 evalY += 24;
                 using (SolidBrush bodyBrush = new SolidBrush(Color.FromArgb(51, 65, 85)))
                 {
-                    string b2 = string.Format("◦ Bạn có {0} câu trả lời chưa chính xác. Hãy bấm nút 'Xem lại bài làm' bên dưới để đọc kỹ lời giải chi tiết của từng câu.", WrongCount);
+                    string b2 = AppL10n.T(string.Format("◦ Bạn có {0} câu trả lời chưa chính xác. Hãy bấm nút 'Xem lại bài làm' bên dưới.", WrongCount), string.Format("◦ You missed {0} question(s). Click 'Review Answers' below to view explanations.", WrongCount));
                     g.DrawString(b2, _resBodyFont, bodyBrush, new RectangleF(32, evalY, w - 64, 40));
                 }
             }
@@ -655,7 +655,7 @@ namespace ZenQOffice.UI
             {
                 g.FillRoundedRectangle(rBg, _btnReviewRect, 17f);
                 g.DrawRoundedRectangle(rBorder, _btnReviewRect, 17f);
-                g.DrawString("‹ Xem lại bài làm", _btnFont, rTxt, _btnReviewRect.X + 22, _btnReviewRect.Y + 8);
+                g.DrawString(AppL10n.T("‹ Xem lại bài làm", "‹ Review Answers"), _btnFont, rTxt, _btnReviewRect.X + 22, _btnReviewRect.Y + 8);
             }
 
             // Nút Làm lại đề này
@@ -664,7 +664,7 @@ namespace ZenQOffice.UI
             using (SolidBrush rkTxt = new SolidBrush(Color.White))
             {
                 g.FillRoundedRectangle(rkBg, _btnRetakeRect, 17f);
-                g.DrawString("🔄 Làm lại đề này", _btnFont, rkTxt, _btnRetakeRect.X + 20, _btnRetakeRect.Y + 8);
+                g.DrawString(AppL10n.T("🔄 Làm lại đề này", "🔄 Retake"), _btnFont, rkTxt, _btnRetakeRect.X + 20, _btnRetakeRect.Y + 8);
             }
         }
 

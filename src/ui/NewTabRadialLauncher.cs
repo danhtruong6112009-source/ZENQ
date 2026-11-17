@@ -353,7 +353,7 @@ namespace ZenQOffice
                     RectangleF headerRect = new RectangleF(cardRect.X + 16f, cardRect.Y + 8f, cardRect.Width - 32f, 18f);
                     StringFormat hSf = new StringFormat();
                     hSf.LineAlignment = StringAlignment.Center;
-                    g.DrawString("TẠO TÀI LIỆU MỚI", headerFont, headerBrush, headerRect, hSf);
+                    g.DrawString(ZenQOffice.Core.AppL10n.T("TẠO TÀI LIỆU MỚI", "CREATE NEW"), headerFont, headerBrush, headerRect, hSf);
                 }
 
                 // Subtle divider under header
@@ -410,7 +410,7 @@ namespace ZenQOffice
                         using (SolidBrush sBrush = new SolidBrush(Color.FromArgb((int)(200 * alpha), 100, 116, 139)))
                         {
                             g.DrawString(item.Title, titleFont, tBrush, textX, rowRect.Y + 6f);
-                            g.DrawString(item.Subtitle, subFont, sBrush, textX, rowRect.Y + 23f);
+                            g.DrawString(ZenQOffice.Core.AppL10n.Tr(item.Subtitle), subFont, sBrush, textX, rowRect.Y + 23f);
                         }
 
                         // Right-side Pill Badge ("DOCX", "XLSX", "PPTX", "PDF")

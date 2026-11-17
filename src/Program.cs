@@ -85,7 +85,9 @@ namespace ZenQOffice
                 Application.SetCompatibleTextRenderingDefault(false);
                 FluentUi.Initialize();
 
-                try { FluentIconRenderer.EnsureFontLoaded(); } catch { }
+                try { FluentIconRenderer.EnsureFontLoaded(); } catch { }
+                try { DatabaseAuthService.Initialize(); } catch { }
+                try { CloudShareService.Initialize(); } catch { }
 
 
 
@@ -247,7 +249,7 @@ namespace ZenQOffice
 
                 {
 
-                    HandleSafeException(e.Exception, "Sự cố giao diện", false);
+                    HandleSafeException(e.Exception, AppL10n.T("Sự cố giao diện", "UI Exception"), false);
 
                 };
 
@@ -257,7 +259,7 @@ namespace ZenQOffice
 
                     Exception ex = e.ExceptionObject as Exception;
 
-                    HandleSafeException(ex, "Sự cố hệ thống", true);
+                    HandleSafeException(ex, AppL10n.T("Sự cố hệ thống", "System Exception"), true);
 
                 };
 
@@ -271,7 +273,7 @@ namespace ZenQOffice
 
             {
 
-                HandleSafeException(ex, "Lỗi khởi động ZENQ OFFICE", true);
+                HandleSafeException(ex, AppL10n.T("Lỗi khởi động ZENQ OFFICE", "ZENQ OFFICE Startup Error"), true);
 
             }
 
@@ -1809,7 +1811,7 @@ namespace ZenQOffice
 
                 {
 
-                    ZenQCrashDialogForm.ShowDialogSafe(ex, "Lỗi khởi tạo giao diện", true);
+                    ZenQCrashDialogForm.ShowDialogSafe(ex, AppL10n.T("Lỗi khởi tạo giao diện", "UI Initialization Error"), true);
 
                 }
 

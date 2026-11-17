@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -82,7 +83,7 @@ namespace ZenQOffice.UI
 
             Label lblHeader = new Label
             {
-                Text = "Bảng màu chủ đề (Theme Colors)",
+                Text = AppL10n.Tr("Bảng màu chủ đề (Theme Colors)"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(10, 8),
@@ -143,7 +144,7 @@ namespace ZenQOffice.UI
                     using (Font nf = new Font("Segoe UI", 8.5f, isSel ? FontStyle.Bold : FontStyle.Regular))
                     using (SolidBrush nb = new SolidBrush(isSel ? Color.FromArgb(29, 78, 216) : Color.FromArgb(30, 41, 59)))
                     {
-                        g.DrawString(pal.Name, nf, nb, 78, 6);
+                        g.DrawString(AppL10n.Tr(pal.Name), nf, nb, 78, 6);
                     }
                 };
 
@@ -160,7 +161,7 @@ namespace ZenQOffice.UI
             int customY = startY + _palettes.Count * (itemH + 2) + 6;
             Button btnCustom = new Button
             {
-                Text = "🎨  Tùy chỉnh màu sắc (Customize Colors)...",
+                Text = AppL10n.Tr("🎨  Tùy chỉnh màu sắc (Customize Colors)..."),
                 Location = new Point(8, customY),
                 Size = new Size(226, 28),
                 FlatStyle = FlatStyle.Flat,

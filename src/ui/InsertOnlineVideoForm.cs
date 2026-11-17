@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -16,7 +17,7 @@ namespace ZenQOffice.UI
 
         public InsertOnlineVideoForm()
         {
-            this.Text = "Chèn Video Trực Tuyến (Insert Online Video)";
+            this.Text = AppL10n.T("Chèn Video Trực Tuyến (Insert Online Video)", "Insert Online Video");
             this.Size = new Size(500, 270);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -29,7 +30,7 @@ namespace ZenQOffice.UI
 
             Label lblHeading = new Label
             {
-                Text = "Nhập liên kết hoặc mã nhúng video từ YouTube, Vimeo hoặc trang web:",
+                Text = AppL10n.T("Nhập liên kết hoặc mã nhúng video từ YouTube, Vimeo hoặc trang web:", "Enter video URL or embed code from YouTube, Vimeo, or web:"),
                 Location = new Point(20, curY),
                 Size = new Size(450, 36),
                 ForeColor = Color.FromArgb(40, 50, 60)
@@ -37,15 +38,15 @@ namespace ZenQOffice.UI
             this.Controls.Add(lblHeading);
             curY += 40;
 
-            Label lblTitle = new Label { Text = "Tiêu đề video:", Location = new Point(20, curY), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Label lblTitle = new Label { Text = AppL10n.T("Tiêu đề video:", "Video title:"), Location = new Point(20, curY), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblTitle);
             curY += 22;
 
-            txtTitle = new TextBox { Text = "Video Giới Thiệu ZENQ OFFICE", Location = new Point(20, curY), Width = 445 };
+            txtTitle = new TextBox { Text = AppL10n.T("Video Giới Thiệu ZENQ OFFICE", "ZENQ OFFICE Introduction Video"), Location = new Point(20, curY), Width = 445 };
             this.Controls.Add(txtTitle);
             curY += 32;
 
-            Label lblUrl = new Label { Text = "Địa chỉ Video (URL):", Location = new Point(20, curY), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Label lblUrl = new Label { Text = AppL10n.T("Địa chỉ Video (URL):", "Video URL:"), Location = new Point(20, curY), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             this.Controls.Add(lblUrl);
             curY += 22;
 
@@ -58,7 +59,7 @@ namespace ZenQOffice.UI
 
             btnOk = new Button
             {
-                Text = "Chèn Video",
+                Text = AppL10n.T("Chèn Video", "Insert"),
                 Location = new Point(285, 10),
                 Size = new Size(95, 28),
                 BackColor = Color.FromArgb(204, 0, 0),
@@ -71,14 +72,14 @@ namespace ZenQOffice.UI
             {
                 VideoTitle = txtTitle.Text.Trim();
                 VideoUrl = txtUrl.Text.Trim();
-                if (string.IsNullOrEmpty(VideoTitle)) VideoTitle = "Video Trực Tuyến";
+                if (string.IsNullOrEmpty(VideoTitle)) VideoTitle = AppL10n.T("Video Trực Tuyến", "Online Video");
                 if (string.IsNullOrEmpty(VideoUrl)) VideoUrl = "https://youtube.com";
             };
             bottomPanel.Controls.Add(btnOk);
 
             btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(388, 10),
                 Size = new Size(75, 28),
                 BackColor = Color.White,

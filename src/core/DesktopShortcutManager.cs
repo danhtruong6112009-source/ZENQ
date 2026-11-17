@@ -246,11 +246,11 @@ namespace ZenQOffice.Core
             string vectorIco = Path.Combine(baseDir, "icon", "vector.ico");
             if (!File.Exists(vectorIco)) vectorIco = Path.Combine(baseDir, "icon", "photo.ico");
 
-            CreateShortcut("ZenQ Writer", "-word", File.Exists(writerIco) ? "icon\\writer.ico" : "ZenQOffice.ico", "ZenQ Writer - Soạn thảo văn bản độc lập");
-            CreateShortcut("ZenQ Calc", "-calc", File.Exists(calcIco) ? "icon\\calc.ico" : "ZenQOffice.ico", "ZenQ Calc - Bảng tính điện tử độc lập");
-            CreateShortcut("ZenQ Slides", "-slides", File.Exists(slidesIco) ? "icon\\present.ico" : "ZenQOffice.ico", "ZenQ Slides - Thiết kế trình chiếu độc lập");
-            CreateShortcut("ZenQ PDF", "-pdf", File.Exists(pdfIco) ? "icon\\pdf.ico" : "ZenQOffice.ico", "ZenQ PDF - Đọc & biên tập tài liệu PDF");
-            CreateShortcut("ZenQ Vector", "-photo", File.Exists(vectorIco) ? "icon\\vector.ico" : "ZenQOffice.ico", "ZenQ Vector - Thiết kế đồ họa vector chuyên nghiệp");
+            CreateShortcut("ZenQ Writer", "-word", File.Exists(writerIco) ? "icon\\writer.ico" : "ZenQOffice.ico", AppL10n.T("ZenQ Writer - Soạn thảo văn bản độc lập", "ZenQ Writer - Standalone Word Processor"));
+            CreateShortcut("ZenQ Calc", "-calc", File.Exists(calcIco) ? "icon\\calc.ico" : "ZenQOffice.ico", AppL10n.T("ZenQ Calc - Bảng tính điện tử độc lập", "ZenQ Calc - Standalone Spreadsheets"));
+            CreateShortcut("ZenQ Slides", "-slides", File.Exists(slidesIco) ? "icon\\present.ico" : "ZenQOffice.ico", AppL10n.T("ZenQ Slides - Thiết kế trình chiếu độc lập", "ZenQ Slides - Standalone Presentations"));
+            CreateShortcut("ZenQ PDF", "-pdf", File.Exists(pdfIco) ? "icon\\pdf.ico" : "ZenQOffice.ico", AppL10n.T("ZenQ PDF - Đọc & biên tập tài liệu PDF", "ZenQ PDF - PDF Reader & Editor"));
+            CreateShortcut("ZenQ Vector", "-photo", File.Exists(vectorIco) ? "icon\\vector.ico" : "ZenQOffice.ico", AppL10n.T("ZenQ Vector - Thiết kế đồ họa vector chuyên nghiệp", "ZenQ Vector - Professional Vector Design"));
         }
 
         public static void DeleteAllBranchShortcuts()

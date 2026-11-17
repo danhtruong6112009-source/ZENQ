@@ -100,13 +100,13 @@ namespace ZenQOffice.Core
         {
             var errors = new List<string>();
             if (string.IsNullOrWhiteSpace(Name))
-                errors.Add("Chưa nhập Tên bộ lưu.");
+                errors.Add(AppL10n.T("Chưa nhập Tên bộ lưu.", "Profile name is required."));
             if ((int)Provider < 0)
-                errors.Add("Chưa chọn Nhà cung cấp AI.");
+                errors.Add(AppL10n.T("Chưa chọn Nhà cung cấp AI.", "AI Provider is required."));
             if (Provider != AiProviderType.Ollama && string.IsNullOrWhiteSpace(ApiKey))
-                errors.Add("Chưa nhập chuỗi API Key.");
+                errors.Add(AppL10n.T("Chưa nhập chuỗi API Key.", "API Key is required."));
             if (string.IsNullOrWhiteSpace(SelectedModel) && (SavedModels == null || SavedModels.Count == 0))
-                errors.Add("Chưa chọn hoặc thêm Model AI nào.");
+                errors.Add(AppL10n.T("Chưa chọn hoặc thêm Model AI nào.", "Select or add at least one AI Model."));
             return errors;
         }
 
@@ -300,7 +300,7 @@ namespace ZenQOffice.Core
         {
             Profiles = new List<AiKeyProfile>();
             ActiveProfileId = "";
-            SystemInstructions = "Bạn là một trợ lý AI thông minh trong phần mềm văn phòng ZENQ OFFICE. Hãy luôn giao tiếp và trả lời bằng Tiếng Việt một cách ngắn gọn, súc tích và chuyên nghiệp.";
+            SystemInstructions = AppL10n.T("Bạn là một trợ lý AI thông minh trong phần mềm văn phòng ZENQ OFFICE. Hãy luôn giao tiếp và trả lời bằng Tiếng Việt một cách chuyên nghiệp, rõ ràng và súc tích.", "You are ZenQ AI, an intelligent assistant integrated into ZENQ OFFICE. Communicate clearly, accurately, and concisely in the user's language.");
         }
 
         public static string GetDefaultSystemPrompt()
@@ -384,7 +384,7 @@ namespace ZenQOffice.Core
                 case AiProviderType.DeepSeek: return "DeepSeek AI";
                 case AiProviderType.Ollama: return "Ollama Local";
                 case AiProviderType.OpenRouter: return "OpenRouter";
-                case AiProviderType.Custom: return "API Tùy chỉnh";
+                case AiProviderType.Custom: return AppL10n.T("API Tùy chỉnh", "Custom API");
                 default: return provider.ToString();
             }
         }
@@ -455,8 +455,6 @@ namespace ZenQOffice.Core
                     };
                 case AiProviderType.Ollama:
                     return new List<string> {
-                        "zenq-vector-slide",
-                        "zenq-slide-ai",
                         "qwen2.5:3b",
                         "llama3.2:3b",
                         "phi3:mini",

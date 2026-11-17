@@ -292,7 +292,7 @@ namespace ZenQOffice.UI
                 // 4. Thanh phân cách và chân bảng gợi ý (Footer Guide)
                 g.DrawLine(new Pen(Color.FromArgb(241, 245, 249), 1f), Bounds.X + 6, curY + 1, Bounds.Right - 6, curY + 1);
 
-                string guide = "↑↓ Di chuyển  •  Tab / Click Chọn  •  Esc Đóng";
+                string guide = ZenQOffice.Core.AppL10n.T("↑↓ Di chuyển  •  Tab / Click Chọn  •  Esc Đóng", "↑↓ Move  •  Tab / Click Select  •  Esc Close");
                 using (SolidBrush gBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
                 {
                     g.DrawString(guide, footerFont, gBrush, Bounds.X + 10, curY + 4);

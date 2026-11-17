@@ -34,7 +34,7 @@ namespace ZenQOffice.Core
                 string lbl = string.IsNullOrWhiteSpace(VolumeLabel) ? "USB Drive" : VolumeLabel;
                 double freeGb = FreeSpaceBytes / (1024.0 * 1024.0 * 1024.0);
                 double totalGb = TotalSizeBytes / (1024.0 * 1024.0 * 1024.0);
-                return string.Format("{0} ({1}) - Trống {2:0.1}/{3:0.1} GB", lbl, DriveLetter.TrimEnd('\\'), freeGb, totalGb);
+                return string.Format(AppL10n.T("{0} ({1}) - Trống {2:0.1}/{3:0.1} GB", "{0} ({1}) - Free {2:0.1}/{3:0.1} GB"), lbl, DriveLetter.TrimEnd('\\'), freeGb, totalGb);
             }
         }
     }
@@ -50,9 +50,9 @@ namespace ZenQOffice.Core
         {
             get
             {
-                return string.Format("Màn hình {0}: {1}×{2} {3}",
+                return string.Format(AppL10n.T("Màn hình {0}: {1}×{2} {3}", "Display {0}: {1}×{2} {3}"),
                     Index + 1, Bounds.Width, Bounds.Height,
-                    IsPrimary ? "(Chính)" : "(Phụ)");
+                    IsPrimary ? AppL10n.T("(Chính)", "(Primary)") : AppL10n.T("(Phụ)", "(Secondary)"));
             }
         }
     }
@@ -251,11 +251,11 @@ namespace ZenQOffice.Core
             bool isSlate;
             bool hasTouch = HasTouchHardware(out maxTouches, out hasPen, out isSlate);
             List<string> parts = new List<string>();
-            if (hasTouch) parts.Add(string.Format("Cảm ứng {0} điểm", Math.Max(1, maxTouches)));
-            else parts.Add("Chuột & bàn phím");
+            if (hasTouch) parts.Add(string.Format(AppL10n.T("Cảm ứng {0} điểm", "{0}-point Touch"), Math.Max(1, maxTouches)));
+            else parts.Add(AppL10n.T("Chuột & bàn phím", "Mouse & Keyboard"));
 
-            if (hasPen) parts.Add("Bút Stylus");
-            if (isSlate) parts.Add("Chế độ Tablet");
+            if (hasPen) parts.Add(AppL10n.T("Bút Stylus", "Stylus Pen"));
+            if (isSlate) parts.Add(AppL10n.T("Chế độ Tablet", "Tablet Mode"));
             return string.Join(" • ", parts.ToArray());
         }
 
@@ -451,12 +451,12 @@ namespace ZenQOffice.Core
             {
                 if (string.IsNullOrEmpty(sourceFilePath) || !File.Exists(sourceFilePath))
                 {
-                    errorMsg = "Vui lòng lưu tài liệu hiện tại ra đĩa trước khi sao lưu nhanh sang USB.";
+                    errorMsg = AppL10n.T("Vui lòng lưu tài liệu hiện tại ra đĩa trước khi sao lưu nhanh sang USB.", "Please save the current document to disk before backing up to USB.");
                     return false;
                 }
                 if (string.IsNullOrEmpty(driveRoot) || !Directory.Exists(driveRoot))
                 {
-                    errorMsg = "Không tìm thấy ổ đĩa USB đích.";
+                    errorMsg = AppL10n.T("Không tìm thấy ổ đĩa USB đích.", "Target USB drive not found.");
                     return false;
                 }
 
@@ -593,8 +593,8 @@ namespace ZenQOffice.Core
             }
             catch
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Không tìm thấy trình điều khiển máy quét WIA mặc định hoặc chưa kết nối máy Scan USB/LAN.",
-                    "Quét Tài Liệu (WIA Scanner)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không tìm thấy trình điều khiển máy quét WIA mặc định hoặc chưa kết nối máy Scan USB/LAN.", "Default WIA scanner driver not found or USB/LAN scanner is not connected."),
+                    AppL10n.T("Quét Tài Liệu (WIA Scanner)", "Scan Document (WIA Scanner)"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 

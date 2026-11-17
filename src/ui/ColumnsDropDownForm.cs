@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -245,7 +246,7 @@ namespace ZenQOffice.UI
                     }
 
                     // Text label
-                    g.DrawString(_items[i].Name, titleFont, textBrush, 48, itemY + 13);
+                    g.DrawString(AppL10n.Tr(_items[i].Name), titleFont, textBrush, 48, itemY + 13);
                 }
             }
         }
@@ -270,7 +271,7 @@ namespace ZenQOffice.UI
             using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Regular))
             using (Brush b = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("Thêm tùy chọn cột (More Columns)...", f, b, 34, 10);
+                g.DrawString(AppL10n.Tr("Thêm tùy chọn cột (More Columns)..."), f, b, 34, 10);
             }
         }
 

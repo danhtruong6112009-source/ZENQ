@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -166,7 +167,7 @@ namespace ZenQOffice.UI
                         {
                             g.DrawLine(sepPen, 10, curY, _listPanel.Width - 10, curY);
                         }
-                        g.DrawString(item.Title, headFont, headBrush, 12, curY + 6);
+                        g.DrawString(AppL10n.Tr(item.Title), headFont, headBrush, 12, curY + 6);
                     }
                     else
                     {
@@ -181,9 +182,9 @@ namespace ZenQOffice.UI
                         DrawBreakIcon(g, iconBox, item.BreakType);
 
                         // Draw Title & Subtitle with word wrap
-                        g.DrawString(item.Title, titleFont, titleBrush, 52, curY + 4);
+                        g.DrawString(AppL10n.Tr(item.Title), titleFont, titleBrush, 52, curY + 4);
                         Rectangle subRect = new Rectangle(52, curY + 20, _listPanel.Width - 60, 26);
-                        g.DrawString(item.Subtitle, subFont, subBrush, subRect);
+                        g.DrawString(AppL10n.Tr(item.Subtitle), subFont, subBrush, subRect);
                     }
 
                     curY += itemH;

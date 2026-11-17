@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -68,7 +69,7 @@ namespace ZenQOffice.UI
             Panel header = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Color.FromArgb(241, 245, 249) };
             Label lblTitle = new Label
             {
-                Text = "Biểu tượng Vector (Microsoft 365 Icons)",
+                Text = AppL10n.Tr("Biểu tượng Vector (Microsoft 365 Icons)"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(10, 8),
@@ -125,7 +126,7 @@ namespace ZenQOffice.UI
                 canvas.Invalidate();
                 if (hoveredIndex >= 0 && hoveredIndex < items.Count)
                 {
-                    tip.SetToolTip(canvas, items[hoveredIndex].Name);
+                    tip.SetToolTip(canvas, AppL10n.Tr(items[hoveredIndex].Name));
                 }
                 else
                 {
@@ -201,7 +202,7 @@ namespace ZenQOffice.UI
                 using (StringFormat sfC = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 {
                     RectangleF textRect = new RectangleF(box.X, box.Y + 38, box.Width, 20);
-                    g.DrawString(items[i].Name, sf, textBrush, textRect, sfC);
+                    g.DrawString(AppL10n.Tr(items[i].Name), sf, textBrush, textRect, sfC);
                 }
             }
         }

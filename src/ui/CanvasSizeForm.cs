@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -22,7 +23,7 @@ namespace ZenQOffice.UI
             CanvasWidth = currentWidth;
             CanvasHeight = currentHeight;
 
-            this.Text = "Kích Thước Khung Vẽ (Canvas Size)";
+            this.Text = AppL10n.T("Kích Thước Khung Vẽ (Canvas Size)", "Canvas Size");
             this.Size = new Size(420, 310);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -34,7 +35,7 @@ namespace ZenQOffice.UI
             // Title
             Label lblHeader = new Label
             {
-                Text = "Thay đổi kích thước Khung vẽ thiết kế",
+                Text = AppL10n.T("Thay đổi kích thước Khung vẽ thiết kế", "Resize Design Canvas"),
                 Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(20, 16),
@@ -45,7 +46,7 @@ namespace ZenQOffice.UI
             // Preset Label & ComboBox
             Label lblPreset = new Label
             {
-                Text = "Khung mẫu sẵn:",
+                Text = AppL10n.T("Khung mẫu sẵn:", "Preset:"),
                 Location = new Point(20, 52),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -60,14 +61,14 @@ namespace ZenQOffice.UI
             };
             cboPresets.Items.AddRange(new object[]
             {
-                "Tùy chỉnh",
+                AppL10n.T("Tùy chỉnh", "Custom"),
                 "1920 × 1080 px (Full HD 16:9)",
-                "1080 × 1080 px (Vuông 1:1 - Post)",
+                AppL10n.T("1080 × 1080 px (Vuông 1:1 - Post)", "1080 × 1080 px (Square 1:1 - Post)"),
                 "1280 × 720 px (HD 16:9)",
                 "3840 × 2160 px (4K UHD)",
                 "1080 × 1920 px (Story / Reel 9:16)",
                 "1200 × 630 px (Facebook Share)",
-                "2480 × 3508 px (Khổ A4 In ấn 300 DPI)"
+                AppL10n.T("2480 × 3508 px (Khổ A4 In ấn 300 DPI)", "2480 × 3508 px (A4 Print 300 DPI)")
             });
             cboPresets.SelectedIndex = 0;
             cboPresets.SelectedIndexChanged += CboPresets_SelectedIndexChanged;
@@ -76,7 +77,7 @@ namespace ZenQOffice.UI
             // Width
             Label lblW = new Label
             {
-                Text = "Chiều rộng (px):",
+                Text = AppL10n.T("Chiều rộng (px):", "Width (px):"),
                 Location = new Point(20, 92),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -96,7 +97,7 @@ namespace ZenQOffice.UI
             // Height
             Label lblH = new Label
             {
-                Text = "Chiều cao (px):",
+                Text = AppL10n.T("Chiều cao (px):", "Height (px):"),
                 Location = new Point(20, 130),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -116,7 +117,7 @@ namespace ZenQOffice.UI
             // Center Content Checkbox
             chkCenter = new CheckBox
             {
-                Text = "Căn giữa các đối tượng vào khung mới",
+                Text = AppL10n.T("Căn giữa các đối tượng vào khung mới", "Center existing objects on canvas"),
                 Location = new Point(22, 168),
                 AutoSize = true,
                 Checked = true,
@@ -127,7 +128,7 @@ namespace ZenQOffice.UI
             // Action Buttons
             Button btnCancel = new SettingsActionButton
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Location = new Point(290, 220),
                 Size = new Size(90, 32),
                 BackColor = Color.FromArgb(241, 245, 249),
@@ -138,7 +139,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new SettingsActionButton
             {
-                Text = "Đồng ý",
+                Text = AppL10n.T("Đồng ý", "OK"),
                 Location = new Point(190, 220),
                 Size = new Size(90, 32),
                 BackColor = Color.FromArgb(99, 102, 241),

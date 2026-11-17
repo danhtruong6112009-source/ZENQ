@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -46,7 +47,7 @@ namespace ZenQOffice.UI
 
         private void InitializeUI()
         {
-            this.Text = "Kiểm Tra Chính Tả (Spelling)";
+            this.Text = AppL10n.T("Kiểm Tra Chính Tả (Spelling)", "Spelling");
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -68,15 +69,15 @@ namespace ZenQOffice.UI
                 using (Font hFont = new Font("Segoe UI", 11f, FontStyle.Bold))
                 using (Font subFont = new Font("Segoe UI", 8f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("✓ Kiểm Tra Chính Tả & Ngữ Pháp", hFont, Brushes.White, 14, 8);
-                    e.Graphics.DrawString("Phát hiện và sửa lỗi từ ngữ, lặp từ, định dạng trong bảng tính", subFont, Brushes.WhiteSmoke, 16, 28);
+                    e.Graphics.DrawString(AppL10n.T("✓ Kiểm Tra Chính Tả & Ngữ Pháp", "✓ Spelling & Grammar"), hFont, Brushes.White, 14, 8);
+                    e.Graphics.DrawString(AppL10n.T("Phát hiện và sửa lỗi từ ngữ, lặp từ, định dạng trong bảng tính", "Detect and fix spelling, repeated words, and formatting issues"), subFont, Brushes.WhiteSmoke, 16, 28);
                 }
             };
             this.Controls.Add(pnlHeader);
 
             lblLocation = new Label
             {
-                Text = "Vị trí:",
+                Text = AppL10n.T("Vị trí:", "Location:"),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(14, 116, 144),
                 Location = new Point(16, 60),
@@ -86,7 +87,7 @@ namespace ZenQOffice.UI
 
             lblReason = new Label
             {
-                Text = "Lỗi:",
+                Text = AppL10n.T("Lỗi:", "Issue:"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Italic),
                 ForeColor = Color.FromArgb(220, 38, 38),
                 Location = new Point(16, 80),
@@ -96,7 +97,7 @@ namespace ZenQOffice.UI
 
             Label lblNotDict = new Label
             {
-                Text = "Từ / Câu gốc:",
+                Text = AppL10n.T("Từ / Câu gốc:", "Not in dictionary:"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Location = new Point(16, 104),
@@ -117,7 +118,7 @@ namespace ZenQOffice.UI
 
             Label lblChange = new Label
             {
-                Text = "Thay đổi thành:",
+                Text = AppL10n.T("Thay đổi thành:", "Change to:"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Location = new Point(16, 154),
@@ -135,7 +136,7 @@ namespace ZenQOffice.UI
 
             Label lblSugg = new Label
             {
-                Text = "Gợi ý chuẩn:",
+                Text = AppL10n.T("Gợi ý chuẩn:", "Suggestions:"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Location = new Point(16, 204),
@@ -162,7 +163,7 @@ namespace ZenQOffice.UI
             int btnX = 350;
             btnIgnore = new Button
             {
-                Text = "Bỏ qua",
+                Text = AppL10n.T("Bỏ qua", "Ignore"),
                 Size = new Size(100, 28),
                 Location = new Point(btnX, 122),
                 BackColor = Color.White,
@@ -175,7 +176,7 @@ namespace ZenQOffice.UI
 
             btnChange = new Button
             {
-                Text = "Thay đổi",
+                Text = AppL10n.T("Thay đổi", "Change"),
                 Size = new Size(100, 28),
                 Location = new Point(btnX, 156),
                 BackColor = Color.FromArgb(14, 116, 144),
@@ -194,7 +195,7 @@ namespace ZenQOffice.UI
 
             btnChangeAll = new Button
             {
-                Text = "Đổi tất cả",
+                Text = AppL10n.T("Đổi tất cả", "Change All"),
                 Size = new Size(100, 28),
                 Location = new Point(btnX, 190),
                 BackColor = Color.White,
@@ -219,7 +220,7 @@ namespace ZenQOffice.UI
 
             btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 DialogResult = DialogResult.Cancel,
                 Size = new Size(100, 28),
                 Location = new Point(btnX, 276),
@@ -236,14 +237,14 @@ namespace ZenQOffice.UI
         {
             if (_items == null || _items.Count == 0 || _currentIndex >= _items.Count)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Kiểm tra chính tả hoàn tất! Không còn lỗi nào khác trên trang tính.", "Chính Tả Hoàn Tất", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Kiểm tra chính tả hoàn tất! Không còn lỗi nào khác trên trang tính.", "Spell check complete! You're good to go."), AppL10n.T("Chính Tả Hoàn Tất", "Spelling"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.Close();
                 return;
             }
 
             var item = _items[_currentIndex];
-            lblLocation.Text = string.Format("Vị trí: {0} ({1}/{2})", item.Location, _currentIndex + 1, _items.Count);
-            lblReason.Text = "Lỗi: " + item.Reason;
+            lblLocation.Text = string.Format(AppL10n.T("Vị trí: {0} ({1}/{2})", "Location: {0} ({1}/{2})"), item.Location, _currentIndex + 1, _items.Count);
+            lblReason.Text = AppL10n.T("Lỗi: ", "Issue: ") + item.Reason;
             txtOriginal.Text = item.OriginalText;
 
             lstSuggestions.Items.Clear();

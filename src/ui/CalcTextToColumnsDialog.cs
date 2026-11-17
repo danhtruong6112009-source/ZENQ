@@ -49,7 +49,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Chuyển Văn Bản Thành Cột (Convert Text to Columns)";
+            this.Text = AppL10n.T("Chuyển Văn Bản Thành Cột (Convert Text to Columns)", "Convert Text to Columns");
             this.Size = new Size(580, 520);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -60,12 +60,12 @@ namespace ZenQOffice.UI
             this.BackColor = Color.FromArgb(243, 242, 241);
 
             GroupBox grpMode = new GroupBox();
-            grpMode.Text = "Kiểu dữ liệu gốc";
+            grpMode.Text = AppL10n.T("Kiểu dữ liệu gốc", "Original data type");
             grpMode.Location = new Point(15, 10);
             grpMode.Size = new Size(535, 65);
 
             radDelimited = new RadioButton();
-            radDelimited.Text = "Phân tách bằng ký tự (Delimited - Tab, phẩy, chấm phẩy, v.v.)";
+            radDelimited.Text = AppL10n.T("Phân tách bằng ký tự (Delimited - Tab, phẩy, chấm phẩy, v.v.)", "Delimited - Characters such as commas or tabs separate each field");
             radDelimited.Location = new Point(15, 20);
             radDelimited.AutoSize = true;
             radDelimited.Checked = true;
@@ -73,7 +73,7 @@ namespace ZenQOffice.UI
             grpMode.Controls.Add(radDelimited);
 
             radFixedWidth = new RadioButton();
-            radFixedWidth.Text = "Độ rộng cố định (Fixed width - Các cột canh đều theo vị trí ký tự)";
+            radFixedWidth.Text = AppL10n.T("Độ rộng cố định (Fixed width - Các cột canh đều theo vị trí ký tự)", "Fixed width - Fields are aligned in columns with spaces");
             radFixedWidth.Location = new Point(15, 42);
             radFixedWidth.AutoSize = true;
             grpMode.Controls.Add(radFixedWidth);
@@ -81,7 +81,7 @@ namespace ZenQOffice.UI
 
             // Delimiters Group
             grpDelim = new GroupBox();
-            grpDelim.Text = "Ký tự phân cách (Delimiters)";
+            grpDelim.Text = AppL10n.T("Ký tự phân cách (Delimiters)", "Delimiters");
             grpDelim.Location = new Point(15, 80);
             grpDelim.Size = new Size(535, 98);
 
@@ -94,28 +94,28 @@ namespace ZenQOffice.UI
             grpDelim.Controls.Add(chkTab);
 
             chkSemicolon = new CheckBox();
-            chkSemicolon.Text = "Chấm phẩy (;)";
+            chkSemicolon.Text = AppL10n.T("Chấm phẩy (;)", "Semicolon (;)");
             chkSemicolon.Location = new Point(110, 20);
             chkSemicolon.AutoSize = true;
             chkSemicolon.CheckedChanged += delegate(object sender, EventArgs e) { UpdateLivePreview(); };
             grpDelim.Controls.Add(chkSemicolon);
 
             chkComma = new CheckBox();
-            chkComma.Text = "Dấu phẩy (,)";
+            chkComma.Text = AppL10n.T("Dấu phẩy (,)", "Comma (,)");
             chkComma.Location = new Point(230, 20);
             chkComma.AutoSize = true;
             chkComma.CheckedChanged += delegate(object sender, EventArgs e) { UpdateLivePreview(); };
             grpDelim.Controls.Add(chkComma);
 
             chkSpace = new CheckBox();
-            chkSpace.Text = "Khoảng trắng";
+            chkSpace.Text = AppL10n.T("Khoảng trắng", "Space");
             chkSpace.Location = new Point(340, 20);
             chkSpace.AutoSize = true;
             chkSpace.CheckedChanged += delegate(object sender, EventArgs e) { UpdateLivePreview(); };
             grpDelim.Controls.Add(chkSpace);
 
             chkOther = new CheckBox();
-            chkOther.Text = "Khác:";
+            chkOther.Text = AppL10n.T("Khác:", "Other:");
             chkOther.Location = new Point(15, 45);
             chkOther.AutoSize = true;
             chkOther.CheckedChanged += delegate(object sender, EventArgs e) { UpdateLivePreview(); };
@@ -133,7 +133,7 @@ namespace ZenQOffice.UI
             grpDelim.Controls.Add(txtOther);
 
             chkConsecutive = new CheckBox();
-            chkConsecutive.Text = "Coi các dấu phân cách liên tiếp là một";
+            chkConsecutive.Text = AppL10n.T("Coi các dấu phân cách liên tiếp là một", "Treat consecutive delimiters as one");
             chkConsecutive.Location = new Point(150, 45);
             chkConsecutive.AutoSize = true;
             chkConsecutive.Checked = true;
@@ -141,7 +141,7 @@ namespace ZenQOffice.UI
             grpDelim.Controls.Add(chkConsecutive);
 
             Label lblQual = new Label();
-            lblQual.Text = "Ký tự định danh văn bản:";
+            lblQual.Text = AppL10n.T("Ký tự định danh văn bản:", "Text qualifier:");
             lblQual.Location = new Point(15, 72);
             lblQual.AutoSize = true;
             grpDelim.Controls.Add(lblQual);
@@ -150,7 +150,7 @@ namespace ZenQOffice.UI
             cboQualifier.DropDownStyle = ComboBoxStyle.DropDownList;
             cboQualifier.Location = new Point(160, 69);
             cboQualifier.Size = new Size(90, 22);
-            cboQualifier.Items.AddRange(new object[] { "\"", "'", "{Không có}" });
+            cboQualifier.Items.AddRange(new object[] { "\"", "'", AppL10n.T("{Không có}", "{None}") });
             cboQualifier.SelectedIndex = 0;
             cboQualifier.SelectedIndexChanged += delegate(object sender, EventArgs e) { UpdateLivePreview(); };
             grpDelim.Controls.Add(cboQualifier);
@@ -159,13 +159,13 @@ namespace ZenQOffice.UI
 
             // Fixed Width Box
             grpFixed = new GroupBox();
-            grpFixed.Text = "Độ rộng cố định (Fixed Width Breakpoints)";
+            grpFixed.Text = AppL10n.T("Độ rộng cố định (Fixed Width Breakpoints)", "Fixed Width Breakpoints");
             grpFixed.Location = new Point(15, 80);
             grpFixed.Size = new Size(535, 98);
             grpFixed.Visible = false;
 
             Label lblFixedHelp = new Label();
-            lblFixedHelp.Text = "Nhập danh sách các vị trí cắt cột (phân cách bằng dấu phẩy, VD: 10, 25, 40):";
+            lblFixedHelp.Text = AppL10n.T("Nhập danh sách các vị trí cắt cột (phân cách bằng dấu phẩy, VD: 10, 25, 40):", "Enter break positions (comma-separated, e.g. 10, 25, 40):");
             lblFixedHelp.Location = new Point(15, 25);
             lblFixedHelp.AutoSize = true;
             grpFixed.Controls.Add(lblFixedHelp);
@@ -180,7 +180,7 @@ namespace ZenQOffice.UI
 
             // Destination
             Label lblDest = new Label();
-            lblDest.Text = "Ô đích (Destination):";
+            lblDest.Text = AppL10n.T("Ô đích (Destination):", "Destination:");
             lblDest.Location = new Point(15, 188);
             lblDest.AutoSize = true;
             this.Controls.Add(lblDest);
@@ -193,7 +193,7 @@ namespace ZenQOffice.UI
 
             // Live Preview Grid
             Label lblPrev = new Label();
-            lblPrev.Text = "Xem trước dữ liệu phân tách (Data Preview):";
+            lblPrev.Text = AppL10n.T("Xem trước dữ liệu phân tách (Data Preview):", "Data preview:");
             lblPrev.Location = new Point(15, 218);
             lblPrev.AutoSize = true;
             this.Controls.Add(lblPrev);
@@ -211,14 +211,14 @@ namespace ZenQOffice.UI
             this.Controls.Add(dgvPreview);
 
             btnOK = new Button();
-            btnOK.Text = "Thực hiện (Finish)";
+            btnOK.Text = AppL10n.T("Thực hiện (Finish)", "Finish");
             btnOK.Location = new Point(320, 435);
             btnOK.Size = new Size(130, 32);
             btnOK.Click += BtnOK_Click;
             this.Controls.Add(btnOK);
 
             btnCancel = new Button();
-            btnCancel.Text = "Hủy";
+            btnCancel.Text = AppL10n.T("Hủy", "Cancel");
             btnCancel.Location = new Point(460, 435);
             btnCancel.Size = new Size(90, 32);
             btnCancel.Click += delegate(object sender, EventArgs e) { this.Close(); };
@@ -307,7 +307,7 @@ namespace ZenQOffice.UI
 
             for (int c = 0; c < maxCols; c++)
             {
-                dgvPreview.Columns.Add("Col" + c, "Cột " + (c + 1));
+                dgvPreview.Columns.Add("Col" + c, AppL10n.T("Cột ", "Column ") + (c + 1));
             }
 
             for (int r = 0; r < rowTokens.Count; r++)
@@ -352,8 +352,8 @@ namespace ZenQOffice.UI
             if (hasCollision)
             {
                 DialogResult dr = ZenQOffice.UI.FluentMessageBox.Show(this,
-                    "Vùng dữ liệu đích đã có sẵn dữ liệu. Bạn có muốn ghi đè lên các ô này không?",
-                    "Cảnh báo ghi đè", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                    AppL10n.T("Vùng dữ liệu đích đã có sẵn dữ liệu. Bạn có muốn ghi đè lên các ô này không?", "Destination already contains data. Do you want to replace it?"),
+                    AppL10n.T("Cảnh báo ghi đè", "Overwrite Warning"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (dr != DialogResult.Yes) return;
             }
 

@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -63,7 +64,7 @@ namespace ZenQOffice.UI
 
         private void InitializeUI()
         {
-            Text = "Bảng chọn màu sắc & Kênh Alpha (Color & Transparency)";
+            Text = AppL10n.T("Bảng chọn màu sắc & Kênh Alpha (Color & Transparency)", "Color & Transparency Picker");
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -114,7 +115,7 @@ namespace ZenQOffice.UI
 
 
             // 3. Preview Area (New vs Old) với nền trong suốt Checkerboard
-            Label lblPreview = new Label { Text = "Màu sắc & Độ trong", Location = new Point(312, 16), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblPreview = new Label { Text = AppL10n.T("Màu sắc & Độ trong", "Color & Opacity"), Location = new Point(312, 16), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             Controls.Add(lblPreview);
 
             _pnlPreviewNew = new ColorDoubleBufferedPanel { Location = new Point(314, 38), Size = new Size(95, 34), BorderStyle = BorderStyle.FixedSingle };
@@ -122,22 +123,22 @@ namespace ZenQOffice.UI
             _pnlPreviewNew.Paint += PnlPreviewNew_Paint;
             _pnlPreviewOld.Paint += PnlPreviewOld_Paint;
 
-            Label lblNew = new Label { Text = "Màu mới", Location = new Point(314, 74), AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139), Font = new Font("Segoe UI", 7.8f) };
-            Label lblOld = new Label { Text = "Hiện tại", Location = new Point(415, 74), AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139), Font = new Font("Segoe UI", 7.8f) };
+            Label lblNew = new Label { Text = AppL10n.T("Màu mới", "New"), Location = new Point(314, 74), AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139), Font = new Font("Segoe UI", 7.8f) };
+            Label lblOld = new Label { Text = AppL10n.T("Hiện tại", "Current"), Location = new Point(415, 74), AutoSize = true, ForeColor = Color.FromArgb(100, 116, 139), Font = new Font("Segoe UI", 7.8f) };
             Controls.Add(_pnlPreviewNew);
             Controls.Add(_pnlPreviewOld);
             Controls.Add(lblNew);
             Controls.Add(lblOld);
 
             // 4. Hex Input
-            Label lblHex = new Label { Text = "Mã màu Hex:", Location = new Point(312, 100), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblHex = new Label { Text = AppL10n.T("Mã màu Hex:", "Hex Color:"), Location = new Point(312, 100), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             _txtHex = new TextBox { Location = new Point(395, 97), Size = new Size(115, 23), Font = new Font("Consolas", 9.5f) };
             _txtHex.TextChanged += TxtHex_TextChanged;
             Controls.Add(lblHex);
             Controls.Add(_txtHex);
 
             // 5. Hệ màu RGB
-            Label lblRgbSec = new Label { Text = "Hệ màu RGB:", Location = new Point(312, 132), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblRgbSec = new Label { Text = AppL10n.T("Hệ màu RGB:", "RGB:"), Location = new Point(312, 132), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             Controls.Add(lblRgbSec);
 
             _numR = CreateNumeric(360, 156, 0, 255);
@@ -155,7 +156,7 @@ namespace ZenQOffice.UI
             _numB.ValueChanged += (s, e) => OnRgbChanged();
 
             // 6. Hệ màu HSL
-            Label lblHslSec = new Label { Text = "Hệ màu HSL:", Location = new Point(312, 192), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblHslSec = new Label { Text = AppL10n.T("Hệ màu HSL:", "HSL:"), Location = new Point(312, 192), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             Controls.Add(lblHslSec);
 
             _numH = CreateNumeric(360, 216, 0, 360);
@@ -173,7 +174,7 @@ namespace ZenQOffice.UI
             _numL.ValueChanged += (s, e) => OnHslChanged();
 
             // 7. Kênh Alpha / Độ trong suốt (0 - 100%)
-            Label lblAlphaSec = new Label { Text = "Độ đục / Alpha (Opacity):", Location = new Point(312, 250), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblAlphaSec = new Label { Text = AppL10n.T("Độ đục / Alpha (Opacity):", "Opacity / Alpha:"), Location = new Point(312, 250), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             Controls.Add(lblAlphaSec);
 
             _tbAlpha = new TrackBar
@@ -217,7 +218,7 @@ namespace ZenQOffice.UI
             Controls.Add(lblPct);
 
             // 8. Bảng màu cơ bản (Quick Swatches)
-            Label lblSw = new Label { Text = "Màu cơ bản:", Location = new Point(16, 270), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblSw = new Label { Text = AppL10n.T("Màu cơ bản:", "Swatches:"), Location = new Point(16, 270), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             Controls.Add(lblSw);
 
             Color[] basicSwatches = new Color[]
@@ -250,7 +251,7 @@ namespace ZenQOffice.UI
             // Nút nhanh trong suốt 50% và 0%
             Button btn50 = new Button
             {
-                Text = "Trong suốt 50%",
+                Text = AppL10n.T("Trong suốt 50%", "50% Opacity"),
                 Location = new Point(16, 328),
                 Size = new Size(110, 26),
                 BackColor = Color.FromArgb(241, 245, 249),
@@ -271,7 +272,7 @@ namespace ZenQOffice.UI
 
             Button btn100 = new Button
             {
-                Text = "Đậm đặc 100%",
+                Text = AppL10n.T("Đậm đặc 100%", "100% Solid"),
                 Location = new Point(132, 328),
                 Size = new Size(110, 26),
                 BackColor = Color.FromArgb(241, 245, 249),
@@ -293,7 +294,7 @@ namespace ZenQOffice.UI
             // 9. Buttons OK / Cancel
             Button btnOk = new Button
             {
-                Text = "Đồng ý",
+                Text = AppL10n.T("Đồng ý", "OK"),
                 DialogResult = DialogResult.OK,
                 Location = new Point(328, 385),
                 Size = new Size(88, 32),
@@ -306,7 +307,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(426, 385),
                 Size = new Size(88, 32),

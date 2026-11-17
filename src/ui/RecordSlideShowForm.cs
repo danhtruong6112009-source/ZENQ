@@ -601,7 +601,7 @@ namespace ZenQOffice.UI
             }
 
             SlideNode slide = (_presentation != null && _currentSlideIndex < _presentation.Slides.Count) ? _presentation.Slides[_currentSlideIndex] : null;
-            string notes = (slide != null && !string.IsNullOrEmpty(slide.Notes)) ? slide.Notes : "(Chưa có ghi chú cho slide này)";
+            string notes = (slide != null && !string.IsNullOrEmpty(slide.Notes)) ? slide.Notes : AppL10n.T("(Chưa có ghi chú cho slide này)", "(No notes for this slide)");
 
             using (Font nFont = new Font("Segoe UI", 12f, FontStyle.Regular))
             using (SolidBrush txtB = new SolidBrush(Color.FromArgb(244, 244, 245)))
@@ -876,8 +876,8 @@ namespace ZenQOffice.UI
             if (promptSaveVideo)
             {
                 DialogResult ask = ZenQOffice.UI.FluentMessageBox.Show(
-                    "Đã hoàn thành phiên ghi hình bài thuyết trình!\n\nBạn có muốn chọn vị trí lưu tệp video trình chiếu (.mp4 / .wmv / .avi) ngay bây giờ không?",
-                    "Lưu Bản Ghi Video (Save Recorded Presentation Video)",
+                    AppL10n.T("Đã hoàn thành phiên ghi hình bài thuyết trình!\n\nBạn có muốn chọn vị trí lưu tệp video trình chiếu (.mp4 / .wmv / .avi) ngay bây giờ không?", "Presentation recording finished!\n\nDo you want to choose where to save the video file (.mp4 / .wmv / .avi) now?"),
+                    AppL10n.T("Lưu Bản Ghi Video (Save Recorded Presentation Video)", "Save Recorded Presentation Video"),
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question);
 
@@ -892,8 +892,8 @@ namespace ZenQOffice.UI
         {
             using (SaveFileDialog sfd = new SaveFileDialog())
             {
-                sfd.Title = "Chọn vị trí lưu Video Trình chiếu (Save Recorded Video)";
-                sfd.Filter = "Tệp Video MP4 (*.mp4)|*.mp4|Tệp Windows Media Video (*.wmv)|*.wmv|Tệp Video AVI (*.avi)|*.avi|Tất cả tệp (*.*)|*.*";
+                sfd.Title = AppL10n.T("Chọn vị trí lưu Video Trình chiếu (Save Recorded Video)", "Save Recorded Video");
+                sfd.Filter = AppL10n.T("Tệp Video MP4 (*.mp4)|*.mp4|Tệp Windows Media Video (*.wmv)|*.wmv|Tệp Video AVI (*.avi)|*.avi|Tất cả tệp (*.*)|*.*", "MP4 Video (*.mp4)|*.mp4|Windows Media Video (*.wmv)|*.wmv|AVI Video (*.avi)|*.avi|All Files (*.*)|*.*");
                 sfd.FileName = "Presentation_Recording_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".mp4";
                 sfd.DefaultExt = "mp4";
                 sfd.AddExtension = true;
@@ -919,7 +919,7 @@ namespace ZenQOffice.UI
 
                 if (_presentation == null || _presentation.Slides.Count == 0)
                 {
-                    if (showSuccessDialog) ZenQOffice.UI.FluentMessageBox.Show("Không có slide nào để xuất video!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    if (showSuccessDialog) ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không có slide nào để xuất video!", "No slides to export as video!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -954,8 +954,8 @@ namespace ZenQOffice.UI
                 if (showSuccessDialog)
                 {
                     DialogResult openFolder = ZenQOffice.UI.FluentMessageBox.Show(
-                        string.Format("Bản ghi video đã được xuất thành công tại:\n\n{0}\n\nBạn có muốn mở thư mục chứa video không?", targetPath),
-                        "Xuất Video Thành Công (Export Complete)",
+                        string.Format(AppL10n.T("Bản ghi video đã được xuất thành công tại:\n\n{0}\n\nBạn có muốn mở thư mục chứa video không?", "Video exported successfully to:\n\n{0}\n\nOpen output folder?"), targetPath),
+                        AppL10n.T("Xuất Video Thành Công (Export Complete)", "Export Complete"),
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Information);
 
@@ -973,7 +973,7 @@ namespace ZenQOffice.UI
             {
                 Cursor = Cursors.Default;
                 Console.WriteLine("EXPORT ERROR: " + ex.ToString());
-                if (showSuccessDialog) ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi xuất video: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (showSuccessDialog) ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Lỗi khi xuất video: ", "Error exporting video: ") + ex.Message, AppL10n.T("Lỗi", "Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1292,7 +1292,7 @@ namespace ZenQOffice.UI
         private void ShowClearMenu(Point loc)
         {
             ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
-            menu.Items.Add("Xóa bản ghi trên slide hiện tại (Clear on Current Slide)", null, (s, e) =>
+            menu.Items.Add(AppL10n.T("Xóa bản ghi trên slide hiện tại (Clear on Current Slide)", "Clear Recording on Current Slide"), null, (s, e) =>
             {
                 if (_slideAnnotations.ContainsKey(_currentSlideIndex))
                 {
@@ -1305,7 +1305,7 @@ namespace ZenQOffice.UI
                 }
                 Invalidate();
             });
-            menu.Items.Add("Xóa bản ghi trên tất cả slide (Clear on All Slides)", null, (s, e) =>
+            menu.Items.Add(AppL10n.T("Xóa bản ghi trên tất cả slide (Clear on All Slides)", "Clear Recordings on All Slides"), null, (s, e) =>
             {
                 _slideAnnotations.Clear();
                 if (_presentation != null)
@@ -1324,8 +1324,8 @@ namespace ZenQOffice.UI
         private void ShowSettingsMenu(Point loc)
         {
             ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
-            menu.Items.Add("🎤 Thiết bị Microphone: Mặc định (Default Mic)", null, null).Enabled = false;
-            menu.Items.Add("📷 Thiết bị Camera: Webcam HD", null, null).Enabled = false;
+            menu.Items.Add(AppL10n.T("🎤 Thiết bị Microphone: Mặc định (Default Mic)", "🎤 Microphone: Default Mic"), null, null).Enabled = false;
+            menu.Items.Add(AppL10n.T("📷 Thiết bị Camera: Webcam HD", "📷 Camera: HD Webcam"), null, null).Enabled = false;
             menu.Show(this, loc);
         }
 

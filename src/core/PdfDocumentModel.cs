@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -201,7 +201,7 @@ namespace ZenQOffice.Core
             Color = color;
             Opacity = (type == PdfAnnotationType.Highlight) ? 0.35f : 1.0f;
             Content = "";
-            Author = "Người dùng ZENQ OFFICE";
+            Author = AppL10n.T("Người dùng ZENQ OFFICE", "ZENQ OFFICE User");
             CreatedAt = DateTime.Now;
             InkPoints = new List<PointF>();
             StrokeWidth = 2.5f;
@@ -241,7 +241,7 @@ namespace ZenQOffice.Core
             Bounds = bounds;
             SignerName = signerName;
             SignDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
-            Reason = "Đã phê duyệt tài liệu";
+            Reason = AppL10n.T("Đã phê duyệt tài liệu", "Document Approved");
             SignatureColor = Color.FromArgb(30, 58, 138); // Deep Royal Blue
             SignatureStrokes = new List<List<PointF>>();
         }
@@ -276,9 +276,9 @@ namespace ZenQOffice.Core
         public float FontSize { get; set; }
         public bool IsEnabled { get; set; }
 
-        public PdfWatermark(string text = "BẢO MẬT")
+        public PdfWatermark(string text = null)
         {
-            Text = text;
+            Text = text ?? AppL10n.T("BẢO MẬT", "CONFIDENTIAL");
             Color = Color.FromArgb(220, 38, 38);
             Opacity = 0.18f;
             AngleDegrees = -45f;
@@ -446,11 +446,11 @@ namespace ZenQOffice.Core
         public bool IsApplied { get; set; }
         public DateTime MarkedAt { get; set; }
 
-        public PdfRedactionElement(RectangleF bounds, string overlayText = "BẢO MẬT")
+        public PdfRedactionElement(RectangleF bounds, string overlayText = null)
         {
             Id = Guid.NewGuid().ToString("N");
             Bounds = bounds;
-            OverlayText = overlayText;
+            OverlayText = overlayText ?? AppL10n.T("BẢO MẬT", "REDACTED");
             FillColor = Color.Black;
             BorderColor = Color.FromArgb(239, 68, 68);
             TextColor = Color.White;
@@ -661,6 +661,7 @@ namespace ZenQOffice.Core
         public PdfSecuritySettings SecuritySettings { get; set; } = new PdfSecuritySettings();
         public bool IsModified { get; set; }
         public string PrimaryFontName { get; set; }
+        public byte[] OriginalBytes { get; set; }
         public PdfiumViewer.PdfDocument UnderlyingPdfiumDoc { get; set; }
 
         public void InvalidateAllCaches()
@@ -751,14 +752,14 @@ namespace ZenQOffice.Core
             return SecuritySettings.VerifyAnyPassword(password);
         }
 
-        public PdfDocument(string title = "Tài liệu PDF Mới.pdf")
+        public PdfDocument(string title = null)
         {
-            Title = title;
+            Title = string.IsNullOrEmpty(title) ? AppL10n.T("Tài liệu PDF Mới.pdf", "New PDF Document.pdf") : title;
             FilePath = "";
             PrimaryFontName = "Times New Roman";
-            Author = "Người dùng ZENQ OFFICE";
+            Author = AppL10n.T("Người dùng ZENQ OFFICE", "ZENQ OFFICE User");
             Creator = "ZENQ OFFICE Suite PDF Engine";
-            Subject = "Tài liệu PDF";
+            Subject = AppL10n.T("Tài liệu PDF", "PDF Document");
             CreatedDate = DateTime.Now;
             ModifiedDate = DateTime.Now;
             Pages = new List<PdfPageModel>();
@@ -868,7 +869,7 @@ namespace ZenQOffice.Core
 
         public PdfDocument ExtractPages(IEnumerable<int> pageIndices, string newTitle = "")
         {
-            string title = string.IsNullOrEmpty(newTitle) ? "Trích xuất - " + Title : newTitle;
+            string title = string.IsNullOrEmpty(newTitle) ? AppL10n.T("Trích xuất - ", "Extracted - ") + Title : newTitle;
             var newDoc = new PdfDocument(title)
             {
                 Author = this.Author,

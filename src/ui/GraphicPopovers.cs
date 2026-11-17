@@ -292,7 +292,7 @@ namespace ZenQOffice.UI
             using (Font lblFont = new Font("Segoe UI Semibold", 9.0f, FontStyle.Bold))
             using (SolidBrush txtB = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("Độ đậm đường viền", lblFont, txtB, 14, 66);
+                g.DrawString(AppL10n.Tr("Độ đậm đường viền"), lblFont, txtB, 14, 66);
             }
 
             // Color swatch circle on the right of label
@@ -314,11 +314,11 @@ namespace ZenQOffice.UI
             using (Font lblFont = new Font("Segoe UI Semibold", 9.0f, FontStyle.Bold))
             using (SolidBrush txtB = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("Bo tròn góc", lblFont, txtB, 14, 14);
+                g.DrawString(AppL10n.Tr("Bo tròn góc"), lblFont, txtB, 14, 14);
                 float crVal = Math.Max(0f, Math.Min(100f, _shape.CornerRadius));
                 DrawCanvaSliderRow(g, 38, crVal, 0f, 100f, ((int)Math.Round(crVal)).ToString(), out _sliderTrack1Bounds, out _valuePill1Bounds);
 
-                g.DrawString("Cạnh", lblFont, txtB, 14, 76);
+                g.DrawString(AppL10n.Tr("Cạnh"), lblFont, txtB, 14, 76);
                 int sides = GetCurrentSideCount();
                 DrawCanvaSliderRow(g, 100, sides, 3f, 12f, sides.ToString(), out _sliderTrack2Bounds, out _valuePill2Bounds);
             }
@@ -329,7 +329,7 @@ namespace ZenQOffice.UI
             using (Font lblFont = new Font("Segoe UI Semibold", 9.0f, FontStyle.Bold))
             using (SolidBrush txtB = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("Độ trong suốt", lblFont, txtB, 14, 14);
+                g.DrawString(AppL10n.Tr("Độ trong suốt"), lblFont, txtB, 14, 14);
                 float opVal = Math.Max(0f, Math.Min(100f, _shape.FillOpacity * 100f));
                 DrawCanvaSliderRow(g, 40, opVal, 0f, 100f, ((int)Math.Round(opVal)).ToString(), out _sliderTrack1Bounds, out _valuePill1Bounds);
             }
@@ -340,11 +340,11 @@ namespace ZenQOffice.UI
             using (Font lblFont = new Font("Segoe UI Semibold", 9.0f, FontStyle.Bold))
             using (SolidBrush txtB = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("Độ mờ bóng đổ", lblFont, txtB, 14, 14);
+                g.DrawString(AppL10n.Tr("Độ mờ bóng đổ"), lblFont, txtB, 14, 14);
                 float blurVal = _shape.HasShadow ? Math.Max(0f, Math.Min(60f, _shape.ShadowBlur)) : 0f;
                 DrawCanvaSliderRow(g, 38, blurVal, 0f, 60f, ((int)Math.Round(blurVal)).ToString(), out _sliderTrack1Bounds, out _valuePill1Bounds);
 
-                g.DrawString("Khoảng cách bóng", lblFont, txtB, 14, 76);
+                g.DrawString(AppL10n.Tr("Khoảng cách bóng"), lblFont, txtB, 14, 76);
                 float distVal = _shape.HasShadow ? Math.Max(0f, Math.Min(40f, _shape.ShadowOffsetY)) : 0f;
                 DrawCanvaSliderRow(g, 100, distVal, 0f, 40f, ((int)Math.Round(distVal)).ToString(), out _sliderTrack2Bounds, out _valuePill2Bounds);
             }
@@ -365,7 +365,7 @@ namespace ZenQOffice.UI
                         g.FillPath(hb, gp);
                 }
                 DrawFlipIcon(g, _flipHBounds.X + 10, _flipHBounds.Y + 8, true);
-                g.DrawString("Lật ngang", f, txtB, _flipHBounds.X + 36, _flipHBounds.Y + 7);
+                g.DrawString(AppL10n.Tr("Lật ngang"), f, txtB, _flipHBounds.X + 36, _flipHBounds.Y + 7);
 
                 if (_hoveredFlipIdx == 1)
                 {
@@ -374,7 +374,7 @@ namespace ZenQOffice.UI
                         g.FillPath(hb, gp);
                 }
                 DrawFlipIcon(g, _flipVBounds.X + 10, _flipVBounds.Y + 8, false);
-                g.DrawString("Lật dọc", f, txtB, _flipVBounds.X + 36, _flipVBounds.Y + 7);
+                g.DrawString(AppL10n.Tr("Lật dọc"), f, txtB, _flipVBounds.X + 36, _flipVBounds.Y + 7);
             }
         }
 

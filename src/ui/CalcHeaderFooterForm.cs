@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -17,7 +18,7 @@ namespace ZenQOffice.UI
         public CalcHeaderFooterForm(CalcView calcView)
         {
             _calcView = calcView;
-            this.Text = "Thiết Lập Đầu Trang & Chân Trang (Header & Footer)";
+            this.Text = AppL10n.T("Thiết Lập Đầu Trang & Chân Trang (Header & Footer)", "Header & Footer");
             this.Size = new Size(560, 420);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -35,16 +36,16 @@ namespace ZenQOffice.UI
             // Header Group
             GroupBox grpHeader = new GroupBox
             {
-                Text = "Đầu trang (Header):",
+                Text = AppL10n.T("Đầu trang (Header):", "Header:"),
                 Location = new Point(20, 15),
                 Size = new Size(505, 125),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
             };
             this.Controls.Add(grpHeader);
 
-            Label lblHL = new Label { Text = "Phần bên trái:", Location = new Point(15, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
-            Label lblHC = new Label { Text = "Phần ở giữa:", Location = new Point(175, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
-            Label lblHR = new Label { Text = "Phần bên phải:", Location = new Point(335, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
+            Label lblHL = new Label { Text = AppL10n.T("Phần bên trái:", "Left section:"), Location = new Point(15, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
+            Label lblHC = new Label { Text = AppL10n.T("Phần ở giữa:", "Center section:"), Location = new Point(175, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
+            Label lblHR = new Label { Text = AppL10n.T("Phần bên phải:", "Right section:"), Location = new Point(335, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
             grpHeader.Controls.AddRange(new Control[] { lblHL, lblHC, lblHR });
 
             txtHeaderLeft = new TextBox { Location = new Point(15, 48), Size = new Size(150, 60), Multiline = true, Font = new Font("Segoe UI", 9.0f) };
@@ -55,16 +56,16 @@ namespace ZenQOffice.UI
             // Footer Group
             GroupBox grpFooter = new GroupBox
             {
-                Text = "Chân trang (Footer):",
+                Text = AppL10n.T("Chân trang (Footer):", "Footer:"),
                 Location = new Point(20, 155),
                 Size = new Size(505, 125),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
             };
             this.Controls.Add(grpFooter);
 
-            Label lblFL = new Label { Text = "Phần bên trái:", Location = new Point(15, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
-            Label lblFC = new Label { Text = "Phần ở giữa:", Location = new Point(175, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
-            Label lblFR = new Label { Text = "Phần bên phải:", Location = new Point(335, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
+            Label lblFL = new Label { Text = AppL10n.T("Phần bên trái:", "Left section:"), Location = new Point(15, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
+            Label lblFC = new Label { Text = AppL10n.T("Phần ở giữa:", "Center section:"), Location = new Point(175, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
+            Label lblFR = new Label { Text = AppL10n.T("Phần bên phải:", "Right section:"), Location = new Point(335, 25), Size = new Size(150, 18), Font = new Font("Segoe UI", 8.5f) };
             grpFooter.Controls.AddRange(new Control[] { lblFL, lblFC, lblFR });
 
             txtFooterLeft = new TextBox { Location = new Point(15, 48), Size = new Size(150, 60), Multiline = true, Font = new Font("Segoe UI", 9.0f) };
@@ -76,17 +77,17 @@ namespace ZenQOffice.UI
             FlowLayoutPanel pnlPresets = new FlowLayoutPanel { Location = new Point(20, 290), Size = new Size(505, 32) };
             this.Controls.Add(pnlPresets);
 
-            Button btnAddPageNum = new Button { Text = "+ Số trang &[Page]", AutoSize = true, BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+            Button btnAddPageNum = new Button { Text = AppL10n.T("+ Số trang &[Page]", "+ Page Number &[Page]"), AutoSize = true, BackColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnAddPageNum.FlatAppearance.BorderColor = Color.FromArgb(209, 213, 219);
             btnAddPageNum.Click += (s, e) => { txtFooterCenter.Text = "Trang &[Page] / &[Pages]"; };
             pnlPresets.Controls.Add(btnAddPageNum);
 
-            Button btnAddDate = new Button { Text = "+ Ngày &[Date]", AutoSize = true, BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+            Button btnAddDate = new Button { Text = AppL10n.T("+ Ngày &[Date]", "+ Date &[Date]"), AutoSize = true, BackColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnAddDate.FlatAppearance.BorderColor = Color.FromArgb(209, 213, 219);
             btnAddDate.Click += (s, e) => { txtHeaderRight.Text = "&[Date]"; };
             pnlPresets.Controls.Add(btnAddDate);
 
-            Button btnAddSheet = new Button { Text = "+ Tên Sheet &[Tab]", AutoSize = true, BackColor = Color.White, FlatStyle = FlatStyle.Flat };
+            Button btnAddSheet = new Button { Text = AppL10n.T("+ Tên Sheet &[Tab]", "+ Sheet Name &[Tab]"), AutoSize = true, BackColor = Color.White, FlatStyle = FlatStyle.Flat };
             btnAddSheet.FlatAppearance.BorderColor = Color.FromArgb(209, 213, 219);
             btnAddSheet.Click += (s, e) => { txtHeaderLeft.Text = "&[Tab]"; };
             pnlPresets.Controls.Add(btnAddSheet);
@@ -97,7 +98,7 @@ namespace ZenQOffice.UI
 
             Button btnOK = new Button
             {
-                Text = "Đồng ý",
+                Text = AppL10n.T("Đồng ý", "OK"),
                 Location = new Point(330, 10),
                 Size = new Size(95, 28),
                 BackColor = Color.FromArgb(16, 124, 65),
@@ -111,7 +112,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Location = new Point(435, 10),
                 Size = new Size(80, 28),
                 BackColor = Color.White,

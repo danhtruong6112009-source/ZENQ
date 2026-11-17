@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -33,8 +33,8 @@ namespace ZenQOffice.Core
             if (slide == null) return ideas;
 
             // 1. Phân tích nội dung hiện có trên Slide
-            string slideTitle = "Tiêu đề Bài thuyết trình";
-            string slideSubtitle = "Nội dung tóm tắt & điểm nhấn chiến lược";
+            string slideTitle = AppL10n.T("Tiêu đề Bài thuyết trình", "Presentation Title");
+            string slideSubtitle = AppL10n.T("Nội dung tóm tắt & điểm nhấn chiến lược", "Summary & strategic highlights");
             List<string> contentPoints = new List<string>();
             ShapeNode existingImage = null;
 
@@ -53,11 +53,11 @@ namespace ZenQOffice.Core
                     if (!string.IsNullOrEmpty(shp.Text))
                     {
                         string trimmed = shp.Text.Trim();
-                        if (shp.PlaceholderType == "Title" || (shp.FontSize >= 28f && slideTitle == "Tiêu đề Bài thuyết trình"))
+                        if (shp.PlaceholderType == "Title" || (shp.FontSize >= 28f && (slideTitle == "Tiêu đề Bài thuyết trình" || slideTitle == "Presentation Title")))
                         {
                             slideTitle = trimmed;
                         }
-                        else if (shp.PlaceholderType == "Subtitle" || (shp.FontSize >= 18f && slideSubtitle == "Nội dung tóm tắt & điểm nhấn chiến lược"))
+                        else if (shp.PlaceholderType == "Subtitle" || (shp.FontSize >= 18f && (slideSubtitle == "Nội dung tóm tắt & điểm nhấn chiến lược" || slideSubtitle == "Summary & strategic highlights")))
                         {
                             slideSubtitle = trimmed;
                         }
@@ -76,9 +76,9 @@ namespace ZenQOffice.Core
 
             if (contentPoints.Count == 0)
             {
-                contentPoints.Add("Phân tích cơ hội & xu hướng công nghệ mới");
-                contentPoints.Add("Tối ưu hóa năng suất và trải nghiệm người dùng");
-                contentPoints.Add("Định vị giá trị cốt lõi và lộ trình phát triển bền vững");
+                contentPoints.Add(AppL10n.T("Phân tích cơ hội & xu hướng công nghệ mới", "Analyze opportunities & emerging technology trends"));
+                contentPoints.Add(AppL10n.T("Tối ưu hóa năng suất và trải nghiệm người dùng", "Optimize productivity and user experience"));
+                contentPoints.Add(AppL10n.T("Định vị giá trị cốt lõi và lộ trình phát triển bền vững", "Define core values and sustainable roadmap"));
             }
 
             // 2. Sinh 8 ý tưởng thiết kế phong cách PowerPoint 365 chuẩn mực
@@ -89,9 +89,9 @@ namespace ZenQOffice.Core
             ideas.Add(new SlideDesignIdea
             {
                 Id = "hero_split",
-                Title = "Hero Split Đẳng cấp",
-                Category = "Hiện đại",
-                Description = "Bố cục chia đôi cân đối với khối màu ấn tượng bên trái và thẻ nội dung trang nhã bên phải.",
+                Title = AppL10n.T("Hero Split Đẳng cấp", "Executive Hero Split"),
+                Category = AppL10n.T("Hiện đại", "Modern"),
+                Description = AppL10n.T("Bố cục chia đôi cân đối với khối màu ấn tượng bên trái và thẻ nội dung trang nhã bên phải.", "Balanced split layout with a bold left accent panel and refined content card."),
                 BackgroundColor = 0xF8FAFC,
                 AccentColor = 0x0F172A,
                 Apply = (s, w, h) =>
@@ -123,7 +123,7 @@ namespace ZenQOffice.Core
                         CornerRadius = 14f,
                         FillColor = 0x2563EB,
                         StrokeColor = 0x2563EB,
-                        Text = "CHIẾN LƯỢC TOÀN CẦU",
+                        Text = AppL10n.T("CHIẾN LƯỢC TOÀN CẦU", "GLOBAL STRATEGY"),
                         FontName = "Segoe UI",
                         FontSize = 14f,
                         Bold = true,
@@ -250,9 +250,9 @@ namespace ZenQOffice.Core
             ideas.Add(new SlideDesignIdea
             {
                 Id = "bento_grid",
-                Title = "Bento Grid Đa Năng",
-                Category = "Thanh lịch",
-                Description = "Bố cục khối Bento dạng thẻ bo tròn hiện đại với các dải màu điểm xuyết tinh tế.",
+                Title = AppL10n.T("Bento Grid Đa Năng", "Modular Bento Grid"),
+                Category = AppL10n.T("Thanh lịch", "Clean"),
+                Description = AppL10n.T("Bố cục khối Bento dạng thẻ bo tròn hiện đại với các dải màu điểm xuyết tinh tế.", "Modern rounded Bento card grid with subtle accent bars."),
                 BackgroundColor = 0xF1F5F9,
                 AccentColor = 0x2563EB,
                 Apply = (s, w, h) =>
@@ -301,7 +301,7 @@ namespace ZenQOffice.Core
                     float cardH = h - cardY - 80f;
 
                     int[] accentColors = new int[] { 0x2563EB, 0x10B981, 0xF59E0B };
-                    string[] cardTitles = new string[] { "ĐỊNH HƯỚNG", "THỰC THI", "KẾT QUẢ" };
+                    string[] cardTitles = new string[] { AppL10n.T("ĐỊNH HƯỚNG", "VISION"), AppL10n.T("THỰC THI", "EXECUTION"), AppL10n.T("KẾT QUẢ", "IMPACT") };
 
                     for (int i = 0; i < cols; i++)
                     {
@@ -352,7 +352,7 @@ namespace ZenQOffice.Core
                         });
 
                         // Card Content
-                        string pointText = (i < contentPoints.Count) ? contentPoints[i] : $"Giải pháp trọng tâm cho trụ cột {i + 1}";
+                        string pointText = (i < contentPoints.Count) ? contentPoints[i] : string.Format(AppL10n.T("Giải pháp trọng tâm cho trụ cột {0}", "Key initiative for pillar {0}"), i + 1);
                         s.Shapes.Add(new ShapeNode
                         {
                             Id = Guid.NewGuid().ToString(),
@@ -399,8 +399,8 @@ namespace ZenQOffice.Core
             {
                 Id = "dark_obsidian",
                 Title = "Executive Dark Obsidian",
-                Category = "Sang trọng",
-                Description = "Giao diện nền tối Obsidian quý phái với thanh dải màu Gradient rực rỡ và hiệu ứng thẻ thủy tinh.",
+                Category = AppL10n.T("Sang trọng", "Luxury"),
+                Description = AppL10n.T("Giao diện nền tối Obsidian quý phái với thanh dải màu Gradient rực rỡ và hiệu ứng thẻ thủy tinh.", "Refined Obsidian dark backdrop with vibrant gradient accent and frosted card feel."),
                 BackgroundColor = 0x0B0F19,
                 AccentColor = 0x6366F1,
                 Apply = (s, w, h) =>
@@ -535,9 +535,9 @@ namespace ZenQOffice.Core
             ideas.Add(new SlideDesignIdea
             {
                 Id = "editorial",
-                Title = "Tạp Chí Nghệ Thuật Tối Giản",
-                Category = "Tối giản",
-                Description = "Không gian trắng thanh thoát chuẩn tạp chí quốc tế với typography sắc nét và thanh kẻ màu cobalt.",
+                Title = AppL10n.T("Tạp Chí Nghệ Thuật Tối Giản", "Minimal Editorial"),
+                Category = AppL10n.T("Tối giản", "Minimal"),
+                Description = AppL10n.T("Không gian trắng thanh thoát chuẩn tạp chí quốc tế với typography sắc nét và thanh kẻ màu cobalt.", "Clean editorial whitespace with crisp typography and cobalt divider."),
                 BackgroundColor = 0xFFFFFF,
                 AccentColor = 0x2563EB,
                 Apply = (s, w, h) =>
@@ -667,9 +667,9 @@ namespace ZenQOffice.Core
             ideas.Add(new SlideDesignIdea
             {
                 Id = "process_steps",
-                Title = "Quy Trình 3 Bước Liền Mạch",
-                Category = "Quy trình",
-                Description = "Sắp xếp thông tin dạng lộ trình tiến độ với huy hiệu số tròn và đường dẫn kết nối trực quan.",
+                Title = AppL10n.T("Quy Trình 3 Bước Liền Mạch", "3-Step Process Flow"),
+                Category = AppL10n.T("Quy trình", "Process"),
+                Description = AppL10n.T("Sắp xếp thông tin dạng lộ trình tiến độ với huy hiệu số tròn và đường dẫn kết nối trực quan.", "Structured progress roadmap with numbered circular badges and connectors."),
                 BackgroundColor = 0xF8FAFC,
                 AccentColor = 0x059669,
                 Apply = (s, w, h) =>
@@ -765,7 +765,7 @@ namespace ZenQOffice.Core
                         });
 
                         // Step Text
-                        string text = (i < contentPoints.Count) ? contentPoints[i] : $"Bước hành động then chốt {i + 1}";
+                        string text = (i < contentPoints.Count) ? contentPoints[i] : string.Format(AppL10n.T("Bước hành động then chốt {0}", "Key action step {0}"), i + 1);
                         s.Shapes.Add(new ShapeNode
                         {
                             Id = Guid.NewGuid().ToString(),
@@ -810,9 +810,9 @@ namespace ZenQOffice.Core
             ideas.Add(new SlideDesignIdea
             {
                 Id = "sunset_header",
-                Title = "Dải Màu Hoàng Hôn Sáng Tạo",
-                Category = "Sáng tạo",
-                Description = "Thanh tiêu đề Gradient rực rỡ từ cánh hoa hồng đến cam san hô tràn ngập năng lượng tích cực.",
+                Title = AppL10n.T("Dải Màu Hoàng Hôn Sáng Tạo", "Creative Sunset Banner"),
+                Category = AppL10n.T("Sáng tạo", "Creative"),
+                Description = AppL10n.T("Thanh tiêu đề Gradient rực rỡ từ cánh hoa hồng đến cam san hô tràn ngập năng lượng tích cực.", "Vibrant rose-to-coral gradient header with high visual energy."),
                 BackgroundColor = 0xFFFFFF,
                 AccentColor = 0xF43F5E,
                 Apply = (s, w, h) =>
@@ -931,9 +931,9 @@ namespace ZenQOffice.Core
             ideas.Add(new SlideDesignIdea
             {
                 Id = "kpi_spotlight",
-                Title = "Tiêu Điểm Số Liệu & KPI",
-                Category = "Số liệu",
-                Description = "Tập trung sự chú ý vào số liệu ấn tượng hoặc phần trăm tăng trưởng với thẻ thông tin phân cấp.",
+                Title = AppL10n.T("Tiêu Điểm Số Liệu & KPI", "Metrics & KPI Spotlight"),
+                Category = AppL10n.T("Số liệu", "Data"),
+                Description = AppL10n.T("Tập trung sự chú ý vào số liệu ấn tượng hoặc phần trăm tăng trưởng với thẻ thông tin phân cấp.", "Highlights key metrics or growth figures with hierarchical callout cards."),
                 BackgroundColor = 0xF8FAFC,
                 AccentColor = 0x4F46E5,
                 Apply = (s, w, h) =>
@@ -992,7 +992,7 @@ namespace ZenQOffice.Core
                         Id = Guid.NewGuid().ToString(),
                         Name = "KPI_Label",
                         Type = ShapeType.TextBox,
-                        Text = "Chỉ số hoàn thành mục tiêu chiến lược",
+                        Text = AppL10n.T("Chỉ số hoàn thành mục tiêu chiến lược", "Strategic goal completion metric"),
                         FontName = "Segoe UI",
                         FontSize = 22f,
                         TextColor = 0xE0E7FF,
@@ -1068,9 +1068,9 @@ namespace ZenQOffice.Core
             ideas.Add(new SlideDesignIdea
             {
                 Id = "dual_comparison",
-                Title = "So Sánh Hai Cột Song Song",
-                Category = "So sánh",
-                Description = "Định dạng đối chiếu rõ ràng giữa Hiện trạng và Giải pháp hoặc Thách thức và Cơ hội.",
+                Title = AppL10n.T("So Sánh Hai Cột Song Song", "Two-Column Comparison"),
+                Category = AppL10n.T("So sánh", "Comparison"),
+                Description = AppL10n.T("Định dạng đối chiếu rõ ràng giữa Hiện trạng và Giải pháp hoặc Thách thức và Cơ hội.", "Side-by-side layout contrasting current state vs. proposed solution."),
                 BackgroundColor = 0xFFFFFF,
                 AccentColor = 0x0284C7,
                 Apply = (s, w, h) =>
@@ -1119,7 +1119,7 @@ namespace ZenQOffice.Core
                         Id = Guid.NewGuid().ToString(),
                         Name = "Comp_Col1_Header",
                         Type = ShapeType.TextBox,
-                        Text = "HIỆN TRẠNG & THÁCH THỨC",
+                        Text = AppL10n.T("HIỆN TRẠNG & THÁCH THỨC", "CHALLENGES"),
                         FontName = "Segoe UI",
                         FontSize = 20f,
                         Bold = true,
@@ -1127,7 +1127,7 @@ namespace ZenQOffice.Core
                         Transform = new Transform2D { X = 110, Y = colY + 30, Width = colW - 60, Height = 35 }
                     });
 
-                    string leftText = (contentPoints.Count > 0) ? contentPoints[0] : "Các vấn đề còn tồn đọng và hạn chế hiện hành";
+                    string leftText = (contentPoints.Count > 0) ? contentPoints[0] : AppL10n.T("Các vấn đề còn tồn đọng và hạn chế hiện hành", "Existing pain points and current limitations");
                     s.Shapes.Add(new ShapeNode
                     {
                         Id = Guid.NewGuid().ToString(),
@@ -1159,7 +1159,7 @@ namespace ZenQOffice.Core
                         Id = Guid.NewGuid().ToString(),
                         Name = "Comp_Col2_Header",
                         Type = ShapeType.TextBox,
-                        Text = "MỤC TIÊU & GIẢI PHÁP ĐỘT PHÁ",
+                        Text = AppL10n.T("MỤC TIÊU & GIẢI PHÁP ĐỘT PHÁ", "SOLUTIONS & GOALS"),
                         FontName = "Segoe UI",
                         FontSize = 20f,
                         Bold = true,
@@ -1167,7 +1167,7 @@ namespace ZenQOffice.Core
                         Transform = new Transform2D { X = rightColX + 30, Y = colY + 30, Width = colW - 60, Height = 35 }
                     });
 
-                    string rightText = (contentPoints.Count > 1) ? contentPoints[1] : (contentPoints.Count > 0 ? contentPoints[0] : "Lộ trình cải tiến đột phá và kết quả kỳ vọng");
+                    string rightText = (contentPoints.Count > 1) ? contentPoints[1] : (contentPoints.Count > 0 ? contentPoints[0] : AppL10n.T("Lộ trình cải tiến đột phá và kết quả kỳ vọng", "Improvement roadmap and expected outcomes"));
                     s.Shapes.Add(new ShapeNode
                     {
                         Id = Guid.NewGuid().ToString(),

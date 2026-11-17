@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice
 {
@@ -19,7 +20,7 @@ namespace ZenQOffice
 
         private void InitializeComponent()
         {
-            this.Text = "Thêm Bình luận (New Comment)";
+            this.Text = AppL10n.T("Thêm Bình luận (New Comment)", "New Comment");
             this.Size = new Size(420, 290);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -47,7 +48,7 @@ namespace ZenQOffice
                 }
                 using (Font hf = new Font("Segoe UI", 9.5f, FontStyle.Bold))
                 {
-                    e.Graphics.DrawString("New Comment (Thêm bình luận)", hf, new SolidBrush(Color.FromArgb(15, 23, 42)), 32, 12);
+                    e.Graphics.DrawString(AppL10n.T("New Comment (Thêm bình luận)", "New Comment"), hf, new SolidBrush(Color.FromArgb(15, 23, 42)), 32, 12);
                 }
                 e.Graphics.DrawLine(new Pen(Color.FromArgb(226, 232, 240)), 0, 43, pnlHeader.Width, 43);
             };
@@ -84,7 +85,7 @@ namespace ZenQOffice
             // Author & Time label
             Label lblAuthor = new Label
             {
-                Text = "Tác giả: " + Environment.UserName + " • " + DateTime.Now.ToString("HH:mm - dd/MM/yyyy"),
+                Text = AppL10n.T("Tác giả: ", "Author: ") + Environment.UserName + " • " + DateTime.Now.ToString("HH:mm - dd/MM/yyyy"),
                 Location = new Point(16, contentTop),
                 Size = new Size(372, 18),
                 ForeColor = Color.FromArgb(100, 116, 139),
@@ -108,7 +109,7 @@ namespace ZenQOffice
             // Bottom Buttons
             Button btnPost = new Button
             {
-                Text = "Đăng (Post)",
+                Text = AppL10n.T("Đăng (Post)", "Post"),
                 Size = new Size(95, 30),
                 Location = new Point(195, 210),
                 BackColor = Color.FromArgb(37, 99, 235),
@@ -122,7 +123,7 @@ namespace ZenQOffice
             {
                 if (string.IsNullOrWhiteSpace(_txtComment.Text))
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập nội dung bình luận!", "ZENQ OFFICE", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng nhập nội dung bình luận!", "Please enter a comment!"), "ZENQ OFFICE", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 CommentText = _txtComment.Text.Trim();
@@ -133,7 +134,7 @@ namespace ZenQOffice
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Size = new Size(80, 30),
                 Location = new Point(298, 210),
                 BackColor = Color.FromArgb(226, 232, 240),

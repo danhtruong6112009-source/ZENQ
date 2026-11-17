@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -108,7 +109,7 @@ namespace ZenQOffice.UI
 
         public WordArtGalleryForm()
         {
-            this.Text = "Kiểu Chữ Nghệ Thuật (WordArt - Microsoft 365)";
+            this.Text = AppL10n.Tr("Kiểu Chữ Nghệ Thuật (WordArt - Microsoft 365)");
             this.Size = new Size(540, 400);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -120,7 +121,7 @@ namespace ZenQOffice.UI
 
             Label lblText = new Label
             {
-                Text = "Văn bản chữ nghệ thuật:",
+                Text = AppL10n.Tr("Văn bản chữ nghệ thuật:"),
                 Location = new Point(20, 14),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
@@ -139,7 +140,7 @@ namespace ZenQOffice.UI
 
             Label lblPick = new Label
             {
-                Text = "Chọn phong cách WordArt (Nhấp đúp hoặc bấm Chèn để áp dụng):",
+                Text = AppL10n.Tr("Chọn phong cách WordArt (Nhấp đúp hoặc bấm Chèn để áp dụng):"),
                 Location = new Point(20, 72),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -168,7 +169,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new Button
             {
-                Text = "Chèn WordArt",
+                Text = AppL10n.Tr("Chèn WordArt"),
                 Location = new Point(310, 10),
                 Size = new Size(115, 28),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -182,7 +183,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.Tr("Hủy"),
                 Location = new Point(435, 10),
                 Size = new Size(70, 28),
                 BackColor = Color.White,

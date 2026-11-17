@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -281,6 +281,104 @@ namespace ZenQOffice.UI
         }
     }
 
+    public class WriterColumnSettings
+    {
+        public int ColumnCount { get; set; } = 1;
+        public string PresetType { get; set; } = "One";
+        public float SpacingInches { get; set; } = 0.5f;
+        public bool LineBetween { get; set; } = false;
+        public bool EqualWidth { get; set; } = true;
+        public float Col1WidthInches { get; set; } = 0f;
+
+        public WriterColumnSettings Clone()
+        {
+            return new WriterColumnSettings
+            {
+                ColumnCount = ColumnCount,
+                PresetType = PresetType ?? "One",
+                SpacingInches = SpacingInches,
+                LineBetween = LineBetween,
+                EqualWidth = EqualWidth,
+                Col1WidthInches = Col1WidthInches
+            };
+        }
+
+        public string CacheSignature()
+        {
+            return string.Format("{0}|{1}|{2:F3}|{3}|{4}|{5:F3}",
+                Math.Max(1, ColumnCount), PresetType ?? "One", SpacingInches, LineBetween, EqualWidth, Col1WidthInches);
+        }
+    }
+
+    public class WriterSectionHeaderFooter
+    {
+        public bool LinkHeaderToPrevious { get; set; } = true;
+        public bool LinkFooterToPrevious { get; set; } = true;
+        public string HeaderText { get; set; } = "";
+        public string FooterText { get; set; } = "";
+        public string HeaderTitleText { get; set; } = "";
+        public HeaderFooterPreset CurrentHeaderPreset { get; set; } = HeaderFooterPreset.None;
+        public HeaderFooterPreset CurrentFooterPreset { get; set; } = HeaderFooterPreset.None;
+        public string ThreeColHeaderLeft { get; set; } = "";
+        public string ThreeColHeaderCenter { get; set; } = "";
+        public string ThreeColHeaderRight { get; set; } = "";
+        public string ThreeColFooterLeft { get; set; } = "";
+        public string ThreeColFooterCenter { get; set; } = "";
+        public string ThreeColFooterRight { get; set; } = "";
+        public int HeaderAlignment { get; set; } = 0;
+        public int FooterAlignment { get; set; } = 1;
+        public int HeaderEvenAlignment { get; set; } = 0;
+        public int FooterEvenAlignment { get; set; } = 0;
+        public string HeaderEvenText { get; set; } = "";
+        public string FooterEvenText { get; set; } = "";
+        public List<DocHeaderFooterRun> HeaderRuns { get; set; } = new List<DocHeaderFooterRun>();
+        public List<DocHeaderFooterRun> FooterRuns { get; set; } = new List<DocHeaderFooterRun>();
+        public List<DocHeaderFooterRun> HeaderEvenRuns { get; set; } = new List<DocHeaderFooterRun>();
+        public List<DocHeaderFooterRun> FooterEvenRuns { get; set; } = new List<DocHeaderFooterRun>();
+
+        public static List<DocHeaderFooterRun> CloneRuns(List<DocHeaderFooterRun> src)
+        {
+            var res = new List<DocHeaderFooterRun>();
+            if (src == null) return res;
+            foreach (var r in src)
+            {
+                if (r == null) continue;
+                res.Add(r.Clone());
+            }
+            return res;
+        }
+
+        public WriterSectionHeaderFooter Clone()
+        {
+            return new WriterSectionHeaderFooter
+            {
+                LinkHeaderToPrevious = LinkHeaderToPrevious,
+                LinkFooterToPrevious = LinkFooterToPrevious,
+                HeaderText = HeaderText ?? "",
+                FooterText = FooterText ?? "",
+                HeaderTitleText = HeaderTitleText ?? "",
+                CurrentHeaderPreset = CurrentHeaderPreset,
+                CurrentFooterPreset = CurrentFooterPreset,
+                ThreeColHeaderLeft = ThreeColHeaderLeft ?? "",
+                ThreeColHeaderCenter = ThreeColHeaderCenter ?? "",
+                ThreeColHeaderRight = ThreeColHeaderRight ?? "",
+                ThreeColFooterLeft = ThreeColFooterLeft ?? "",
+                ThreeColFooterCenter = ThreeColFooterCenter ?? "",
+                ThreeColFooterRight = ThreeColFooterRight ?? "",
+                HeaderAlignment = HeaderAlignment,
+                FooterAlignment = FooterAlignment,
+                HeaderEvenAlignment = HeaderEvenAlignment,
+                FooterEvenAlignment = FooterEvenAlignment,
+                HeaderEvenText = HeaderEvenText ?? "",
+                FooterEvenText = FooterEvenText ?? "",
+                HeaderRuns = CloneRuns(HeaderRuns),
+                FooterRuns = CloneRuns(FooterRuns),
+                HeaderEvenRuns = CloneRuns(HeaderEvenRuns),
+                FooterEvenRuns = CloneRuns(FooterEvenRuns)
+            };
+        }
+    }
+
     public class WriterUndoSnapshot
     {
         public string Text { get; set; }
@@ -303,6 +401,17 @@ namespace ZenQOffice.UI
         public Dictionary<int, float> ParagraphLeftIndents { get; set; }
         public Dictionary<int, float> ParagraphRightIndents { get; set; }
         public Dictionary<int, List<TabStopInfo>> ParagraphTabStops { get; set; }
+        public Dictionary<int, int> ParagraphOutlineLevels { get; set; }
+        public Dictionary<int, bool> ParagraphCollapsedByDefault { get; set; }
+        public Dictionary<int, bool> ParagraphMirrorIndents { get; set; }
+        public Dictionary<int, bool> ParagraphDontAddSpaceSameStyle { get; set; }
+        public Dictionary<int, bool> ParagraphWidowOrphan { get; set; }
+        public Dictionary<int, bool> ParagraphKeepWithNext { get; set; }
+        public Dictionary<int, bool> ParagraphKeepLinesTogether { get; set; }
+        public Dictionary<int, bool> ParagraphPageBreakBefore { get; set; }
+        public Dictionary<int, bool> ParagraphSuppressLineNumbers { get; set; }
+        public Dictionary<int, bool> ParagraphDontHyphenate { get; set; }
+        public Dictionary<int, int> ParagraphTightWrap { get; set; }
 
         public List<DocTableObject> DocumentTables { get; set; }
         public Dictionary<int, int> TablePageX { get; set; }
@@ -317,6 +426,14 @@ namespace ZenQOffice.UI
         public List<DocChartObject> DocumentCharts { get; set; }
         public List<DocInkStroke> DocumentInkStrokes { get; set; }
         public List<DocumentRevision> Revisions { get; set; }
+        public int ColumnCount { get; set; } = 1;
+        public string ColumnPreset { get; set; } = "One";
+        public float ColumnSpacingInches { get; set; } = 0.5f;
+        public bool ColumnLineBetween { get; set; } = false;
+        public bool ColumnEqualWidth { get; set; } = true;
+        public float Column1WidthInches { get; set; } = 0f;
+        public Dictionary<int, WriterColumnSettings> SectionColumns { get; set; }
+        public Dictionary<int, WriterSectionHeaderFooter> SectionHeadersFooters { get; set; }
 
         public WriterUndoSnapshot()
         {
@@ -339,6 +456,17 @@ namespace ZenQOffice.UI
             ParagraphLeftIndents = new Dictionary<int, float>();
             ParagraphRightIndents = new Dictionary<int, float>();
             ParagraphTabStops = new Dictionary<int, List<TabStopInfo>>();
+            ParagraphOutlineLevels = new Dictionary<int, int>();
+            ParagraphCollapsedByDefault = new Dictionary<int, bool>();
+            ParagraphMirrorIndents = new Dictionary<int, bool>();
+            ParagraphDontAddSpaceSameStyle = new Dictionary<int, bool>();
+            ParagraphWidowOrphan = new Dictionary<int, bool>();
+            ParagraphKeepWithNext = new Dictionary<int, bool>();
+            ParagraphKeepLinesTogether = new Dictionary<int, bool>();
+            ParagraphPageBreakBefore = new Dictionary<int, bool>();
+            ParagraphSuppressLineNumbers = new Dictionary<int, bool>();
+            ParagraphDontHyphenate = new Dictionary<int, bool>();
+            ParagraphTightWrap = new Dictionary<int, int>();
             DocumentTables = new List<DocTableObject>();
             TablePageX = new Dictionary<int, int>();
             TablePageY = new Dictionary<int, int>();
@@ -351,6 +479,8 @@ namespace ZenQOffice.UI
             DocumentCharts = new List<DocChartObject>();
             DocumentInkStrokes = new List<DocInkStroke>();
             Revisions = new List<DocumentRevision>();
+            SectionColumns = new Dictionary<int, WriterColumnSettings>();
+            SectionHeadersFooters = new Dictionary<int, WriterSectionHeaderFooter>();
         }
 
         public WriterUndoSnapshot(
@@ -401,6 +531,17 @@ namespace ZenQOffice.UI
             ParagraphLeftIndents = pLeft != null ? new Dictionary<int, float>(pLeft) : new Dictionary<int, float>();
             ParagraphRightIndents = pRight != null ? new Dictionary<int, float>(pRight) : new Dictionary<int, float>();
             ParagraphTabStops = CloneParagraphTabStops(pTabStops);
+            ParagraphOutlineLevels = new Dictionary<int, int>();
+            ParagraphCollapsedByDefault = new Dictionary<int, bool>();
+            ParagraphMirrorIndents = new Dictionary<int, bool>();
+            ParagraphDontAddSpaceSameStyle = new Dictionary<int, bool>();
+            ParagraphWidowOrphan = new Dictionary<int, bool>();
+            ParagraphKeepWithNext = new Dictionary<int, bool>();
+            ParagraphKeepLinesTogether = new Dictionary<int, bool>();
+            ParagraphPageBreakBefore = new Dictionary<int, bool>();
+            ParagraphSuppressLineNumbers = new Dictionary<int, bool>();
+            ParagraphDontHyphenate = new Dictionary<int, bool>();
+            ParagraphTightWrap = new Dictionary<int, int>();
 
             DocumentTables = CloneTables(tables);
             TablePageX = tblPageX != null ? new Dictionary<int, int>(tblPageX) : new Dictionary<int, int>();
@@ -799,9 +940,52 @@ namespace ZenQOffice.UI
         public int CursorPosition { get; set; }
         public int SelectionStart { get; set; }
         public int SelectionEnd { get; set; }
+        public List<CollabPresenceInfo> RemoteCollabPresences { get; set; } = new List<CollabPresenceInfo>();
         public bool IsSelecting { get; set; }
         public bool CursorVisible { get; set; }
-        public int ViewMode { get; set; } // 0 = Chế độ đọc (Read), 1 = Bố cục in (Print), 2 = Bố cục Web (Web)
+        private long _smoothScrollLastTs = 0;
+        private bool _caretAnimInit = false;
+        private float _caretStartX, _caretStartY, _caretStartH;
+        private float _caretCurX, _caretCurY, _caretCurH;
+        private float _caretTargetX, _caretTargetY, _caretTargetH;
+        private float _caretLastScrollX, _caretLastScrollY, _caretLastZoom = 1f;
+        private double _caretGlideStartMs = -10000.0;
+        private const double CaretGlideDurationMs = 72.0;
+        public int ViewMode { get; set; } // 0 = Chế độ đọc (Read), 1 = Bố cục in (Print), 2 = Bố cục Web (Web), 3 = Bản nháp (Draft), 4 = Đề cương (Outline)
+        public bool IsMultiplePagesView = false;
+        public int OutlineFilterMaxLevel = 9;
+        public HashSet<int> CollapsedOutlineParaStarts = new HashSet<int>();
+        private int _outlineLayoutVersion = 0;
+        private int _lastLayoutOutlineVersion = -1;
+        private bool _lastLayoutMultiplePages = false;
+        private float _lastContinuousContentBottomY = 0f;
+        private List<KeyValuePair<Rectangle, int>> _outlineToggleHits = new List<KeyValuePair<Rectangle, int>>();
+        private List<KeyValuePair<Rectangle, string>> _outlineToolbarHits = new List<KeyValuePair<Rectangle, string>>();
+
+        // Real Split View (Horizontal 2-pane split)
+        public bool IsSplitView = false;
+        public float SplitRatio = 0.48f;
+        public int ActiveSplitPane = 0; // 0 = Top, 1 = Bottom
+        public float SecondarySmoothScrollY = 0f;
+        public float SecondaryTargetScrollY = 0f;
+        public int SecondaryScrollY
+        {
+            get => (int)Math.Round(SecondarySmoothScrollY);
+            set { SecondarySmoothScrollY = value; SecondaryTargetScrollY = value; }
+        }
+        public Rectangle SplitSplitterBounds = Rectangle.Empty;
+        public bool IsDraggingSplitter = false;
+        public Rectangle SecondaryScrollBarBounds = Rectangle.Empty;
+        public Rectangle SecondaryScrollBarThumbBounds = Rectangle.Empty;
+        public bool IsDraggingSecondaryScrollBar = false;
+        public bool IsHoveringSecondaryScrollBar = false;
+        private int _activeScrollBarDragPane = 0;
+        private List<RenderedLineInfo> _pane0RenderedLines = new List<RenderedLineInfo>();
+        private List<RenderedLineInfo> _pane1RenderedLines = new List<RenderedLineInfo>();
+        private List<TableCellHit> _pane0TableCellHits = new List<TableCellHit>();
+        private List<TableCellHit> _pane1TableCellHits = new List<TableCellHit>();
+        private List<Rectangle> _pane0TableBoundsList = new List<Rectangle>();
+        private List<Rectangle> _pane1TableBoundsList = new List<Rectangle>();
         public int ReadModePageIndex { get; set; }
         public int CalculatedPageCount = 1;
         public bool ShowFormattingMarks { get; set; }
@@ -819,6 +1003,9 @@ namespace ZenQOffice.UI
 
         public string GetCurrentHeaderText()
         {
+            var _hfSc = BeginActiveHeaderFooterScope();
+            try
+            {
             if (CurrentHeaderPreset == HeaderFooterPreset.Banded)
             {
                 return !string.IsNullOrEmpty(HeaderTitleText) ? HeaderTitleText : (HeaderText ?? "");
@@ -853,10 +1040,15 @@ namespace ZenQOffice.UI
             string raw = !string.IsNullOrEmpty(HeaderText) ? HeaderText : (HeaderTitleText ?? "");
             if (raw == "TIÊU ĐỀ ĐẦU TRANG" || raw == "[Nhập tại đây]" || raw == "[Tiêu đề tài liệu]") return "";
             return raw;
+                    }
+            finally { EndPageHeaderFooterScope(_hfSc, false); }
         }
 
         public void SetCurrentHeaderText(string newText)
         {
+            var _hfSc = BeginActiveHeaderFooterScope();
+            try
+            {
             if (CurrentHeaderPreset == HeaderFooterPreset.Banded)
             {
                 HeaderTitleText = newText;
@@ -914,6 +1106,8 @@ namespace ZenQOffice.UI
                     });
                 }
             }
+                    }
+            finally { EndPageHeaderFooterScope(_hfSc, true); }
         }
 
         /// <summary>
@@ -947,6 +1141,9 @@ namespace ZenQOffice.UI
 
         public void EnsureActiveHeaderRunsInitialized()
         {
+            var _hfSc = BeginActiveHeaderFooterScope();
+            try
+            {
             var runs = GetActiveHeaderRuns();
             if (runs != null && runs.Count == 0)
             {
@@ -971,10 +1168,15 @@ namespace ZenQOffice.UI
                     });
                 }
             }
+                    }
+            finally { EndPageHeaderFooterScope(_hfSc, true); }
         }
 
         public void EnsureActiveFooterRunsInitialized()
         {
+            var _hfSc = BeginActiveHeaderFooterScope();
+            try
+            {
             var runs = GetActiveFooterRuns();
             if (runs != null && runs.Count == 0)
             {
@@ -999,6 +1201,8 @@ namespace ZenQOffice.UI
                     });
                 }
             }
+                    }
+            finally { EndPageHeaderFooterScope(_hfSc, true); }
         }
 
         /// <summary>
@@ -1148,6 +1352,9 @@ namespace ZenQOffice.UI
 
         public string GetCurrentFooterText()
         {
+            var _hfSc = BeginActiveHeaderFooterScope();
+            try
+            {
             if (CurrentFooterPreset == HeaderFooterPreset.ThreeColumns)
             {
                 if (ActiveThreeColIndex == 0) return ThreeColFooterLeft ?? "";
@@ -1172,10 +1379,15 @@ namespace ZenQOffice.UI
                 return sb.ToString();
             }
             return FooterText ?? "";
+                    }
+            finally { EndPageHeaderFooterScope(_hfSc, false); }
         }
 
         public void SetCurrentFooterText(string newText)
         {
+            var _hfSc = BeginActiveHeaderFooterScope();
+            try
+            {
             if (CurrentFooterPreset == HeaderFooterPreset.ThreeColumns)
             {
                 if (ActiveThreeColIndex == 0) ThreeColFooterLeft = newText;
@@ -1224,6 +1436,8 @@ namespace ZenQOffice.UI
                     ShowPageNumbers = false;
                 }
             }
+                    }
+            finally { EndPageHeaderFooterScope(_hfSc, true); }
         }
 
         private int GetSimpleStringCharIndexAt(float mouseX, int pageX, int pageW, string text, string fontName, float fontSize, bool bold, bool italic, int align, RibbonBar ribbon, bool isThreeCol = false)
@@ -1418,6 +1632,9 @@ namespace ZenQOffice.UI
 
         public int GetHeaderCharIndexAt(float mouseX, int pageX, int pageW, int pageIndex, RibbonBar ribbon = null)
         {
+            var _hfSc = BeginPageHeaderFooterScope(pageIndex);
+            try
+            {
             if (CurrentHeaderPreset == HeaderFooterPreset.ThreeColumns)
             {
                 string cStr = (ActiveThreeColIndex == 0) ? (ThreeColHeaderLeft ?? "") :
@@ -1452,10 +1669,15 @@ namespace ZenQOffice.UI
             int hAlign = HeaderAlignment;
             if (DifferentOddEvenPages && isEven) hAlign = HeaderEvenAlignment;
             return GetSimpleStringCharIndexAt(mouseX, pageX, pageW, hStr, HeaderFontName, HeaderFontSize, HeaderBold, HeaderItalic, hAlign, ribbon);
+                    }
+            finally { EndPageHeaderFooterScope(_hfSc, false); }
         }
 
         public int GetFooterCharIndexAt(float mouseX, int pageX, int pageW, int pageIndex, RibbonBar ribbon = null)
         {
+            var _hfSc = BeginPageHeaderFooterScope(pageIndex);
+            try
+            {
             if (CurrentFooterPreset == HeaderFooterPreset.ThreeColumns)
             {
                 string cStr = (ActiveThreeColIndex == 0) ? (ThreeColFooterLeft ?? "") :
@@ -1483,6 +1705,8 @@ namespace ZenQOffice.UI
 
             string fStr = GetCurrentFooterText();
             return GetSimpleStringCharIndexAt(mouseX, pageX, pageW, fStr, FooterFontName, FooterFontSize, FooterBold, FooterItalic, effAlign, ribbon);
+                    }
+            finally { EndPageHeaderFooterScope(_hfSc, false); }
         }
 
         public int HeaderBannerXOffset = 0;
@@ -1615,49 +1839,326 @@ namespace ZenQOffice.UI
 
         public bool UpdateSmoothScroll()
         {
+            double dt = FluentMotion.DeltaSeconds(ref _smoothScrollLastTs);
+            float scrollBlend = FluentMotion.DampFactor(dt, 0.044);
             bool moved = false;
+            if (FluentMotion.StepAxis(ref SmoothScrollY, TargetScrollY, scrollBlend, 0.35f)) moved = true;
+            if (FluentMotion.StepAxis(ref SmoothScrollX, TargetScrollX, scrollBlend, 0.35f)) moved = true;
 
-            // 1. Vertical smooth scrolling with subpixel precision and zero-jitter snap
-            TargetScrollY = (float)Math.Round(TargetScrollY);
-            float diffY = TargetScrollY - SmoothScrollY;
-            if (Math.Abs(diffY) > 1.5f)
+            int maxY0 = GetMaxScrollY(LastViewHeight > 0 ? LastViewHeight : 800, Ribbon, 0);
+            if (TargetScrollY > maxY0) TargetScrollY = maxY0;
+            if (TargetScrollY < 0f) TargetScrollY = 0f;
+            if (SmoothScrollY > maxY0) SmoothScrollY = maxY0;
+            if (SmoothScrollY < 0f) SmoothScrollY = 0f;
+
+            if (IsSplitView)
             {
-                float stepY = diffY * 0.45f;
-                if (Math.Abs(stepY) < 2.0f) stepY = Math.Sign(diffY) * Math.Min(Math.Abs(diffY), 2.0f);
-                SmoothScrollY += stepY;
-                if (Math.Abs(TargetScrollY - SmoothScrollY) <= 1.5f)
-                {
-                    SmoothScrollY = TargetScrollY;
-                }
-                moved = true;
+                if (FluentMotion.StepAxis(ref SecondarySmoothScrollY, SecondaryTargetScrollY, scrollBlend, 0.35f)) moved = true;
+                int maxY1 = GetMaxScrollY(LastViewHeight > 0 ? LastViewHeight : 800, Ribbon, 1);
+                if (SecondaryTargetScrollY > maxY1) SecondaryTargetScrollY = maxY1;
+                if (SecondaryTargetScrollY < 0f) SecondaryTargetScrollY = 0f;
+                if (SecondarySmoothScrollY > maxY1) SecondarySmoothScrollY = maxY1;
+                if (SecondarySmoothScrollY < 0f) SecondarySmoothScrollY = 0f;
             }
-            else if (SmoothScrollY != TargetScrollY)
+            else
             {
-                SmoothScrollY = TargetScrollY;
+                int maxY = maxY0;
+                if (TargetScrollY > maxY) { TargetScrollY = maxY; SmoothScrollY = maxY; }
+            }
+
+            if (!moved && Math.Abs(TargetScrollY - SmoothScrollY) <= 0.35f && Math.Abs(TargetScrollX - SmoothScrollX) <= 0.35f)
+            {
+                _smoothScrollLastTs = 0;
+            }
+
+            double caretElapsed = FluentMotion.NowMs - _caretGlideStartMs;
+            if (_caretAnimInit && caretElapsed >= 0 && caretElapsed < CaretGlideDurationMs)
+            {
                 moved = true;
             }
 
-            // 2. Horizontal smooth scrolling with subpixel precision and zero-jitter snap
-            TargetScrollX = (float)Math.Round(TargetScrollX);
-            float diffX = TargetScrollX - SmoothScrollX;
-            if (Math.Abs(diffX) > 1.5f)
+            double paneDt = FluentMotion.DeltaSeconds(ref _paneAnimLastTs);
+            float paneBlend = FluentMotion.DampFactor(paneDt, 0.048);
+            bool paneWidthChanged = false;
+            if (FluentMotion.StepAxis(ref _navPaneAnim, _showNavigationPane ? 1f : 0f, paneBlend, 0.004f))
             {
-                float stepX = diffX * 0.45f;
-                if (Math.Abs(stepX) < 2.0f) stepX = Math.Sign(diffX) * Math.Min(Math.Abs(diffX), 2.0f);
-                SmoothScrollX += stepX;
-                if (Math.Abs(TargetScrollX - SmoothScrollX) <= 1.5f)
-                {
-                    SmoothScrollX = TargetScrollX;
-                }
+                paneWidthChanged = true;
                 moved = true;
             }
-            else if (SmoothScrollX != TargetScrollX)
+            if (FluentMotion.StepAxis(ref _selPaneAnim, _showSelectionPane ? 1f : 0f, paneBlend, 0.004f))
             {
-                SmoothScrollX = TargetScrollX;
+                paneWidthChanged = true;
                 moved = true;
+            }
+            if (paneWidthChanged && ViewMode >= 2)
+            {
+                InvalidateLayoutAndTextCache();
+            }
+
+            float targetTabX = (NavActiveTab == 0) ? 14f : (NavActiveTab == 1 ? 82f : 138f);
+            float targetTabW = (NavActiveTab == 0) ? 56f : (NavActiveTab == 1 ? 44f : 64f);
+            if (_navTabIndX < 0f)
+            {
+                _navTabIndX = targetTabX;
+                _navTabIndW = targetTabW;
+            }
+            else
+            {
+                float tabBlend = FluentMotion.DampFactor(paneDt, 0.040);
+                if (FluentMotion.StepAxis(ref _navTabIndX, targetTabX, tabBlend, 0.35f)) moved = true;
+                if (FluentMotion.StepAxis(ref _navTabIndW, targetTabW, tabBlend, 0.35f)) moved = true;
+            }
+
+            if (!paneWidthChanged && Math.Abs(_navTabIndX - targetTabX) <= 0.35f && Math.Abs(_navTabIndW - targetTabW) <= 0.35f)
+            {
+                _paneAnimLastTs = 0;
             }
 
             return moved;
+        }
+
+        public void SetViewMode(int newMode)
+        {
+            ViewMode = newMode;
+            if (newMode != 1) IsMultiplePagesView = false;
+            if (newMode == 0) ReadModePageIndex = 0;
+            InvalidateLayoutAndTextCache();
+            Invalidate();
+        }
+
+        public void FitOnePage(int canvasW, int canvasH, RibbonBar ribbon)
+        {
+            ViewMode = 1;
+            IsMultiplePagesView = false;
+            float baseW = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+            float baseH = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+            if (ribbon != null && ribbon.IsLandscape) { float t = Math.Max(baseW, baseH); baseH = Math.Min(baseW, baseH); baseW = t; }
+            else { float t = Math.Min(baseW, baseH); baseH = Math.Max(baseW, baseH); baseW = t; }
+            int navOffset = EffectiveNavPaneWidth;
+            int selOffset = EffectiveSelectionPaneWidth;
+            int effW = Math.Max(220, canvasW - navOffset - selOffset - 70);
+            int topBase = (ribbon != null && ribbon.ShowRuler) ? 190 : 165;
+            int effH = Math.Max(220, canvasH - topBase - 42);
+            float fit = Math.Min(effH / (baseH * 96f), effW / (baseW * 96f));
+            ZoomLevel = (float)Math.Round(Math.Max(0.25f, Math.Min(2.0f, fit)), 2);
+            ScrollX = 0f; TargetScrollX = 0f; SmoothScrollX = 0f;
+            InvalidateLayoutAndTextCache();
+            Invalidate();
+        }
+
+        public void FitPageWidth(int canvasW, RibbonBar ribbon)
+        {
+            ViewMode = 1;
+            IsMultiplePagesView = false;
+            float baseW = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+            float baseH = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+            if (ribbon != null && ribbon.IsLandscape) baseW = Math.Max(baseW, baseH);
+            else baseW = Math.Min(baseW, baseH);
+            int navOffset = EffectiveNavPaneWidth;
+            int selOffset = EffectiveSelectionPaneWidth;
+            int effW = Math.Max(220, canvasW - navOffset - selOffset - 80);
+            float fit = effW / (baseW * 96f);
+            ZoomLevel = (float)Math.Round(Math.Max(0.25f, Math.Min(3.0f, fit)), 2);
+            ScrollX = 0f; TargetScrollX = 0f; SmoothScrollX = 0f;
+            InvalidateLayoutAndTextCache();
+            Invalidate();
+        }
+
+        public void EnableMultiplePages(int canvasW, int canvasH, RibbonBar ribbon)
+        {
+            ViewMode = 1;
+            IsMultiplePagesView = true;
+            float baseW = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+            float baseH = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+            if (ribbon != null && ribbon.IsLandscape) { float t = Math.Max(baseW, baseH); baseH = Math.Min(baseW, baseH); baseW = t; }
+            else { float t = Math.Min(baseW, baseH); baseH = Math.Max(baseW, baseH); baseW = t; }
+            int navOffset = EffectiveNavPaneWidth;
+            int selOffset = EffectiveSelectionPaneWidth;
+            int effW = Math.Max(320, canvasW - navOffset - selOffset - 96);
+            int topBase = (ribbon != null && ribbon.ShowRuler) ? 190 : 165;
+            int effH = Math.Max(220, canvasH - topBase - 42);
+            float fit2W = ((effW - 28f) / 2f) / (baseW * 96f);
+            float fitH = effH / (baseH * 96f);
+            float fit = Math.Min(fit2W, fitH);
+            ZoomLevel = (float)Math.Round(Math.Max(0.25f, Math.Min(0.85f, fit)), 2);
+            ScrollX = 0f; TargetScrollX = 0f; SmoothScrollX = 0f;
+            InvalidateLayoutAndTextCache();
+            Invalidate();
+        }
+
+        public void ToggleSplitView()
+        {
+            IsSplitView = !IsSplitView;
+            if (IsSplitView)
+            {
+                SecondaryScrollY = ScrollY;
+                SecondarySmoothScrollY = SmoothScrollY;
+                SecondaryTargetScrollY = TargetScrollY;
+                ActiveSplitPane = 0;
+            }
+            else
+            {
+                IsDraggingSplitter = false;
+                IsDraggingSecondaryScrollBar = false;
+                SplitSplitterBounds = Rectangle.Empty;
+                SecondaryScrollBarBounds = Rectangle.Empty;
+                SecondaryScrollBarThumbBounds = Rectangle.Empty;
+                ActiveSplitPane = 0;
+            }
+            Invalidate();
+        }
+
+        public int GetMultiplePagesColsPerRow(int canvasW, int pageW, RibbonBar ribbon)
+        {
+            if (ViewMode != 1 || !IsMultiplePagesView) return 1;
+            int navOffset = EffectiveNavPaneWidth;
+            int selOffset = EffectiveSelectionPaneWidth;
+            int effW = Math.Max(160, canvasW - navOffset - selOffset - 36);
+            int gap = Math.Max(16, PageGap * 2);
+            int cols = Math.Max(1, (effW + gap) / Math.Max(80, pageW + gap));
+            return cols;
+        }
+
+        public Rectangle GetPageVisualBounds(int pgIndex, int canvasW, RibbonBar ribbon, int baseStartPageY, int pageX, int pageW, int pageH)
+        {
+            if (ViewMode == 0)
+            {
+                return new Rectangle(pageX, baseStartPageY, pageW, pageH);
+            }
+            if (ViewMode == 1 && IsMultiplePagesView)
+            {
+                int cols = GetMultiplePagesColsPerRow(canvasW, pageW, ribbon);
+                if (cols > 1)
+                {
+                    int navOffset = EffectiveNavPaneWidth;
+                    int selOffset = EffectiveSelectionPaneWidth;
+                    int effW = Math.Max(200, canvasW - navOffset - selOffset - 24);
+                    int hGap = Math.Max(16, PageGap * 2);
+                    int vGap = Math.Max(16, PageGap * 2);
+                    int rowW = cols * pageW + (cols - 1) * hGap;
+                    int gridX = navOffset + Math.Max(16, (effW - rowW) / 2);
+                    int row = pgIndex / cols;
+                    int col = pgIndex % cols;
+                    return new Rectangle(gridX + col * (pageW + hGap), baseStartPageY + row * (pageH + vGap), pageW, pageH);
+                }
+            }
+            return new Rectangle(pageX, baseStartPageY + pgIndex * (pageH + PageGap), pageW, pageH);
+        }
+
+        public int GetParagraphOutlineLevel(string para, int paraStartIndex)
+        {
+            if (ParagraphOutlineLevels != null && ParagraphOutlineLevels.TryGetValue(paraStartIndex, out int explicitLvl) && explicitLvl >= 1 && explicitLvl <= 9)
+            {
+                return explicitLvl;
+            }
+            string pStyle = "";
+            if (ParagraphStyles != null && ParagraphStyles.TryGetValue(paraStartIndex, out pStyle) && !string.IsNullOrEmpty(pStyle))
+            {
+                if (pStyle.IndexOf("Heading ", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    for (int lv = 1; lv <= 9; lv++)
+                    {
+                        if (pStyle.IndexOf("Heading " + lv, StringComparison.OrdinalIgnoreCase) >= 0) return lv;
+                    }
+                }
+                if (pStyle.IndexOf("Tiêu đề ", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    for (int lv = 1; lv <= 9; lv++)
+                    {
+                        if (pStyle.IndexOf("Tiêu đề " + lv, StringComparison.OrdinalIgnoreCase) >= 0) return lv;
+                    }
+                }
+                if (pStyle.IndexOf("Title", StringComparison.OrdinalIgnoreCase) >= 0) return 1;
+                if (pStyle.IndexOf("Subtitle", StringComparison.OrdinalIgnoreCase) >= 0) return 2;
+            }
+            string trimmed = para != null ? para.Trim() : "";
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("|") || trimmed.StartsWith("![") || trimmed.StartsWith("[--- "))
+                return 0;
+            if (trimmed.StartsWith("###")) return 3;
+            if (trimmed.StartsWith("##")) return 2;
+            if (trimmed.StartsWith("#")) return 1;
+            if (trimmed.StartsWith("CHỦ ĐỀ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("PHẦN ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("CHƯƠNG ", StringComparison.OrdinalIgnoreCase))
+                return 1;
+            if (trimmed.StartsWith("BÀI ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("MỤC ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("CHAPTER ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("UNIT ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith("LESSON ", StringComparison.OrdinalIgnoreCase))
+                return 2;
+            if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^(\d+(\.\d+)*\.|[IVX]+\.)\s+"))
+            {
+                int dots = 0;
+                for (int d = 0; d < trimmed.Length && trimmed[d] != ' '; d++) if (trimmed[d] == '.') dots++;
+                return Math.Max(1, Math.Min(3, dots));
+            }
+            return 0;
+        }
+
+        public void ToggleOutlineCollapseAt(int paraStartIndex)
+        {
+            if (CollapsedOutlineParaStarts.Contains(paraStartIndex))
+                CollapsedOutlineParaStarts.Remove(paraStartIndex);
+            else
+                CollapsedOutlineParaStarts.Add(paraStartIndex);
+            _outlineLayoutVersion++;
+            InvalidateLayoutAndTextCache();
+            Invalidate();
+        }
+
+        public void ExpandAllOutline()
+        {
+            CollapsedOutlineParaStarts.Clear();
+            _outlineLayoutVersion++;
+            InvalidateLayoutAndTextCache();
+            Invalidate();
+        }
+
+        public void CollapseAllOutline()
+        {
+            CollapsedOutlineParaStarts.Clear();
+            string full = PieceTable != null ? PieceTable.GetText() : "";
+            string[] paras = full.Split('\n');
+            int pIdx = 0;
+            for (int i = 0; i < paras.Length; i++)
+            {
+                int lvl = GetParagraphOutlineLevel(paras[i], pIdx);
+                if (lvl >= 1) CollapsedOutlineParaStarts.Add(pIdx);
+                pIdx += paras[i].Length + 1;
+            }
+            _outlineLayoutVersion++;
+            InvalidateLayoutAndTextCache();
+            Invalidate();
+        }
+
+        private void ComputePaneBounds(int clientHeight, RibbonBar ribbon, int paneIndex, out int paneTop, out int paneBottom)
+        {
+            int w = LastViewWidth > 0 ? LastViewWidth : 1200;
+            int baseTop = (ribbon != null && ribbon.ShowRuler) ? 181 : 155;
+            if (ViewMode == 4) baseTop += 30; // Outline control bar pinned below ruler
+            int maxScrollX = GetMaxScrollX(w);
+            int wsBottom = Math.Max(baseTop + 60, clientHeight - 26 - (maxScrollX > 0 ? 12 : 0));
+            if (!IsSplitView)
+            {
+                paneTop = baseTop;
+                paneBottom = wsBottom;
+                return;
+            }
+            int splitterH = 6;
+            int availH = Math.Max(80, wsBottom - baseTop - splitterH);
+            int topH = Math.Max(40, Math.Min(availH - 40, (int)Math.Round(availH * SplitRatio)));
+            int splitY = baseTop + topH;
+            if (paneIndex == 0)
+            {
+                paneTop = baseTop;
+                paneBottom = splitY;
+            }
+            else
+            {
+                paneTop = splitY + splitterH;
+                paneBottom = wsBottom;
+            }
         }
 
         public void ZoomAt(Point mousePos, int delta, RibbonBar ribbon, int viewWidth = 0, int viewHeight = 0)
@@ -1718,8 +2219,8 @@ namespace ZenQOffice.UI
             int oldPageH = (int)Math.Round(stdH * oldZoom);
             int oldPitch = oldPageH + oldGap;
 
-            int navOffset = ShowNavigationPane ? 280 : 0;
-            int selPaneOffset = ShowSelectionPane ? 260 : 0;
+            int navOffset = EffectiveNavPaneWidth;
+            int selPaneOffset = EffectiveSelectionPaneWidth;
             int effectiveCanvasW = viewWidth - navOffset - selPaneOffset;
 
             int oldPageX = (oldPageW + 80 <= effectiveCanvasW)
@@ -1784,8 +2285,8 @@ namespace ZenQOffice.UI
         {
             if (ViewMode == 0) return 0;
             if (canvasWidth <= 0) canvasWidth = LastViewWidth > 0 ? LastViewWidth : 1200;
-            int navOffset = ShowNavigationPane ? 280 : 0;
-            int selPaneOffset = ShowSelectionPane ? 260 : 0;
+            int navOffset = EffectiveNavPaneWidth;
+            int selPaneOffset = EffectiveSelectionPaneWidth;
             int effectiveCanvasW = canvasWidth - navOffset - selPaneOffset;
 
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
@@ -1797,6 +2298,317 @@ namespace ZenQOffice.UI
 
         public int TotalPageCount { get; set; }
         public int CurrentActivePage { get; set; }
+        public bool HasSelection => SelectionStart != SelectionEnd;
+
+        // Multi-Column / Newspaper Layout Settings
+        public int ColumnCount { get; set; } = 1;
+        public string ColumnPreset { get; set; } = "One";
+        public float ColumnSpacingInches { get; set; } = 0.5f;
+        public bool ColumnLineBetween { get; set; } = false;
+        public bool ColumnEqualWidth { get; set; } = true;
+        public float Column1WidthInches { get; set; } = 0f;
+        public Dictionary<int, WriterColumnSettings> SectionColumns { get; set; } = new Dictionary<int, WriterColumnSettings>();
+
+        public static Dictionary<int, WriterColumnSettings> CloneSectionColumns(Dictionary<int, WriterColumnSettings> src)
+        {
+            var res = new Dictionary<int, WriterColumnSettings>();
+            if (src != null)
+            {
+                foreach (var kvp in src)
+                {
+                    if (kvp.Value != null) res[kvp.Key] = kvp.Value.Clone();
+                }
+            }
+            return res;
+        }
+
+        public static Dictionary<int, WriterSectionHeaderFooter> CloneSectionHeadersFooters(Dictionary<int, WriterSectionHeaderFooter> src)
+        {
+            var res = new Dictionary<int, WriterSectionHeaderFooter>();
+            if (src != null)
+            {
+                foreach (var kvp in src)
+                {
+                    if (kvp.Value != null) res[kvp.Key] = kvp.Value.Clone();
+                }
+            }
+            return res;
+        }
+
+        public float GetBaseBodyLogicalWidth(RibbonBar ribbon)
+        {
+            float baseW = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+            float baseH = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+            if (ribbon != null && ribbon.IsLandscape) baseW = Math.Max(baseW, baseH);
+            else baseW = Math.Min(baseW, baseH);
+            float leftM = (ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96f;
+            float rightM = (ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f) * 96f;
+            return Math.Max(60f, baseW * 96f - leftM - rightM);
+        }
+
+        public int GetSectionIndexAtCharPos(int charPos)
+        {
+            if (PieceTable == null || charPos <= 0) return 0;
+            string txt = PieceTable.GetText();
+            if (string.IsNullOrEmpty(txt)) return 0;
+            int limit = Math.Min(charPos, txt.Length);
+            int sec = 0;
+            int idx = 0;
+            while (idx < limit)
+            {
+                int found = txt.IndexOf("[--- SECTION BREAK (", idx, StringComparison.Ordinal);
+                if (found < 0 || found >= limit) break;
+                sec++;
+                idx = found + 20;
+            }
+            return sec;
+        }
+
+        public WriterColumnSettings GetEffectiveColumnSettings(int sectionIndex, RibbonBar ribbon = null)
+        {
+            if (SectionColumns != null && SectionColumns.TryGetValue(sectionIndex, out var secCols) && secCols != null)
+            {
+                return secCols;
+            }
+            return new WriterColumnSettings
+            {
+                ColumnCount = Math.Max(1, ColumnCount),
+                PresetType = !string.IsNullOrEmpty(ColumnPreset) ? ColumnPreset : (ColumnCount > 1 ? "Two" : "One"),
+                SpacingInches = ColumnSpacingInches > 0 ? ColumnSpacingInches : 0.5f,
+                LineBetween = ColumnLineBetween,
+                EqualWidth = ColumnEqualWidth,
+                Col1WidthInches = Column1WidthInches
+            };
+        }
+
+        public WriterColumnSettings GetCurrentSectionColumns(RibbonBar ribbon = null)
+        {
+            return GetEffectiveColumnSettings(GetSectionIndexAtCharPos(CursorPosition), ribbon);
+        }
+
+        public static void ComputeColumnBounds(WriterColumnSettings cols, float baseMaxTextW, float zoom, int textX, int colIdx, out float colLogicalOffset, out float colLogicalW, out int colScreenX, out int colScreenW)
+        {
+            int cnt = (cols != null && cols.ColumnCount > 1) ? Math.Min(10, cols.ColumnCount) : 1;
+            if (cnt <= 1)
+            {
+                colLogicalOffset = 0f;
+                colLogicalW = baseMaxTextW;
+                colScreenX = textX;
+                colScreenW = Math.Max(20, (int)Math.Round(baseMaxTextW * zoom));
+                return;
+            }
+            int c = Math.Max(0, Math.Min(cnt - 1, colIdx));
+            float rawGap = Math.Max(4f, (cols.SpacingInches > 0 ? cols.SpacingInches : 0.5f) * 96f);
+            float maxAllowedGap = Math.Max(4f, (baseMaxTextW - cnt * 48f) / Math.Max(1, cnt - 1));
+            float gap = Math.Min(rawGap, maxAllowedGap);
+            float totalColsW = Math.Max(cnt * 40f, baseMaxTextW - (cnt - 1) * gap);
+
+            float[] w = new float[cnt];
+            if (cnt == 2 && string.Equals(cols.PresetType, "Left", StringComparison.OrdinalIgnoreCase))
+            {
+                w[0] = totalColsW * 0.33f;
+                w[1] = totalColsW - w[0];
+            }
+            else if (cnt == 2 && string.Equals(cols.PresetType, "Right", StringComparison.OrdinalIgnoreCase))
+            {
+                w[0] = totalColsW * 0.67f;
+                w[1] = totalColsW - w[0];
+            }
+            else if (cols.Col1WidthInches > 0 && !cols.EqualWidth && cnt >= 2)
+            {
+                float minColW = 48f;
+                float w0 = Math.Max(minColW, Math.Min(totalColsW - (cnt - 1) * minColW, cols.Col1WidthInches * 96f));
+                w[0] = w0;
+                float rem = (totalColsW - w0) / (cnt - 1);
+                for (int i = 1; i < cnt; i++) w[i] = rem;
+            }
+            else
+            {
+                float cw = totalColsW / cnt;
+                for (int i = 0; i < cnt; i++) w[i] = cw;
+            }
+
+            colLogicalOffset = 0f;
+            for (int i = 0; i < c; i++) colLogicalOffset += w[i] + gap;
+            colLogicalW = w[c];
+            colScreenX = textX + (int)Math.Round(colLogicalOffset * zoom);
+            colScreenW = Math.Max(16, (int)Math.Round(colLogicalW * zoom));
+        }
+
+        public static void GetColumnGapBounds(WriterColumnSettings cols, float baseMaxTextW, float zoom, int textX, int gapIndex, out int gapX, out int gapW, out int midX)
+        {
+            float off0, w0, off1, w1;
+            int sx0, sw0, sx1, sw1;
+            ComputeColumnBounds(cols, baseMaxTextW, zoom, textX, gapIndex, out off0, out w0, out sx0, out sw0);
+            ComputeColumnBounds(cols, baseMaxTextW, zoom, textX, gapIndex + 1, out off1, out w1, out sx1, out sw1);
+            gapX = sx0 + sw0;
+            gapW = Math.Max(2, sx1 - gapX);
+            midX = (sx0 + sw0 + sx1) / 2;
+        }
+
+        private string BuildDocumentColumnsSignature()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append(Math.Max(1, ColumnCount)).Append('|').Append(ColumnPreset ?? "One").Append('|')
+              .Append(ColumnSpacingInches.ToString("F3")).Append('|').Append(ColumnLineBetween).Append('|')
+              .Append(ColumnEqualWidth).Append('|').Append(Column1WidthInches.ToString("F3"));
+            if (SectionColumns != null && SectionColumns.Count > 0)
+            {
+                foreach (var kvp in SectionColumns)
+                {
+                    if (kvp.Value != null) sb.Append(';').Append(kvp.Key).Append(':').Append(kvp.Value.CacheSignature());
+                }
+            }
+            return sb.ToString();
+        }
+
+        public void ApplyColumnSettings(int colCount, string presetType, float spacingInches, bool lineBetween, bool equalWidth, float col1WidthInches, string applyTo, RibbonBar ribbon = null)
+        {
+            if (PieceTable == null) return;
+            SaveUndoState();
+            int safeCount = Math.Max(1, Math.Min(10, colCount));
+            string safePreset = !string.IsNullOrEmpty(presetType) ? presetType : (safeCount == 1 ? "One" : (safeCount == 2 ? "Two" : (safeCount == 3 ? "Three" : "Custom")));
+            if (safeCount == 1) safePreset = "One";
+            var newCols = new WriterColumnSettings
+            {
+                ColumnCount = safeCount,
+                PresetType = safePreset,
+                SpacingInches = spacingInches > 0 ? spacingInches : 0.5f,
+                LineBetween = lineBetween,
+                EqualWidth = equalWidth,
+                Col1WidthInches = equalWidth ? 0f : col1WidthInches
+            };
+
+            string applyLower = (applyTo ?? "").ToLowerInvariant();
+            string fullText = PieceTable.GetText();
+            if (SectionColumns == null) SectionColumns = new Dictionary<int, WriterColumnSettings>();
+
+            bool isSelectedApply = (applyLower.Contains("đoạn") || applyLower.Contains("selected")) && HasSelection;
+            bool isPointForward = applyLower.Contains("từ điểm") || applyLower.Contains("this point");
+
+            if (isSelectedApply)
+            {
+                int selMin = Math.Max(0, Math.Min(fullText.Length, Math.Min(SelectionStart, SelectionEnd)));
+                int selMax = Math.Max(0, Math.Min(fullText.Length, Math.Max(SelectionStart, SelectionEnd)));
+                int pStart = selMin > 0 ? fullText.LastIndexOf('\n', selMin - 1) + 1 : 0;
+                int searchEndFrom = (selMax > pStart && selMax <= fullText.Length && fullText[selMax - 1] == '\n') ? selMax - 1 : selMax;
+                int pEndBreak = (searchEndFrom < fullText.Length) ? fullText.IndexOf('\n', searchEndFrom) : -1;
+
+                int origSec = GetSectionIndexAtCharPos(pStart);
+                WriterColumnSettings prevCols = GetEffectiveColumnSettings(origSec, ribbon).Clone();
+                int addedBefore = (pStart > 0) ? 1 : 0;
+                int addedAfter = (pEndBreak >= 0) ? 1 : 0;
+
+                if (addedAfter > 0)
+                {
+                    string afterTag = "\n[--- SECTION BREAK (CONTINUOUS) ---]";
+                    PieceTable.Insert(pEndBreak, afterTag);
+                    AdjustFormattedRunsOnInsert(pEndBreak, afterTag.Length);
+                }
+                if (addedBefore > 0)
+                {
+                    string beforeTag = "[--- SECTION BREAK (CONTINUOUS) ---]\n";
+                    PieceTable.Insert(pStart, beforeTag);
+                    AdjustFormattedRunsOnInsert(pStart, beforeTag.Length);
+                    CursorPosition = Math.Min(PieceTable.Length, CursorPosition + beforeTag.Length);
+                    SelectionStart = Math.Min(PieceTable.Length, SelectionStart + beforeTag.Length);
+                    SelectionEnd = Math.Min(PieceTable.Length, SelectionEnd + beforeTag.Length);
+                }
+
+                int totalShift = addedBefore + addedAfter;
+                if (totalShift > 0)
+                {
+                    var shifted = new Dictionary<int, WriterColumnSettings>();
+                    foreach (var kvp in SectionColumns)
+                    {
+                        if (kvp.Key > origSec) shifted[kvp.Key + totalShift] = kvp.Value;
+                        else shifted[kvp.Key] = kvp.Value;
+                    }
+                    SectionColumns = shifted;
+                }
+                if (addedBefore > 0 && !SectionColumns.ContainsKey(origSec))
+                    SectionColumns[origSec] = prevCols.Clone();
+                int targetSec = origSec + addedBefore;
+                SectionColumns[targetSec] = newCols.Clone();
+                if (addedAfter > 0)
+                    SectionColumns[targetSec + 1] = prevCols.Clone();
+            }
+            else if (isPointForward)
+            {
+                int curPos = Math.Max(0, Math.Min(fullText.Length, CursorPosition));
+                int pStart = curPos > 0 ? fullText.LastIndexOf('\n', curPos - 1) + 1 : 0;
+                int origSec = GetSectionIndexAtCharPos(pStart);
+                WriterColumnSettings prevCols = GetEffectiveColumnSettings(origSec, ribbon).Clone();
+
+                if (pStart > 0)
+                {
+                    string breakTag = "[--- SECTION BREAK (CONTINUOUS) ---]\n";
+                    PieceTable.Insert(pStart, breakTag);
+                    AdjustFormattedRunsOnInsert(pStart, breakTag.Length);
+                    CursorPosition = Math.Min(PieceTable.Length, CursorPosition + breakTag.Length);
+                    SelectionStart = CursorPosition;
+                    SelectionEnd = CursorPosition;
+
+                    var shifted = new Dictionary<int, WriterColumnSettings>();
+                    foreach (var kvp in SectionColumns)
+                    {
+                        if (kvp.Key > origSec) shifted[kvp.Key + 1] = kvp.Value;
+                        else shifted[kvp.Key] = kvp.Value;
+                    }
+                    SectionColumns = shifted;
+                    if (!SectionColumns.ContainsKey(origSec)) SectionColumns[origSec] = prevCols;
+                    SectionColumns[origSec + 1] = newCols.Clone();
+                }
+                else
+                {
+                    SectionColumns[origSec] = newCols.Clone();
+                    if (SectionColumns.Count <= 1)
+                    {
+                        ColumnCount = newCols.ColumnCount;
+                        ColumnPreset = newCols.PresetType;
+                        ColumnSpacingInches = newCols.SpacingInches;
+                        ColumnLineBetween = newCols.LineBetween;
+                        ColumnEqualWidth = newCols.EqualWidth;
+                        Column1WidthInches = newCols.Col1WidthInches;
+                    }
+                }
+            }
+            else
+            {
+                ColumnCount = newCols.ColumnCount;
+                ColumnPreset = newCols.PresetType;
+                ColumnSpacingInches = newCols.SpacingInches;
+                ColumnLineBetween = newCols.LineBetween;
+                ColumnEqualWidth = newCols.EqualWidth;
+                Column1WidthInches = newCols.Col1WidthInches;
+                SectionColumns.Clear();
+            }
+
+            if (ribbon != null)
+            {
+                WriterColumnSettings curSec = GetCurrentSectionColumns(ribbon);
+                ribbon.ColumnCount = curSec.ColumnCount;
+                ribbon.ColumnPreset = curSec.PresetType;
+                ribbon.ColumnSpacingInches = curSec.SpacingInches;
+                ribbon.ColumnLineBetween = curSec.LineBetween;
+                ribbon.ColumnEqualWidth = curSec.EqualWidth;
+                ribbon.Column1WidthInches = curSec.Col1WidthInches;
+                if (ribbon.ActiveDocIndex >= 0 && ribbon.ActiveDocIndex < ribbon.DocTabs.Count && ribbon.DocTabs[ribbon.ActiveDocIndex].Mode == OfficeAppMode.Writer)
+                {
+                    var tab = ribbon.DocTabs[ribbon.ActiveDocIndex];
+                    tab.WriterColumnCount = ColumnCount;
+                    tab.WriterColumnPreset = ColumnPreset;
+                    tab.WriterColumnSpacingInches = ColumnSpacingInches;
+                    tab.WriterColumnLineBetween = ColumnLineBetween;
+                    tab.WriterColumnEqualWidth = ColumnEqualWidth;
+                    tab.WriterColumn1WidthInches = Column1WidthInches;
+                    tab.WriterSectionColumns = CloneSectionColumns(SectionColumns);
+                }
+            }
+
+            InvalidateLayoutAndTextCache();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
 
         public Dictionary<int, int> ParagraphAlignments = new Dictionary<int, int>();
         public Dictionary<int, Color> ParagraphBottomBorders = new Dictionary<int, Color>();
@@ -1815,6 +2627,18 @@ namespace ZenQOffice.UI
         public Dictionary<int, float> ParagraphLeftIndents = new Dictionary<int, float>();      // in pt (■ Left Indent)
         public Dictionary<int, float> ParagraphRightIndents = new Dictionary<int, float>();     // in pt (▲ Right Indent)
         public Dictionary<int, List<TabStopInfo>> ParagraphTabStops = new Dictionary<int, List<TabStopInfo>>();
+        public Dictionary<int, int> ParagraphOutlineLevels = new Dictionary<int, int>();
+        public Dictionary<int, bool> ParagraphCollapsedByDefault = new Dictionary<int, bool>();
+        public Dictionary<int, bool> ParagraphMirrorIndents = new Dictionary<int, bool>();
+        public Dictionary<int, bool> ParagraphDontAddSpaceSameStyle = new Dictionary<int, bool>();
+        public Dictionary<int, bool> ParagraphWidowOrphan = new Dictionary<int, bool>();
+        public Dictionary<int, bool> ParagraphKeepWithNext = new Dictionary<int, bool>();
+        public Dictionary<int, bool> ParagraphKeepLinesTogether = new Dictionary<int, bool>();
+        public Dictionary<int, bool> ParagraphPageBreakBefore = new Dictionary<int, bool>();
+        public Dictionary<int, bool> ParagraphSuppressLineNumbers = new Dictionary<int, bool>();
+        public Dictionary<int, bool> ParagraphDontHyphenate = new Dictionary<int, bool>();
+        public Dictionary<int, int> ParagraphTightWrap = new Dictionary<int, int>();
+        public float DefaultTabStopInches = 0.5f;
 
         // Ruler Hit Rectangles and Drag State
         public RulerDragHandle ActiveRulerDrag = RulerDragHandle.None;
@@ -2198,8 +3022,77 @@ namespace ZenQOffice.UI
             InvalidateLayoutAndTextCache();
         }
 
+        public void ApplyFullParagraphSettings(
+            int alignment,
+            int outlineLevel,
+            bool collapsedByDefault,
+            float leftIndentPt,
+            float rightIndentPt,
+            bool mirrorIndents,
+            float firstLineIndentPt,
+            float hangingIndentPt,
+            float spaceBeforePt,
+            float spaceAfterPt,
+            float lineSpacingFactor,
+            bool dontAddSpaceSameStyle,
+            bool widowOrphan,
+            bool keepWithNext,
+            bool keepLinesTogether,
+            bool pageBreakBefore,
+            bool suppressLineNumbers,
+            bool dontHyphenate,
+            int tightWrap,
+            List<TabStopInfo> tabStops = null,
+            float? defaultTabInches = null)
+        {
+            SaveUndoState();
+            var targetPStarts = GetSelectedOrCurrentParagraphStarts();
+            foreach (int pStart in targetPStarts)
+            {
+                ParagraphAlignments[pStart] = alignment;
+                ParagraphOutlineLevels[pStart] = outlineLevel;
+                ParagraphCollapsedByDefault[pStart] = collapsedByDefault;
+                ParagraphLeftIndents[pStart] = leftIndentPt;
+                ParagraphRightIndents[pStart] = rightIndentPt;
+                ParagraphMirrorIndents[pStart] = mirrorIndents;
+                ParagraphFirstLineIndents[pStart] = firstLineIndentPt;
+                ParagraphHangingIndents[pStart] = hangingIndentPt;
+                ParagraphSpacingsBefore[pStart] = spaceBeforePt;
+                ParagraphSpacingsAfter[pStart] = spaceAfterPt;
+                ParagraphLineSpacings[pStart] = lineSpacingFactor;
+                ParagraphDontAddSpaceSameStyle[pStart] = dontAddSpaceSameStyle;
+                ParagraphWidowOrphan[pStart] = widowOrphan;
+                ParagraphKeepWithNext[pStart] = keepWithNext;
+                ParagraphKeepLinesTogether[pStart] = keepLinesTogether;
+                ParagraphPageBreakBefore[pStart] = pageBreakBefore;
+                ParagraphSuppressLineNumbers[pStart] = suppressLineNumbers;
+                ParagraphDontHyphenate[pStart] = dontHyphenate;
+                ParagraphTightWrap[pStart] = tightWrap;
+                if (tabStops != null)
+                {
+                    var cloned = new List<TabStopInfo>(tabStops.Count);
+                    foreach (var ts in tabStops)
+                        if (ts != null) cloned.Add(new TabStopInfo(ts.PositionPt, ts.Type, ts.Leader));
+                    ParagraphTabStops[pStart] = cloned;
+                }
+            }
+            if (defaultTabInches.HasValue && defaultTabInches.Value > 0.05f)
+            {
+                DefaultTabStopInches = defaultTabInches.Value;
+            }
+            InvalidateLayoutAndTextCache();
+        }
+
         // MS Word Navigation Pane (Thanh Tìm Kiếm & Điều Hướng)
         private bool _showNavigationPane = false;
+        private float _navPaneAnim = 0f;
+        private float _selPaneAnim = 0f;
+        private float _navTabIndX = -1f;
+        private float _navTabIndW = -1f;
+        private long _paneAnimLastTs = 0;
+        public int EffectiveNavPaneWidth => (int)Math.Round(280f * _navPaneAnim);
+        public int EffectiveSelectionPaneWidth => (int)Math.Round(260f * _selPaneAnim);
+
         public bool ShowNavigationPane
         {
             get => _showNavigationPane;
@@ -2327,6 +3220,10 @@ namespace ZenQOffice.UI
         public Point TableDragStartOffset = Point.Empty;
         public int TableDragStartScrollY = 0;
         public int CurrentRenderTextX = 0;     // Exact document textX recorded during Draw()
+        public int CurrentRenderPageX = 0;     // Exact document pageX recorded during Draw()
+        public int CurrentRenderStartPageY = 0;
+        public int CurrentRenderPageH = 1123;
+        public float CurrentRenderTopMarginY = 96f;
         public Point HoveredMousePoint = new Point(-999, -999); // Mouse hover position for dynamic + button rendering
         // Per-table custom column widths & row heights (individual cell sizing)
         public Dictionary<int, List<int>> TableColWidths = new Dictionary<int, List<int>>();
@@ -2991,6 +3888,10 @@ namespace ZenQOffice.UI
             public int ScreenH;
             public int ScreenX; // left edge of text in this line
             public float ExtraSpaceW; // extra space per space character for justified text
+            public int ColLeftX;
+            public int ColRightX;
+            public int PageIndex;
+            public int ColumnIndex;
         }
         public List<RenderedLineInfo> RenderedLines = new List<RenderedLineInfo>();
         public int LastCursorScreenX = -1; // remembered X for up/down navigation
@@ -3640,6 +4541,8 @@ namespace ZenQOffice.UI
         public void ApplyFontSizeToSelectionOrTyping(float fontSize)
         {
             SaveUndoState();
+            if (float.IsNaN(fontSize) || float.IsInfinity(fontSize) || fontSize <= 0f) return;
+            fontSize = Math.Max(1f, Math.Min(400f, fontSize));
             TypingFontSize = fontSize;
             if (SelectionStart != SelectionEnd)
             {
@@ -4346,8 +5249,44 @@ namespace ZenQOffice.UI
                 }
                 ParagraphStyles = newStyles;
             }
+            ParagraphOutlineLevels = ShiftParaDictOnDelete(ParagraphOutlineLevels, delStart, delEnd, delLen);
+            ParagraphCollapsedByDefault = ShiftParaDictOnDelete(ParagraphCollapsedByDefault, delStart, delEnd, delLen);
+            ParagraphMirrorIndents = ShiftParaDictOnDelete(ParagraphMirrorIndents, delStart, delEnd, delLen);
+            ParagraphDontAddSpaceSameStyle = ShiftParaDictOnDelete(ParagraphDontAddSpaceSameStyle, delStart, delEnd, delLen);
+            ParagraphWidowOrphan = ShiftParaDictOnDelete(ParagraphWidowOrphan, delStart, delEnd, delLen);
+            ParagraphKeepWithNext = ShiftParaDictOnDelete(ParagraphKeepWithNext, delStart, delEnd, delLen);
+            ParagraphKeepLinesTogether = ShiftParaDictOnDelete(ParagraphKeepLinesTogether, delStart, delEnd, delLen);
+            ParagraphPageBreakBefore = ShiftParaDictOnDelete(ParagraphPageBreakBefore, delStart, delEnd, delLen);
+            ParagraphSuppressLineNumbers = ShiftParaDictOnDelete(ParagraphSuppressLineNumbers, delStart, delEnd, delLen);
+            ParagraphDontHyphenate = ShiftParaDictOnDelete(ParagraphDontHyphenate, delStart, delEnd, delLen);
+            ParagraphTightWrap = ShiftParaDictOnDelete(ParagraphTightWrap, delStart, delEnd, delLen);
             _lastFoundRun = null;
             _lastFoundRunIndex = -1;
+        }
+
+        private static Dictionary<int, T> ShiftParaDictOnDelete<T>(Dictionary<int, T> dict, int delStart, int delEnd, int delLen)
+        {
+            if (dict == null || dict.Count == 0) return dict;
+            var res = new Dictionary<int, T>();
+            foreach (var kvp in dict)
+            {
+                if (kvp.Key >= delStart && kvp.Key < delEnd) continue;
+                else if (kvp.Key >= delEnd) res[kvp.Key - delLen] = kvp.Value;
+                else res[kvp.Key] = kvp.Value;
+            }
+            return res;
+        }
+
+        private static Dictionary<int, T> ShiftParaDictOnInsert<T>(Dictionary<int, T> dict, int insStart, int insLen)
+        {
+            if (dict == null || dict.Count == 0) return dict;
+            var res = new Dictionary<int, T>();
+            foreach (var kvp in dict)
+            {
+                if (kvp.Key >= insStart) res[kvp.Key + insLen] = kvp.Value;
+                else res[kvp.Key] = kvp.Value;
+            }
+            return res;
         }
 
         public void AdjustFormattedRunsOnInsert(int insStart, int insLen, FormattedRun inheritFrom = null)
@@ -4455,6 +5394,17 @@ namespace ZenQOffice.UI
                 }
                 ParagraphStyles = newStyles;
             }
+            ParagraphOutlineLevels = ShiftParaDictOnInsert(ParagraphOutlineLevels, insStart, insLen);
+            ParagraphCollapsedByDefault = ShiftParaDictOnInsert(ParagraphCollapsedByDefault, insStart, insLen);
+            ParagraphMirrorIndents = ShiftParaDictOnInsert(ParagraphMirrorIndents, insStart, insLen);
+            ParagraphDontAddSpaceSameStyle = ShiftParaDictOnInsert(ParagraphDontAddSpaceSameStyle, insStart, insLen);
+            ParagraphWidowOrphan = ShiftParaDictOnInsert(ParagraphWidowOrphan, insStart, insLen);
+            ParagraphKeepWithNext = ShiftParaDictOnInsert(ParagraphKeepWithNext, insStart, insLen);
+            ParagraphKeepLinesTogether = ShiftParaDictOnInsert(ParagraphKeepLinesTogether, insStart, insLen);
+            ParagraphPageBreakBefore = ShiftParaDictOnInsert(ParagraphPageBreakBefore, insStart, insLen);
+            ParagraphSuppressLineNumbers = ShiftParaDictOnInsert(ParagraphSuppressLineNumbers, insStart, insLen);
+            ParagraphDontHyphenate = ShiftParaDictOnInsert(ParagraphDontHyphenate, insStart, insLen);
+            ParagraphTightWrap = ShiftParaDictOnInsert(ParagraphTightWrap, insStart, insLen);
 
             string targetFont = inheritFrom != null ? inheritFrom.FontName : (!string.IsNullOrEmpty(TypingFont) ? TypingFont : "Segoe UI");
             float targetSize = inheritFrom != null ? inheritFrom.FontSize : (TypingFontSize > 0 ? TypingFontSize : 11.0f);
@@ -4589,6 +5539,11 @@ namespace ZenQOffice.UI
 
         public void ApplyFormatToRange(int start, int len, string font, float size, bool? bold, bool? italic, bool? underline, bool? strike, Color? col, Color? hl, bool? sub = null, bool? sup = null)
         {
+            ApplyFormatToRangeCore(start, len, font, size, bold, italic, underline, strike, col, hl, sub, sup, null);
+        }
+
+        private void ApplyFormatToRangeCore(int start, int len, string font, float size, bool? bold, bool? italic, bool? underline, bool? strike, Color? col, Color? hl, bool? sub, bool? sup, Func<float, float> sizeTransform)
+        {
             if (len <= 0) return;
             int end = start + len;
 
@@ -4616,7 +5571,7 @@ namespace ZenQOffice.UI
                 newSubRuns.Add(new FormattedRun(
                     segStart, segLen,
                     font ?? curFormat.FontName,
-                    size > 0 ? size : curFormat.FontSize,
+                    sizeTransform != null ? Math.Max(4f, Math.Min(400f, sizeTransform(curFormat.FontSize))) : (size > 0 ? size : curFormat.FontSize),
                     bold.HasValue ? bold.Value : curFormat.Bold,
                     italic.HasValue ? italic.Value : curFormat.Italic,
                     underline.HasValue ? underline.Value : curFormat.Underline,
@@ -4721,7 +5676,8 @@ namespace ZenQOffice.UI
                             if (!onlyEquationSelectedInCell)
                             {
                                 if (font != null) cell.FontName = font;
-                                if (size > 0) cell.FontSize = size;
+                                if (sizeTransform != null) cell.FontSize = Math.Max(4f, Math.Min(400f, sizeTransform(cell.FontSize)));
+                                else if (size > 0) cell.FontSize = size;
                                 if (bold.HasValue) cell.Bold = bold.Value;
                                 if (italic.HasValue) cell.Italic = italic.Value;
                                 if (col.HasValue) cell.TextColor = col.Value;
@@ -4740,7 +5696,8 @@ namespace ZenQOffice.UI
                                         if (!onlyEquationSelectedInCell || pLen <= (cSelEnd - cSelStart))
                                         {
                                             if (font != null) cp.FontName = font;
-                                            if (size > 0) cp.FontSize = size;
+                                            if (sizeTransform != null) cp.FontSize = Math.Max(4f, Math.Min(400f, sizeTransform(cp.FontSize)));
+                                            else if (size > 0) cp.FontSize = size;
                                             if (bold.HasValue) cp.Bold = bold.Value;
                                             if (italic.HasValue) cp.Italic = italic.Value;
                                             if (col.HasValue) cp.TextColor = col.Value;
@@ -5061,9 +6018,28 @@ namespace ZenQOffice.UI
                 DocumentCharts,
                 SmoothScrollY);
             snap.ParagraphStyles = ParagraphStyles != null ? new Dictionary<int, string>(ParagraphStyles) : new Dictionary<int, string>();
+            snap.ParagraphOutlineLevels = new Dictionary<int, int>(ParagraphOutlineLevels);
+            snap.ParagraphCollapsedByDefault = new Dictionary<int, bool>(ParagraphCollapsedByDefault);
+            snap.ParagraphMirrorIndents = new Dictionary<int, bool>(ParagraphMirrorIndents);
+            snap.ParagraphDontAddSpaceSameStyle = new Dictionary<int, bool>(ParagraphDontAddSpaceSameStyle);
+            snap.ParagraphWidowOrphan = new Dictionary<int, bool>(ParagraphWidowOrphan);
+            snap.ParagraphKeepWithNext = new Dictionary<int, bool>(ParagraphKeepWithNext);
+            snap.ParagraphKeepLinesTogether = new Dictionary<int, bool>(ParagraphKeepLinesTogether);
+            snap.ParagraphPageBreakBefore = new Dictionary<int, bool>(ParagraphPageBreakBefore);
+            snap.ParagraphSuppressLineNumbers = new Dictionary<int, bool>(ParagraphSuppressLineNumbers);
+            snap.ParagraphDontHyphenate = new Dictionary<int, bool>(ParagraphDontHyphenate);
+            snap.ParagraphTightWrap = new Dictionary<int, int>(ParagraphTightWrap);
             snap.TextBorders = WriterUndoSnapshot.CloneTextBorders(TextBorders);
             snap.DocumentInkStrokes = WriterUndoSnapshot.CloneInkStrokes(DocumentInkStrokes);
             snap.Revisions = WriterUndoSnapshot.CloneRevisions(Revisions);
+            snap.ColumnCount = ColumnCount;
+            snap.ColumnPreset = ColumnPreset;
+            snap.ColumnSpacingInches = ColumnSpacingInches;
+            snap.ColumnLineBetween = ColumnLineBetween;
+            snap.ColumnEqualWidth = ColumnEqualWidth;
+            snap.Column1WidthInches = Column1WidthInches;
+            snap.SectionColumns = CloneSectionColumns(SectionColumns);
+            snap.SectionHeadersFooters = CloneSectionHeadersFooters(SectionHeadersFooters);
             return snap;
         }
 
@@ -5097,6 +6073,17 @@ namespace ZenQOffice.UI
             ParagraphLeftIndents = prev.ParagraphLeftIndents != null ? new Dictionary<int, float>(prev.ParagraphLeftIndents) : new Dictionary<int, float>();
             ParagraphRightIndents = prev.ParagraphRightIndents != null ? new Dictionary<int, float>(prev.ParagraphRightIndents) : new Dictionary<int, float>();
             ParagraphTabStops = WriterUndoSnapshot.CloneParagraphTabStops(prev.ParagraphTabStops);
+            ParagraphOutlineLevels = prev.ParagraphOutlineLevels != null ? new Dictionary<int, int>(prev.ParagraphOutlineLevels) : new Dictionary<int, int>();
+            ParagraphCollapsedByDefault = prev.ParagraphCollapsedByDefault != null ? new Dictionary<int, bool>(prev.ParagraphCollapsedByDefault) : new Dictionary<int, bool>();
+            ParagraphMirrorIndents = prev.ParagraphMirrorIndents != null ? new Dictionary<int, bool>(prev.ParagraphMirrorIndents) : new Dictionary<int, bool>();
+            ParagraphDontAddSpaceSameStyle = prev.ParagraphDontAddSpaceSameStyle != null ? new Dictionary<int, bool>(prev.ParagraphDontAddSpaceSameStyle) : new Dictionary<int, bool>();
+            ParagraphWidowOrphan = prev.ParagraphWidowOrphan != null ? new Dictionary<int, bool>(prev.ParagraphWidowOrphan) : new Dictionary<int, bool>();
+            ParagraphKeepWithNext = prev.ParagraphKeepWithNext != null ? new Dictionary<int, bool>(prev.ParagraphKeepWithNext) : new Dictionary<int, bool>();
+            ParagraphKeepLinesTogether = prev.ParagraphKeepLinesTogether != null ? new Dictionary<int, bool>(prev.ParagraphKeepLinesTogether) : new Dictionary<int, bool>();
+            ParagraphPageBreakBefore = prev.ParagraphPageBreakBefore != null ? new Dictionary<int, bool>(prev.ParagraphPageBreakBefore) : new Dictionary<int, bool>();
+            ParagraphSuppressLineNumbers = prev.ParagraphSuppressLineNumbers != null ? new Dictionary<int, bool>(prev.ParagraphSuppressLineNumbers) : new Dictionary<int, bool>();
+            ParagraphDontHyphenate = prev.ParagraphDontHyphenate != null ? new Dictionary<int, bool>(prev.ParagraphDontHyphenate) : new Dictionary<int, bool>();
+            ParagraphTightWrap = prev.ParagraphTightWrap != null ? new Dictionary<int, int>(prev.ParagraphTightWrap) : new Dictionary<int, int>();
 
             DocumentTables = WriterUndoSnapshot.CloneTables(prev.DocumentTables);
             TablePageX = prev.TablePageX != null ? new Dictionary<int, int>(prev.TablePageX) : new Dictionary<int, int>();
@@ -5114,6 +6101,14 @@ namespace ZenQOffice.UI
             DocumentCharts = WriterUndoSnapshot.CloneCharts(prev.DocumentCharts);
             DocumentInkStrokes = WriterUndoSnapshot.CloneInkStrokes(prev.DocumentInkStrokes);
             Revisions = WriterUndoSnapshot.CloneRevisions(prev.Revisions);
+            ColumnCount = prev.ColumnCount > 0 ? prev.ColumnCount : 1;
+            ColumnPreset = !string.IsNullOrEmpty(prev.ColumnPreset) ? prev.ColumnPreset : "One";
+            ColumnSpacingInches = prev.ColumnSpacingInches > 0 ? prev.ColumnSpacingInches : 0.5f;
+            ColumnLineBetween = prev.ColumnLineBetween;
+            ColumnEqualWidth = prev.ColumnEqualWidth;
+            Column1WidthInches = prev.Column1WidthInches;
+            SectionColumns = CloneSectionColumns(prev.SectionColumns);
+            SectionHeadersFooters = CloneSectionHeadersFooters(prev.SectionHeadersFooters);
 
             if (prev.ScrollY >= 0)
             {
@@ -5260,6 +6255,335 @@ namespace ZenQOffice.UI
         public int PageNumberStart = 1;
         public int FooterAlignment = 1; // 0: Left, 1: Center, 2: Right
         public bool DifferentOddEvenPages = false;
+        public Dictionary<int, WriterSectionHeaderFooter> SectionHeadersFooters = new Dictionary<int, WriterSectionHeaderFooter>();
+        private Dictionary<int, int> _pageSectionIndices = new Dictionary<int, int>();
+        private int _inHeaderFooterScopeDepth = 0;
+
+        public struct HeaderFooterScopeState
+        {
+            public bool Active;
+            public int HeaderOwnerSection;
+            public int FooterOwnerSection;
+            public WriterSectionHeaderFooter SavedPrimary;
+        }
+
+        public WriterSectionHeaderFooter CapturePrimaryHeaderFooterState()
+        {
+            return new WriterSectionHeaderFooter
+            {
+                HeaderText = HeaderText ?? "",
+                FooterText = FooterText ?? "",
+                HeaderTitleText = HeaderTitleText ?? "",
+                CurrentHeaderPreset = CurrentHeaderPreset,
+                CurrentFooterPreset = CurrentFooterPreset,
+                ThreeColHeaderLeft = ThreeColHeaderLeft ?? "",
+                ThreeColHeaderCenter = ThreeColHeaderCenter ?? "",
+                ThreeColHeaderRight = ThreeColHeaderRight ?? "",
+                ThreeColFooterLeft = ThreeColFooterLeft ?? "",
+                ThreeColFooterCenter = ThreeColFooterCenter ?? "",
+                ThreeColFooterRight = ThreeColFooterRight ?? "",
+                HeaderAlignment = HeaderAlignment,
+                FooterAlignment = FooterAlignment,
+                HeaderEvenAlignment = HeaderEvenAlignment,
+                FooterEvenAlignment = FooterEvenAlignment,
+                HeaderEvenText = HeaderEvenText ?? "",
+                FooterEvenText = FooterEvenText ?? "",
+                HeaderRuns = HeaderRuns != null ? new List<DocHeaderFooterRun>(HeaderRuns) : new List<DocHeaderFooterRun>(),
+                FooterRuns = FooterRuns != null ? new List<DocHeaderFooterRun>(FooterRuns) : new List<DocHeaderFooterRun>(),
+                HeaderEvenRuns = HeaderEvenRuns != null ? new List<DocHeaderFooterRun>(HeaderEvenRuns) : new List<DocHeaderFooterRun>(),
+                FooterEvenRuns = FooterEvenRuns != null ? new List<DocHeaderFooterRun>(FooterEvenRuns) : new List<DocHeaderFooterRun>()
+            };
+        }
+
+        private void ApplyHeaderFieldsFrom(WriterSectionHeaderFooter src)
+        {
+            if (src == null) return;
+            HeaderText = src.HeaderText ?? "";
+            HeaderTitleText = src.HeaderTitleText ?? "";
+            CurrentHeaderPreset = src.CurrentHeaderPreset;
+            ThreeColHeaderLeft = src.ThreeColHeaderLeft ?? "";
+            ThreeColHeaderCenter = src.ThreeColHeaderCenter ?? "";
+            ThreeColHeaderRight = src.ThreeColHeaderRight ?? "";
+            HeaderAlignment = src.HeaderAlignment;
+            HeaderEvenAlignment = src.HeaderEvenAlignment;
+            HeaderEvenText = src.HeaderEvenText ?? "";
+            if (src.HeaderRuns == null) src.HeaderRuns = new List<DocHeaderFooterRun>();
+            if (src.HeaderEvenRuns == null) src.HeaderEvenRuns = new List<DocHeaderFooterRun>();
+            HeaderRuns = src.HeaderRuns;
+            HeaderEvenRuns = src.HeaderEvenRuns;
+        }
+
+        private void ApplyFooterFieldsFrom(WriterSectionHeaderFooter src)
+        {
+            if (src == null) return;
+            FooterText = src.FooterText ?? "";
+            CurrentFooterPreset = src.CurrentFooterPreset;
+            ThreeColFooterLeft = src.ThreeColFooterLeft ?? "";
+            ThreeColFooterCenter = src.ThreeColFooterCenter ?? "";
+            ThreeColFooterRight = src.ThreeColFooterRight ?? "";
+            FooterAlignment = src.FooterAlignment;
+            FooterEvenAlignment = src.FooterEvenAlignment;
+            FooterEvenText = src.FooterEvenText ?? "";
+            if (src.FooterRuns == null) src.FooterRuns = new List<DocHeaderFooterRun>();
+            if (src.FooterEvenRuns == null) src.FooterEvenRuns = new List<DocHeaderFooterRun>();
+            FooterRuns = src.FooterRuns;
+            FooterEvenRuns = src.FooterEvenRuns;
+        }
+
+        private void CopyHeaderFieldsInto(WriterSectionHeaderFooter dst)
+        {
+            if (dst == null) return;
+            dst.HeaderText = HeaderText ?? "";
+            dst.HeaderTitleText = HeaderTitleText ?? "";
+            dst.CurrentHeaderPreset = CurrentHeaderPreset;
+            dst.ThreeColHeaderLeft = ThreeColHeaderLeft ?? "";
+            dst.ThreeColHeaderCenter = ThreeColHeaderCenter ?? "";
+            dst.ThreeColHeaderRight = ThreeColHeaderRight ?? "";
+            dst.HeaderAlignment = HeaderAlignment;
+            dst.HeaderEvenAlignment = HeaderEvenAlignment;
+            dst.HeaderEvenText = HeaderEvenText ?? "";
+            dst.HeaderRuns = HeaderRuns ?? new List<DocHeaderFooterRun>();
+            dst.HeaderEvenRuns = HeaderEvenRuns ?? new List<DocHeaderFooterRun>();
+        }
+
+        private void CopyFooterFieldsInto(WriterSectionHeaderFooter dst)
+        {
+            if (dst == null) return;
+            dst.FooterText = FooterText ?? "";
+            dst.CurrentFooterPreset = CurrentFooterPreset;
+            dst.ThreeColFooterLeft = ThreeColFooterLeft ?? "";
+            dst.ThreeColFooterCenter = ThreeColFooterCenter ?? "";
+            dst.ThreeColFooterRight = ThreeColFooterRight ?? "";
+            dst.FooterAlignment = FooterAlignment;
+            dst.FooterEvenAlignment = FooterEvenAlignment;
+            dst.FooterEvenText = FooterEvenText ?? "";
+            dst.FooterRuns = FooterRuns ?? new List<DocHeaderFooterRun>();
+            dst.FooterEvenRuns = FooterEvenRuns ?? new List<DocHeaderFooterRun>();
+        }
+
+        public bool HasMultipleSections()
+        {
+            if (SectionHeadersFooters != null && SectionHeadersFooters.Count > 0) return true;
+            if (_pageSectionIndices != null)
+            {
+                foreach (var kv in _pageSectionIndices)
+                {
+                    if (kv.Value > 0) return true;
+                }
+            }
+            string txt = PieceTable != null ? PieceTable.GetText() : "";
+            return !string.IsNullOrEmpty(txt) && txt.Contains("[--- SECTION BREAK (");
+        }
+
+        public int GetSectionIndexForPage(int pageIndex)
+        {
+            if (pageIndex <= 0) return 0;
+            if (_pageSectionIndices != null && _pageSectionIndices.TryGetValue(pageIndex, out int cachedSec))
+            {
+                return cachedSec;
+            }
+            string txt = PieceTable != null ? PieceTable.GetText() : "";
+            if (string.IsNullOrEmpty(txt) || !txt.Contains("[--- SECTION BREAK (")) return 0;
+            int sec = 0;
+            int pg = 0;
+            string[] lines = txt.Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string t = lines[i].Trim();
+                if (t == "[--- PAGE BREAK ---]")
+                {
+                    pg++;
+                }
+                else if (t.StartsWith("[--- SECTION BREAK ("))
+                {
+                    sec++;
+                    if (t != "[--- SECTION BREAK (CONTINUOUS) ---]") pg++;
+                }
+                if (pg >= pageIndex) break;
+            }
+            return sec;
+        }
+
+        public int ResolveHeaderOwnerSection(int secIdx)
+        {
+            if (SectionHeadersFooters == null || SectionHeadersFooters.Count == 0) return 0;
+            for (int s = secIdx; s > 0; s--)
+            {
+                if (SectionHeadersFooters.TryGetValue(s, out var shf) && shf != null && !shf.LinkHeaderToPrevious)
+                {
+                    return s;
+                }
+            }
+            return 0;
+        }
+
+        public int ResolveFooterOwnerSection(int secIdx)
+        {
+            if (SectionHeadersFooters == null || SectionHeadersFooters.Count == 0) return 0;
+            for (int s = secIdx; s > 0; s--)
+            {
+                if (SectionHeadersFooters.TryGetValue(s, out var shf) && shf != null && !shf.LinkFooterToPrevious)
+                {
+                    return s;
+                }
+            }
+            return 0;
+        }
+
+        public bool IsSectionHeaderLinkedToPrevious(int secIdx)
+        {
+            if (secIdx <= 0) return false;
+            if (SectionHeadersFooters != null && SectionHeadersFooters.TryGetValue(secIdx, out var shf) && shf != null)
+            {
+                return shf.LinkHeaderToPrevious;
+            }
+            return true;
+        }
+
+        public bool IsSectionFooterLinkedToPrevious(int secIdx)
+        {
+            if (secIdx <= 0) return false;
+            if (SectionHeadersFooters != null && SectionHeadersFooters.TryGetValue(secIdx, out var shf) && shf != null)
+            {
+                return shf.LinkFooterToPrevious;
+            }
+            return true;
+        }
+
+        public int GetActiveHeaderFooterSectionIndex()
+        {
+            return GetSectionIndexForPage(Math.Max(0, ActiveHeaderFooterPageIndex));
+        }
+
+        public bool IsCurrentHeaderFooterLinkedToPrevious()
+        {
+            int sec = GetActiveHeaderFooterSectionIndex();
+            if (sec <= 0) return false;
+            return IsEditingHeaderMode ? IsSectionHeaderLinkedToPrevious(sec) : IsSectionFooterLinkedToPrevious(sec);
+        }
+
+        public bool ToggleActiveHeaderFooterLinkToPrevious()
+        {
+            int sec = GetActiveHeaderFooterSectionIndex();
+            if (sec <= 0) return false;
+            if (SectionHeadersFooters == null) SectionHeadersFooters = new Dictionary<int, WriterSectionHeaderFooter>();
+            if (!SectionHeadersFooters.TryGetValue(sec, out var curObj) || curObj == null)
+            {
+                curObj = CapturePrimaryHeaderFooterState();
+                curObj.LinkHeaderToPrevious = true;
+                curObj.LinkFooterToPrevious = true;
+                SectionHeadersFooters[sec] = curObj;
+            }
+
+            bool isHdr = IsEditingHeaderMode;
+            bool wasLinked = isHdr ? curObj.LinkHeaderToPrevious : curObj.LinkFooterToPrevious;
+            if (wasLinked)
+            {
+                int prevOwner = isHdr ? ResolveHeaderOwnerSection(sec - 1) : ResolveFooterOwnerSection(sec - 1);
+                WriterSectionHeaderFooter src = (prevOwner > 0 && SectionHeadersFooters.TryGetValue(prevOwner, out var prevObj) && prevObj != null)
+                    ? prevObj.Clone()
+                    : CapturePrimaryHeaderFooterState();
+                if (isHdr)
+                {
+                    curObj.HeaderText = src.HeaderText;
+                    curObj.HeaderTitleText = src.HeaderTitleText;
+                    curObj.CurrentHeaderPreset = src.CurrentHeaderPreset;
+                    curObj.ThreeColHeaderLeft = src.ThreeColHeaderLeft;
+                    curObj.ThreeColHeaderCenter = src.ThreeColHeaderCenter;
+                    curObj.ThreeColHeaderRight = src.ThreeColHeaderRight;
+                    curObj.HeaderAlignment = src.HeaderAlignment;
+                    curObj.HeaderEvenAlignment = src.HeaderEvenAlignment;
+                    curObj.HeaderEvenText = src.HeaderEvenText;
+                    curObj.HeaderRuns = WriterSectionHeaderFooter.CloneRuns(src.HeaderRuns);
+                    curObj.HeaderEvenRuns = WriterSectionHeaderFooter.CloneRuns(src.HeaderEvenRuns);
+                    curObj.LinkHeaderToPrevious = false;
+                }
+                else
+                {
+                    curObj.FooterText = src.FooterText;
+                    curObj.CurrentFooterPreset = src.CurrentFooterPreset;
+                    curObj.ThreeColFooterLeft = src.ThreeColFooterLeft;
+                    curObj.ThreeColFooterCenter = src.ThreeColFooterCenter;
+                    curObj.ThreeColFooterRight = src.ThreeColFooterRight;
+                    curObj.FooterAlignment = src.FooterAlignment;
+                    curObj.FooterEvenAlignment = src.FooterEvenAlignment;
+                    curObj.FooterEvenText = src.FooterEvenText;
+                    curObj.FooterRuns = WriterSectionHeaderFooter.CloneRuns(src.FooterRuns);
+                    curObj.FooterEvenRuns = WriterSectionHeaderFooter.CloneRuns(src.FooterEvenRuns);
+                    curObj.LinkFooterToPrevious = false;
+                }
+            }
+            else
+            {
+                if (isHdr) curObj.LinkHeaderToPrevious = true;
+                else curObj.LinkFooterToPrevious = true;
+            }
+
+            SaveUndoState();
+            InvalidateLayoutAndTextCache();
+            Invalidate();
+            return !(isHdr ? curObj.LinkHeaderToPrevious : curObj.LinkFooterToPrevious) ? false : true;
+        }
+
+        public HeaderFooterScopeState BeginPageHeaderFooterScope(int pageIndex)
+        {
+            if (_inHeaderFooterScopeDepth > 0)
+            {
+                return new HeaderFooterScopeState { Active = false };
+            }
+            int sec = GetSectionIndexForPage(pageIndex);
+            int hOwner = ResolveHeaderOwnerSection(sec);
+            int fOwner = ResolveFooterOwnerSection(sec);
+            _inHeaderFooterScopeDepth++;
+            if (hOwner == 0 && fOwner == 0)
+            {
+                return new HeaderFooterScopeState { Active = true, HeaderOwnerSection = 0, FooterOwnerSection = 0 };
+            }
+            var saved = CapturePrimaryHeaderFooterState();
+            if (hOwner > 0 && SectionHeadersFooters.TryGetValue(hOwner, out var hObj) && hObj != null)
+            {
+                ApplyHeaderFieldsFrom(hObj);
+            }
+            if (fOwner > 0 && SectionHeadersFooters.TryGetValue(fOwner, out var fObj) && fObj != null)
+            {
+                ApplyFooterFieldsFrom(fObj);
+            }
+            return new HeaderFooterScopeState
+            {
+                Active = true,
+                HeaderOwnerSection = hOwner,
+                FooterOwnerSection = fOwner,
+                SavedPrimary = saved
+            };
+        }
+
+        public void EndPageHeaderFooterScope(HeaderFooterScopeState state, bool writeBack)
+        {
+            if (!state.Active) return;
+            _inHeaderFooterScopeDepth = Math.Max(0, _inHeaderFooterScopeDepth - 1);
+            if (state.HeaderOwnerSection == 0 && state.FooterOwnerSection == 0) return;
+            if (writeBack)
+            {
+                if (state.HeaderOwnerSection > 0 && SectionHeadersFooters.TryGetValue(state.HeaderOwnerSection, out var hDst) && hDst != null)
+                {
+                    CopyHeaderFieldsInto(hDst);
+                }
+                if (state.FooterOwnerSection > 0 && SectionHeadersFooters.TryGetValue(state.FooterOwnerSection, out var fDst) && fDst != null)
+                {
+                    CopyFooterFieldsInto(fDst);
+                }
+            }
+            if (state.SavedPrimary != null)
+            {
+                if (state.HeaderOwnerSection > 0) ApplyHeaderFieldsFrom(state.SavedPrimary);
+                if (state.FooterOwnerSection > 0) ApplyFooterFieldsFrom(state.SavedPrimary);
+            }
+        }
+
+        public HeaderFooterScopeState BeginActiveHeaderFooterScope()
+        {
+            return BeginPageHeaderFooterScope(Math.Max(0, ActiveHeaderFooterPageIndex));
+        }
         public int FooterEvenAlignment = 0; // 0: Left, 1: Center, 2: Right
         public string FooterEvenText = "";
         public int HeaderEvenAlignment = 0; // 0: Left, 1: Center, 2: Right
@@ -5787,13 +7111,22 @@ namespace ZenQOffice.UI
                     else if (shape.ShapeType == "Group")
                     {
                         string serChildren = DocShapeObject.SerializeGroupChildren(shape.GroupChildren);
-                        newTag = string.Format("![SHAPE:ID={0}:TYPE=Group:PATH={1}:X={2}:Y={3}:W={4}:H={5}:WRAP={6}:PAGE={7}:STYLE={8}:CHILDREN={9}]",
-                            shape.Id, shape.ImagePath ?? "", shape.PageX, shape.PageY, w, h, shape.WrapMode, shape.PageNumber, shape.PictureStylePreset, serChildren);
+                        string fixPart = shape.FixPosition ? ":FIXPOS=1" : "";
+                        string yRelPart = (shape.WrapMode != 0 && (shape.PositionCalculated || shape.PageNumber >= 0)) ? ":YREL=0" : "";
+                        newTag = string.Format("![SHAPE:ID={0}:TYPE=Group:PATH={1}:X={2}:Y={3}:W={4}:H={5}:WRAP={6}:PAGE={7}:STYLE={8}{10}{11}:CHILDREN={9}]",
+                            shape.Id, shape.ImagePath ?? "", shape.PageX, shape.PageY, w, h, shape.WrapMode, shape.PageNumber, shape.PictureStylePreset, serChildren, yRelPart, fixPart);
                     }
                     else
                     {
-                        newTag = string.Format("![{0}:ID={1}:TYPE={2}:PATH={3}:X={4}:Y={5}:W={6}:H={7}:WRAP={8}:PAGE={9}:STYLE={10}]",
-                            prefix, shape.Id, shape.ShapeType, shape.ImagePath ?? "", shape.PageX, shape.PageY, w, h, shape.WrapMode, shape.PageNumber, shape.PictureStylePreset);
+                        string textPart = "";
+                        if (!isImage && shape.ShapeType != "Image" && shape.TextContent != null)
+                        {
+                            textPart = ":TEXT=" + Uri.EscapeDataString(shape.TextContent);
+                        }
+                        string yRelPart = (shape.WrapMode != 0 && (shape.PositionCalculated || shape.PageNumber >= 0)) ? ":YREL=0" : "";
+                        string fixPart = shape.FixPosition ? ":FIXPOS=1" : "";
+                        newTag = string.Format("![{0}:ID={1}:TYPE={2}{11}:PATH={3}:X={4}:Y={5}:W={6}:H={7}:WRAP={8}:PAGE={9}:STYLE={10}{12}{13}]",
+                            prefix, shape.Id, shape.ShapeType, shape.ImagePath ?? "", shape.PageX, shape.PageY, w, h, shape.WrapMode, shape.PageNumber, shape.PictureStylePreset, textPart, yRelPart, fixPart);
                     }
 
                     DocShapeTagProperties prop;
@@ -5801,6 +7134,13 @@ namespace ZenQOffice.UI
                     {
                         prop = new DocShapeTagProperties();
                         DocShapeObject.TagCache[shape.Id] = prop;
+                    }
+                    prop.HasFixPosition = true;
+                    prop.FixPosition = shape.FixPosition;
+                    if (!isImage && shape.ShapeType != "Image")
+                    {
+                        prop.TextContent = shape.TextContent ?? "";
+                        prop.HasTextContent = true;
                     }
                     if (shape.ShapeType == "Group")
                     {
@@ -6339,7 +7679,7 @@ namespace ZenQOffice.UI
             string docText = PieceTable.GetText();
             if (string.IsNullOrEmpty(docText))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Tài liệu hiện đang trống, không có nội dung để kiểm tra chính tả.", "Kiểm tra chính tả", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Tài liệu hiện đang trống, không có nội dung để kiểm tra chính tả.", "The document is currently empty. Nothing to spellcheck."), AppL10n.T("Kiểm tra chính tả", "Spelling"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -6362,10 +7702,10 @@ namespace ZenQOffice.UI
                         string dupPair = words[w] + " " + words[w + 1];
                         string fix = words[w];
                         SpellCheckItem itm = new SpellCheckItem();
-                        itm.Location = string.Format("Đoạn {0}", pIdx + 1);
+                        itm.Location = string.Format(AppL10n.T("Đoạn {0}", "Paragraph {0}"), pIdx + 1);
                         itm.OriginalText = pText.Length > 80 ? pText.Substring(0, 80) + "..." : pText;
                         itm.ProblemWord = dupPair;
-                        itm.Reason = "Từ bị lặp lại liên tiếp (Repeated word)";
+                        itm.Reason = AppL10n.T("Từ bị lặp lại liên tiếp (Repeated word)", "Repeated consecutive word");
                         itm.Suggestions.Add(fix);
                         itm.ApplyCorrection = (newVal) =>
                         {
@@ -6394,10 +7734,10 @@ namespace ZenQOffice.UI
                     {
                         string fixedW = char.ToUpper(cleanW[0]) + cleanW.Substring(1).ToLower();
                         SpellCheckItem itm = new SpellCheckItem();
-                        itm.Location = string.Format("Đoạn {0}", pIdx + 1);
+                        itm.Location = string.Format(AppL10n.T("Đoạn {0}", "Paragraph {0}"), pIdx + 1);
                         itm.OriginalText = pText.Length > 80 ? pText.Substring(0, 80) + "..." : pText;
                         itm.ProblemWord = cleanW;
-                        itm.Reason = "Lỗi viết hoa bất thường (Caps Lock)";
+                        itm.Reason = AppL10n.T("Lỗi viết hoa bất thường (Caps Lock)", "Irregular capitalization (Caps Lock)");
                         itm.Suggestions.Add(fixedW);
                         itm.Suggestions.Add(cleanW.ToLower());
                         itm.ApplyCorrection = (newVal) =>
@@ -6429,10 +7769,10 @@ namespace ZenQOffice.UI
                         if (!string.IsNullOrEmpty(cleanW) && VietnameseAutoCorrect.TryCorrectWord(cleanW, out corrW))
                         {
                             SpellCheckItem itm = new SpellCheckItem();
-                            itm.Location = string.Format("Đoạn {0}", pIdx + 1);
+                            itm.Location = string.Format(AppL10n.T("Đoạn {0}", "Paragraph {0}"), pIdx + 1);
                             itm.OriginalText = pText.Length > 80 ? pText.Substring(0, 80) + "..." : pText;
                             itm.ProblemWord = cleanW;
-                            itm.Reason = "Lỗi gõ chính tả tiếng Việt (Telex / VNI)";
+                            itm.Reason = AppL10n.T("Lỗi gõ chính tả tiếng Việt (Telex / VNI)", "Vietnamese typing spelling error (Telex / VNI)");
                             itm.Suggestions.Add(corrW);
                             string wordToFix = cleanW;
                             itm.ApplyCorrection = (newVal) =>
@@ -6465,7 +7805,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Hoàn tất kiểm tra chính tả: Toàn bộ văn bản đều hợp lệ!", "Chính tả & Ngữ pháp (F7)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Hoàn tất kiểm tra chính tả: Toàn bộ văn bản đều hợp lệ!", "Spelling and grammar check complete!"), AppL10n.T("Chính tả & Ngữ pháp (F7)", "Spelling & Grammar (F7)"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -6799,9 +8139,14 @@ namespace ZenQOffice.UI
                         }
                         else
                         {
-                            int pTopY = (int)Math.Round((double)PageGap) + pNum * (pageH + PageGap) + (int)(96f * ZoomLevel);
-                            shape.PageX = Math.Max(50, (int)((shape.LastBounds.X - (int)(96f * ZoomLevel)) / Math.Max(0.01f, ZoomLevel)));
-                            shape.PageY = Math.Max(50, (int)((shape.LastBounds.Y - pTopY) / Math.Max(0.01f, ZoomLevel)));
+                            float z = Math.Max(0.01f, ZoomLevel);
+                            int pitch = Math.Max(1, CurrentRenderPageH + PageGap);
+                            int pg = Math.Max(0, (shape.LastBounds.Y - CurrentRenderStartPageY) / pitch);
+                            float pTopY = CurrentRenderStartPageY + pg * pitch + CurrentRenderTopMarginY;
+                            shape.PageNumber = pg;
+                            shape.PageX = Math.Max(0, (int)Math.Round((shape.LastBounds.X - CurrentRenderPageX) / z));
+                            shape.PageY = Math.Max(0, (int)Math.Round((shape.LastBounds.Y - pTopY) / z));
+                            shape.PositionCalculated = true;
                         }
                         shape.WrapMode = targetWrapMode;
 
@@ -6839,13 +8184,14 @@ namespace ZenQOffice.UI
                     }
                     else if (!isInsideTable && targetWrapMode == 0)
                     {
-                        // Transition: Floating -> In-Line at current cursor position
+                        // Transition: Floating -> In-Line at the object's existing document anchor
+                        // (never splice into a stale mid-word text CursorPosition)
                         shape.WrapMode = 0;
                         PieceTable.Remove(tagIdx, tagLen);
                         AdjustFormattedRunsOnDelete(tagIdx, tagLen);
 
                         string currentText = PieceTable.GetText();
-                        int insertPos = Math.Max(0, Math.Min(currentText.Length, CursorPosition));
+                        int insertPos = SnapCursorOutOfObjectTag(Math.Max(0, Math.Min(currentText.Length, tagIdx)), -1, currentText);
                         int w = Math.Max(20, shape.BaseWidth + shape.WidthDelta);
                         int h = Math.Max(15, shape.BaseHeight + shape.HeightDelta);
                         string newInlineTag = string.Format("![SHAPE:ID={0}:TYPE={1}:PATH={2}:X={3}:Y={4}:W={5}:H={6}:WRAP=0:PAGE=-1:STYLE={7}]",
@@ -6853,9 +8199,23 @@ namespace ZenQOffice.UI
 
                         PieceTable.Insert(insertPos, newInlineTag);
                         AdjustFormattedRunsOnInsert(insertPos, newInlineTag.Length);
+                        CursorPosition = insertPos + newInlineTag.Length;
+                        SelectionStart = CursorPosition;
+                        SelectionEnd = CursorPosition;
                     }
                     else
                     {
+                        if (oldMode == 0 && targetWrapMode != 0 && !shape.LastBounds.IsEmpty && CurrentRenderPageH > 0)
+                        {
+                            float z = Math.Max(0.01f, ZoomLevel);
+                            int pitch = Math.Max(1, CurrentRenderPageH + PageGap);
+                            int pg = Math.Max(0, (shape.LastBounds.Y - CurrentRenderStartPageY) / pitch);
+                            float pTopY = CurrentRenderStartPageY + pg * pitch + CurrentRenderTopMarginY;
+                            shape.PageNumber = pg;
+                            shape.PageX = Math.Max(0, (int)Math.Round((shape.LastBounds.X - CurrentRenderPageX) / z));
+                            shape.PageY = Math.Max(0, (int)Math.Round((shape.LastBounds.Y - pTopY) / z));
+                            shape.PositionCalculated = true;
+                        }
                         shape.WrapMode = targetWrapMode;
                         SyncShapeTagInDocument(shape);
                     }
@@ -6890,11 +8250,12 @@ namespace ZenQOffice.UI
             int centerH = leftMargin + (pageW - leftMargin - rightMargin - sw) / 2;
             int right = pageW - rightMargin - sw;
 
-            int top = topMargin;
-            int middleV = topMargin + (pageH - topMargin - bottomMargin - sh) / 2;
-            int bottom = pageH - bottomMargin - sh;
+            int top = 0;
+            int middleV = Math.Max(0, (pageH - topMargin - bottomMargin - sh) / 2);
+            int bottom = Math.Max(0, pageH - topMargin - bottomMargin - sh);
 
             ActiveShape.WrapMode = 1; // Square wrap mode
+            ActiveShape.PositionCalculated = true;
 
             switch (posIndex)
             {
@@ -6908,6 +8269,7 @@ namespace ZenQOffice.UI
                 case 7: ActiveShape.PageX = centerH; ActiveShape.PageY = bottom; break; // Bottom Center
                 case 8: ActiveShape.PageX = right; ActiveShape.PageY = bottom; break; // Bottom Right
             }
+            SyncShapeTagInDocument(ActiveShape);
         }
 
         public void RotateShape(float deltaAngle)
@@ -6931,26 +8293,44 @@ namespace ZenQOffice.UI
             }
         }
 
-        public int GetMaxScrollY(int clientHeight, RibbonBar ribbon)
+        public int GetMaxScrollY(int clientHeight, RibbonBar ribbon, int paneIndex = 0)
         {
-            if (clientHeight <= 0) clientHeight = LastViewHeight > 0 ? LastViewHeight : 800;
             int w = LastViewWidth > 0 ? LastViewWidth : 1200;
+            int ch = clientHeight > 0 ? clientHeight : (LastViewHeight > 0 ? LastViewHeight : 800);
 
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
             GetPageLayoutMetrics(w, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
 
+            int paneTop, paneBottom;
+            ComputePaneBounds(ch, ribbon, paneIndex, out paneTop, out paneBottom);
+            int paneH = Math.Max(60, paneBottom - paneTop);
+
             if (ViewMode == 0)
             {
-                int availableH = clientHeight - 155 - 26;
-                return Math.Max(0, pageH + 32 - availableH);
+                return Math.Max(0, pageH + 32 - paneH);
             }
 
-            int topOffset = (ribbon != null && ribbon.ShowRuler) ? 190 : 165;
+            if (ViewMode == 3 || ViewMode == 4)
+            {
+                int contentH = Math.Max(pageH / 2, (int)Math.Ceiling(_lastContinuousContentBottomY) + 48);
+                return Math.Max(0, contentH - paneH);
+            }
+
             int pageCount = Math.Max(1, TotalPageCount);
-            int lastPageBottomNoScroll = topOffset + (pageCount - 1) * (pageH + PageGap) + pageH;
-            int maxScrollX = GetMaxScrollX(w);
-            int targetViewportBottom = (clientHeight - 26 - (maxScrollX > 0 ? 12 : 0)) - 25; // 25px đệm xám phía trên thanh trạng thái 26px
-            return Math.Max(0, lastPageBottomNoScroll - targetViewportBottom);
+            if (ViewMode == 1 && IsMultiplePagesView)
+            {
+                int cols = GetMultiplePagesColsPerRow(w, pageW, ribbon);
+                if (cols > 1)
+                {
+                    int rows = (int)Math.Ceiling((double)pageCount / cols);
+                    int vGap = Math.Max(16, PageGap * 2);
+                    int totalGridH = 10 + rows * pageH + Math.Max(0, rows - 1) * vGap + 25;
+                    return Math.Max(0, totalGridH - paneH);
+                }
+            }
+
+            int totalLinearH = 10 + (pageCount - 1) * (pageH + PageGap) + pageH + 25;
+            return Math.Max(0, totalLinearH - paneH);
         }
 
         public void UpdateShapeDragPosition(int mouseX, int mouseY, int canvasWidth, RibbonBar ribbon)
@@ -7089,8 +8469,13 @@ namespace ZenQOffice.UI
                         if (tX >= 0) sObj.PageX = tX;
                         if (tPage >= 0)
                         {
-                            if (tY >= 0) sObj.PageY = tY;
+                            if (tY >= 0 || tYRel == 0) sObj.PageY = tY >= 0 ? tY : sObj.PageY;
                             sObj.PageNumber = tPage;
+                            sObj.PositionCalculated = true;
+                        }
+                        else if (tWrap > 0 && tYRel == 0 && tY >= 0)
+                        {
+                            sObj.PageY = tY;
                         }
                         if (tW > 0) sObj.BaseWidth = tW;
                         if (tH > 0) sObj.BaseHeight = tH;
@@ -7314,7 +8699,7 @@ namespace ZenQOffice.UI
             SaveUndoState();
             DeleteSelection();
             int insertPos = CursorPosition;
-            PieceTable.Insert(insertPos, text);
+            text = text.Replace("\r\n", "\n").Replace("\r", "\n"); PieceTable.Insert(insertPos, text);
             if (TrackChanges)
             {
                 var rev = RecordChange(RevisionType.Insertion, insertPos, text.Length, text);
@@ -7432,7 +8817,7 @@ namespace ZenQOffice.UI
         {
             if (DetailedFootnotes == null || DetailedFootnotes.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Không tìm thấy chú thích (Footnote / Endnote) nào trong tài liệu!", "ZENQ OFFICE Chú thích", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không tìm thấy chú thích (Footnote / Endnote) nào trong tài liệu!", "No footnotes or endnotes found in this document!"), AppL10n.T("ZENQ OFFICE Chú thích", "ZENQ OFFICE References"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -7444,7 +8829,7 @@ namespace ZenQOffice.UI
 
             if (matching.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show(string.Format("Không có {0} nào trong tài liệu!", isEndnote ? "chú thích cuối tài liệu (Endnote)" : "chú thích chân trang (Footnote)"), "ZENQ OFFICE Chú thích", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T(string.Format("Không có {0} nào trong tài liệu!", isEndnote ? "chú thích cuối tài liệu (Endnote)" : "chú thích chân trang (Footnote)"), string.Format("No {0} found in this document!", isEndnote ? "endnotes" : "footnotes")), AppL10n.T("ZENQ OFFICE Chú thích", "ZENQ OFFICE References"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -7602,13 +8987,13 @@ namespace ZenQOffice.UI
         {
             SaveUndoState();
             string fullText = PieceTable.GetText();
-            int startTOC = fullText.IndexOf("================== MỤC LỤC TỰ ĐỘNG ==================");
+            int startTOC = fullText.IndexOf("================== MỤC LỤC TỰ ĐỘNG =================="); if (startTOC < 0) startTOC = fullText.IndexOf("================== TABLE OF CONTENTS ==================");
             int endTOC = fullText.IndexOf("=====================================================");
 
             var headings = ExtractDetailedHeadings();
             if (headings.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Chưa có đề mục (Heading) nào trong văn bản.\nVui lòng định dạng Heading 1, Heading 2 trước khi cập nhật Mục lục!", "Mục Lục Tự Động", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Chưa có đề mục (Heading) nào trong văn bản.\nVui lòng định dạng Heading 1, Heading 2 trước khi cập nhật Mục lục!", "No headings found in document.\nPlease apply Heading 1 or Heading 2 styles before updating Table of Contents!"), AppL10n.T("Mục Lục Tự Động", "Table of Contents"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -7636,12 +9021,12 @@ namespace ZenQOffice.UI
                 PieceTable.Insert(startTOC, newTOC);
                 AdjustFormattedRunsOnDelete(startTOC, totalEnd - startTOC);
                 AdjustFormattedRunsOnInsert(startTOC, newTOC.Length);
-                ZenQOffice.UI.FluentMessageBox.Show(string.Format("Đã cập nhật mục lục thành công với {0} đề mục!", headings.Count), "Mục Lục Tự Động", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(string.Format(AppL10n.T("Đã cập nhật mục lục thành công với {0} đề mục!", "Table of Contents updated with {0} heading(s)!"), headings.Count), AppL10n.T("Mục Lục Tự Động", "Table of Contents"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
                 InsertText("\n" + newTOC + "\n");
-                ZenQOffice.UI.FluentMessageBox.Show(string.Format("Đã tạo bảng mục lục mới với {0} đề mục!", headings.Count), "Mục Lục Tự Động", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(string.Format(AppL10n.T("Đã tạo bảng mục lục mới với {0} đề mục!", "Created Table of Contents with {0} heading(s)!"), headings.Count), AppL10n.T("Mục Lục Tự Động", "Table of Contents"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -7697,7 +9082,7 @@ namespace ZenQOffice.UI
         {
             SaveUndoState();
             string fullText = PieceTable.GetText();
-            int startFig = fullText.IndexOf("================== DANH MỤC HÌNH ẢNH ==================");
+            int startFig = fullText.IndexOf("================== DANH MỤC HÌNH ẢNH =================="); if (startFig < 0) startFig = fullText.IndexOf("================== LIST OF FIGURES ==================");
             int endFig = fullText.IndexOf("=========================================================");
             using (InsertTableOfFiguresForm figDlg = new InsertTableOfFiguresForm(this))
             {
@@ -7710,7 +9095,7 @@ namespace ZenQOffice.UI
                         PieceTable.Insert(startFig, figDlg.GeneratedTableOfFigures);
                         AdjustFormattedRunsOnDelete(startFig, totalEnd - startFig);
                         AdjustFormattedRunsOnInsert(startFig, figDlg.GeneratedTableOfFigures.Length);
-                        ZenQOffice.UI.FluentMessageBox.Show("Đã cập nhật danh mục hình ảnh thành công!", "Danh Mục Hình Ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã cập nhật danh mục hình ảnh thành công!", "Table of Figures updated successfully!"), AppL10n.T("Danh Mục Hình Ảnh", "Table of Figures"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else
                     {
@@ -7724,7 +9109,7 @@ namespace ZenQOffice.UI
         {
             SaveUndoState();
             string fullText = PieceTable.GetText();
-            int startIdx = fullText.IndexOf("================== CHỈ MỤC TỪ KHÓA (INDEX) ==================");
+            int startIdx = fullText.IndexOf("================== CHỈ MỤC TỪ KHÓA (INDEX) =================="); if (startIdx < 0) startIdx = fullText.IndexOf("================== DOCUMENT INDEX ==================");
             int endIdx = fullText.IndexOf("==============================================================");
             using (InsertIndexForm idxDlg = new InsertIndexForm(this))
             {
@@ -7737,7 +9122,7 @@ namespace ZenQOffice.UI
                         PieceTable.Insert(startIdx, idxDlg.GeneratedIndex);
                         AdjustFormattedRunsOnDelete(startIdx, totalEnd - startIdx);
                         AdjustFormattedRunsOnInsert(startIdx, idxDlg.GeneratedIndex.Length);
-                        ZenQOffice.UI.FluentMessageBox.Show("Đã cập nhật bảng chỉ mục thành công!", "Chỉ Mục Từ Khóa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã cập nhật bảng chỉ mục thành công!", "Index updated successfully!"), AppL10n.T("Chỉ Mục Từ Khóa", "Index"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else
                     {
@@ -7796,7 +9181,7 @@ namespace ZenQOffice.UI
             SaveUndoState();
             if (CitationSources == null || CitationSources.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Chưa có nguồn tài liệu tham khảo nào trong danh mục.\nVui lòng thêm nguồn trong 'Quản lý nguồn' trước khi chèn thư mục!", "Thư Mục Tài Liệu Tham Khảo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Chưa có nguồn tài liệu tham khảo nào trong danh mục.\nVui lòng thêm nguồn trong 'Quản lý nguồn' trước khi chèn thư mục!", "No citation sources found.\nPlease add sources in Manage Sources before inserting a bibliography!"), AppL10n.T("Thư Mục Tài Liệu Tham Khảo", "Bibliography"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -7874,12 +9259,12 @@ namespace ZenQOffice.UI
                     idx = insertAt + fullTag.Length;
                     count++;
                 }
-                ZenQOffice.UI.FluentMessageBox.Show(string.Format("Đã đánh dấu tất cả {0} vị trí xuất hiện của '{1}'!", count > 0 ? count : 1, mainEntry), "Đánh Dấu Mục", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(string.Format(AppL10n.T("Đã đánh dấu tất cả {0} vị trí xuất hiện của '{1}'!", "Marked all {0} occurrences of '{1}'!"), count > 0 ? count : 1, mainEntry), AppL10n.T("Đánh Dấu Mục", "Mark Entry"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
                 InsertText(fullTag);
-                ZenQOffice.UI.FluentMessageBox.Show(string.Format("Đã đánh dấu mục '{0}' tại vị trí con trỏ!", mainEntry), "Đánh Dấu Mục", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(string.Format(AppL10n.T("Đã đánh dấu mục '{0}' tại vị trí con trỏ!", "Marked index entry '{0}' at cursor!"), mainEntry), AppL10n.T("Đánh Dấu Mục", "Mark Entry"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -8162,8 +9547,27 @@ namespace ZenQOffice.UI
                         TableLogicalRowPages.Clear();
                         TableUnzoomedRowHeights.Clear();
 
+                        ColumnCount = meta.ColumnCount > 0 ? meta.ColumnCount : 1;
+                        ColumnPreset = !string.IsNullOrEmpty(meta.ColumnPreset) ? meta.ColumnPreset : "One";
+                        ColumnSpacingInches = meta.ColumnSpacingInches > 0 ? meta.ColumnSpacingInches : 0.5f;
+                        ColumnLineBetween = meta.ColumnLineBetween;
+                        ColumnEqualWidth = meta.ColumnEqualWidth;
+                        Column1WidthInches = meta.Column1WidthInches;
+                        SectionColumns = (meta.SectionColumns != null && meta.SectionColumns.Count > 0)
+                            ? CloneSectionColumns(meta.SectionColumns)
+                            : new Dictionary<int, WriterColumnSettings>();
+                        SectionHeadersFooters = (meta.SectionHeadersFooters != null && meta.SectionHeadersFooters.Count > 0)
+                            ? CloneSectionHeadersFooters(meta.SectionHeadersFooters)
+                            : new Dictionary<int, WriterSectionHeaderFooter>();
+
                         if (ribbon != null)
                         {
+                            ribbon.ColumnCount = ColumnCount;
+                            ribbon.ColumnPreset = ColumnPreset;
+                            ribbon.ColumnSpacingInches = ColumnSpacingInches;
+                            ribbon.ColumnLineBetween = ColumnLineBetween;
+                            ribbon.ColumnEqualWidth = ColumnEqualWidth;
+                            ribbon.Column1WidthInches = Column1WidthInches;
                             ribbon.IsLandscape = meta.IsLandscape;
                             ribbon.MarginMode = meta.MarginMode;
                             if (meta.PageWidthPt > 0 && meta.PageHeightPt > 0)
@@ -8210,7 +9614,7 @@ namespace ZenQOffice.UI
                         ScrollY = 0;
                         TargetScrollY = 0;
                         CurrentFilePath = filepath;
-                        if (ribbon != null && ribbon.ActiveDocIndex >= 0 && ribbon.ActiveDocIndex < ribbon.DocTabs.Count)
+                        if (ribbon != null && ribbon.ActiveDocIndex >= 0 && ribbon.ActiveDocIndex < ribbon.DocTabs.Count && ribbon.DocTabs[ribbon.ActiveDocIndex].Mode != OfficeAppMode.Home)
                         {
                             var activeTab = ribbon.DocTabs[ribbon.ActiveDocIndex];
                             activeTab.FilePath = filepath;
@@ -8232,6 +9636,17 @@ namespace ZenQOffice.UI
                             activeTab.WriterCustomRightMargin = ribbon.CustomRightMargin;
                             activeTab.WriterCustomTopMargin = ribbon.CustomTopMargin;
                             activeTab.WriterCustomBottomMargin = ribbon.CustomBottomMargin;
+                            activeTab.WriterColumnCount = ColumnCount;
+                            activeTab.WriterColumnPreset = ColumnPreset;
+                            activeTab.WriterColumnSpacingInches = ColumnSpacingInches;
+                            activeTab.WriterColumnLineBetween = ColumnLineBetween;
+                            activeTab.WriterColumnEqualWidth = ColumnEqualWidth;
+                            activeTab.WriterColumn1WidthInches = Column1WidthInches;
+                            activeTab.WriterSectionColumns = CloneSectionColumns(SectionColumns);
+                            activeTab.WriterIsMultiplePagesView = IsMultiplePagesView;
+                            activeTab.WriterIsSplitView = IsSplitView;
+                            activeTab.WriterSplitRatio = SplitRatio;
+                            activeTab.WriterSectionHeadersFooters = CloneSectionHeadersFooters(SectionHeadersFooters);
                             activeTab.WriterHeaderText = HeaderText;
                             activeTab.WriterHeaderTitleText = HeaderTitleText;
                             activeTab.WriterFooterText = FooterText;
@@ -8262,7 +9677,7 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    string text = File.ReadAllText(filepath, Encoding.UTF8);
+                    string text = (File.ReadAllText(filepath, Encoding.UTF8) ?? "").Replace("\r\n", "\n").Replace("\r", "\n");
                     ClearUndoRedo();
                     PieceTable = new PieceTable(text);
                     InvalidateLayoutAndTextCache();
@@ -8304,7 +9719,7 @@ namespace ZenQOffice.UI
                     ScrollY = 0;
                     TargetScrollY = 0;
                     CurrentFilePath = filepath;
-                    if (ribbon != null && ribbon.ActiveDocIndex >= 0 && ribbon.ActiveDocIndex < ribbon.DocTabs.Count)
+                    if (ribbon != null && ribbon.ActiveDocIndex >= 0 && ribbon.ActiveDocIndex < ribbon.DocTabs.Count && ribbon.DocTabs[ribbon.ActiveDocIndex].Mode != OfficeAppMode.Home)
                     {
                         var activeTab = ribbon.DocTabs[ribbon.ActiveDocIndex];
                         activeTab.FilePath = filepath;
@@ -8329,7 +9744,7 @@ namespace ZenQOffice.UI
             }
             catch (Exception ex)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Không thể mở tệp: " + ex.Message, "Lỗi mở tệp", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể mở tệp: ", "Unable to open file: ") + ex.Message, AppL10n.T("Lỗi mở tệp", "File Open Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
         }
@@ -8437,7 +9852,15 @@ namespace ZenQOffice.UI
                         HeaderRuns,
                         FooterRuns,
                         HeaderAlignment,
-                        FooterAlignment);
+                        FooterAlignment,
+                        ColumnCount,
+                        ColumnSpacingInches,
+                        ColumnLineBetween,
+                        ColumnPreset,
+                        ColumnEqualWidth,
+                        Column1WidthInches,
+                        SectionColumns,
+                        SectionHeadersFooters);
                 }
                 else if (ext == ".pdf")
                 {
@@ -8476,7 +9899,7 @@ namespace ZenQOffice.UI
                 if (saveOk && !isDraft)
                 {
                     CurrentFilePath = filepath;
-                    if (ribbon != null && ribbon.ActiveDocIndex >= 0 && ribbon.ActiveDocIndex < ribbon.DocTabs.Count)
+                    if (ribbon != null && ribbon.ActiveDocIndex >= 0 && ribbon.ActiveDocIndex < ribbon.DocTabs.Count && ribbon.DocTabs[ribbon.ActiveDocIndex].Mode != OfficeAppMode.Home)
                     {
                         ribbon.DocTabs[ribbon.ActiveDocIndex].FilePath = filepath;
                         ribbon.DocTabs[ribbon.ActiveDocIndex].Title = Path.GetFileName(filepath);
@@ -8489,7 +9912,7 @@ namespace ZenQOffice.UI
             {
                 if (!isDraft)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show("Không thể lưu tệp: " + ex.Message, "Lỗi lưu tệp", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể lưu tệp: ", "Unable to save file: ") + ex.Message, AppL10n.T("Lỗi lưu tệp", "File Save Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 return false;
             }
@@ -8521,6 +9944,25 @@ namespace ZenQOffice.UI
                 for (int i = 0; i < lines.Length; i++)
                 {
                     string line = lines[i];
+                    string trimLine = line.Trim();
+                    if (trimLine == "[--- PAGE BREAK ---]"
+                        || trimLine == "[--- SECTION BREAK (NEXT PAGE) ---]"
+                        || trimLine == "[--- SECTION BREAK (EVEN PAGE) ---]"
+                        || trimLine == "[--- SECTION BREAK (ODD PAGE) ---]"
+                        || trimLine.Contains("TRANG TRẮNG MỚI"))
+                    {
+                        page = new ZenQOffice.Core.PdfPageModel(pdfDoc.Pages.Count + 1, pw, ph);
+                        pdfDoc.Pages.Add(page);
+                        curY = marginY;
+                        continue;
+                    }
+                    if (trimLine == "[--- SECTION BREAK (CONTINUOUS) ---]"
+                        || trimLine == "[--- COLUMN BREAK ---]"
+                        || trimLine == "[--- COVER PAGE START ---]"
+                        || trimLine == "[--- COVER PAGE END ---]")
+                    {
+                        continue;
+                    }
 
                     if (curY + lineH > ph - marginY)
                     {
@@ -8617,13 +10059,13 @@ namespace ZenQOffice.UI
             try
             {
                 string fullText = PieceTable.GetText();
-                string[] paras = fullText.Replace("\r\n", "\n").Split('\n');
+                var paraSlices = ZenQOffice.Format.DocxHandler.SplitParagraphSlices(fullText); string[] paras = paraSlices.ConvertAll(s => s.Text).ToArray();
                 StringBuilder sb = new StringBuilder();
                 int charOffset = 0;
 
                 for (int p = 0; p < paras.Length; p++)
                 {
-                    string para = paras[p];
+                    charOffset = paraSlices[p].StartOffset; string para = paraSlices[p].Text;
                     if (para.Trim() == "[--- PAGE BREAK ---]" || para.Contains("TRANG TRẮNG MỚI"))
                     {
                         sb.AppendLine();
@@ -8698,7 +10140,7 @@ namespace ZenQOffice.UI
             try
             {
                 string fullText = PieceTable.GetText();
-                string[] paras = fullText.Replace("\r\n", "\n").Split('\n');
+                var paraSlices = ZenQOffice.Format.DocxHandler.SplitParagraphSlices(fullText); string[] paras = paraSlices.ConvertAll(s => s.Text).ToArray();
                 StringBuilder htmlSb = new StringBuilder();
                 string title = System.Net.WebUtility.HtmlEncode(Path.GetFileNameWithoutExtension(filepath));
                 htmlSb.AppendLine("<!DOCTYPE html>");
@@ -8719,7 +10161,7 @@ namespace ZenQOffice.UI
                 int charOffset = 0;
                 for (int pIdx = 0; pIdx < paras.Length; pIdx++)
                 {
-                    string p = paras[pIdx];
+                    charOffset = paraSlices[pIdx].StartOffset; string p = paraSlices[pIdx].Text;
                     if (p.Trim() == "[--- PAGE BREAK ---]" || p.Contains("TRANG TRẮNG MỚI"))
                     {
                         htmlSb.AppendLine("<hr class=\"page-break\" />");
@@ -9341,7 +10783,9 @@ namespace ZenQOffice.UI
                 }
 
                 TypingFont = fontName;
-                TypingFontSize = fontSize;
+                if (float.IsNaN(fontSize) || float.IsInfinity(fontSize) || fontSize <= 0f) fontSize = (TypingFontSize > 0f && !float.IsNaN(TypingFontSize)) ? TypingFontSize : 11f;
+            fontSize = Math.Max(1f, Math.Min(400f, fontSize));
+            TypingFontSize = fontSize;
             }
             else
             {
@@ -10226,16 +11670,68 @@ namespace ZenQOffice.UI
         }
 
         #region Complete Word Shortcuts Helper Methods
+        private static float ComputeSteppedFontSize(float baseSize, float delta, bool usePresetSteps)
+        {
+            float cur = (float.IsNaN(baseSize) || float.IsInfinity(baseSize) || baseSize <= 0f) ? 12f : baseSize;
+            if (!usePresetSteps)
+                return Math.Max(4f, Math.Min(400f, cur + delta));
+
+            if (delta >= 0f)
+            {
+                for (int i = 0; i < StandardFontSizes.Length; i++)
+                {
+                    if (StandardFontSizes[i] > cur + 0.01f)
+                        return StandardFontSizes[i];
+                }
+                return Math.Min(400f, cur + 2f);
+            }
+            for (int i = StandardFontSizes.Length - 1; i >= 0; i--)
+            {
+                if (StandardFontSizes[i] < cur - 0.01f)
+                    return StandardFontSizes[i];
+            }
+            return Math.Max(4f, cur - 2f);
+        }
+
+        private void StepSelectionOrTypingFontSize(float delta, bool usePresetSteps)
+        {
+            SaveUndoState();
+            Func<float, float> stepper = (sz) => ComputeSteppedFontSize(sz, delta, usePresetSteps);
+
+            if (SelectionStart != SelectionEnd)
+            {
+                int min = Math.Min(SelectionStart, SelectionEnd);
+                int len = Math.Abs(SelectionEnd - SelectionStart);
+                ApplyFormatToRangeCore(min, len, null, -1, null, null, null, null, null, null, null, null, stepper);
+                float headSize = GetFormatAt(min).FontSize;
+                TypingFontSize = (headSize > 0f && !float.IsNaN(headSize)) ? headSize : ComputeSteppedFontSize(TypingFontSize, delta, usePresetSteps);
+            }
+            else
+            {
+                TypingFontSize = ComputeSteppedFontSize(TypingFontSize, delta, usePresetSteps);
+                string full = PieceTable != null ? PieceTable.GetText() : "";
+                int wStart, wLen;
+                if (TryGetWordAt(CursorPosition, full, out wStart, out wLen))
+                {
+                    ApplyFormatToRangeCore(wStart, wLen, null, -1, null, null, null, null, null, null, null, null, stepper);
+                }
+            }
+
+            _lastFoundRun = null;
+            _lastFoundRunIndex = -1;
+            InvalidateLayoutAndTextCache();
+            if (InvalidateCallback != null) InvalidateCallback();
+        }
         public void IncreaseFontSize(float delta = 1f)
         {
-            float target = (TypingFontSize > 0 ? TypingFontSize : 12f) + delta;
-            ApplyFontSizeToSelectionOrTyping(target);
+            StepSelectionOrTypingFontSize(Math.Abs(delta) > 0f ? Math.Abs(delta) : 1f, usePresetSteps: false);
+            // Per-run stepped font size applied above
         }
 
         public void DecreaseFontSize(float delta = 1f)
         {
-            float target = Math.Max(4f, (TypingFontSize > 0 ? TypingFontSize : 12f) - delta);
-            ApplyFontSizeToSelectionOrTyping(target);
+            StepSelectionOrTypingFontSize(-(Math.Abs(delta) > 0f ? Math.Abs(delta) : 1f), usePresetSteps: false);
+            // Per-run stepped font size applied above
         }
 
         private static readonly float[] StandardFontSizes = new float[] { 8f, 9f, 10f, 11f, 12f, 14f, 16f, 18f, 20f, 22f, 24f, 26f, 28f, 36f, 48f, 72f };
@@ -10252,7 +11748,7 @@ namespace ZenQOffice.UI
                     break;
                 }
             }
-            ApplyFontSizeToSelectionOrTyping(next);
+            StepSelectionOrTypingFontSize(1f, usePresetSteps: true);
         }
 
         public void DecreaseFontSizePreset()
@@ -10267,7 +11763,7 @@ namespace ZenQOffice.UI
                     break;
                 }
             }
-            ApplyFontSizeToSelectionOrTyping(prev);
+            StepSelectionOrTypingFontSize(-1f, usePresetSteps: true);
         }
 
         public void ToggleSubscript()
@@ -11023,10 +12519,18 @@ namespace ZenQOffice.UI
 
         public void DrawNavigationPane(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
+            int curW = EffectiveNavPaneWidth;
+            if (curW <= 0) return;
             int paneW = 280;
             int paneTop = 155;
             int paneH = height - 155 - 26;
             if (paneH <= 50) return;
+
+            GraphicsState navSlideState = g.Save();
+            g.IntersectClip(new Rectangle(0, paneTop, curW, paneH));
+            if (curW < paneW) g.TranslateTransform(curW - paneW, 0);
+            try
+            {
 
             Rectangle paneRect = new Rectangle(0, paneTop, paneW, paneH);
 
@@ -11044,7 +12548,7 @@ namespace ZenQOffice.UI
             using (Font iconFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
             using (SolidBrush iconBrush = new SolidBrush(Color.FromArgb(96, 94, 92)))
             {
-                g.DrawString("Điều hướng", titleFont, titleBrush, 14, paneTop + 12);
+                g.DrawString(AppL10n.T("Điều hướng", "Navigation"), titleFont, titleBrush, 14, paneTop + 12);
                 g.DrawString("▾", iconFont, iconBrush, paneW - 48, paneTop + 16);
 
                 NavCloseBtnRect = new Rectangle(paneW - 28, paneTop + 14, 18, 18);
@@ -11118,16 +12622,17 @@ namespace ZenQOffice.UI
             using (SolidBrush inactiveText = new SolidBrush(Color.FromArgb(96, 94, 92)))
             {
                 // Tab 0: Tiêu đề
-                g.DrawString("Tiêu đề", NavActiveTab == 0 ? activeTabFont : tabFont, NavActiveTab == 0 ? activeBlue : inactiveText, NavTabHeadingsRect.X, NavTabHeadingsRect.Y + 3);
-                if (NavActiveTab == 0) g.FillRectangle(activeBlue, NavTabHeadingsRect.X, NavTabHeadingsRect.Y + 24, NavTabHeadingsRect.Width - 4, 3);
+                g.DrawString(AppL10n.T("Tiêu đề", "Headings"), NavActiveTab == 0 ? activeTabFont : tabFont, NavActiveTab == 0 ? activeBlue : inactiveText, NavTabHeadingsRect.X, NavTabHeadingsRect.Y + 3);
 
                 // Tab 1: Trang
-                g.DrawString("Trang", NavActiveTab == 1 ? activeTabFont : tabFont, NavActiveTab == 1 ? activeBlue : inactiveText, NavTabPagesRect.X, NavTabPagesRect.Y + 3);
-                if (NavActiveTab == 1) g.FillRectangle(activeBlue, NavTabPagesRect.X, NavTabPagesRect.Y + 24, NavTabPagesRect.Width - 4, 3);
+                g.DrawString(AppL10n.T("Trang", "Pages"), NavActiveTab == 1 ? activeTabFont : tabFont, NavActiveTab == 1 ? activeBlue : inactiveText, NavTabPagesRect.X, NavTabPagesRect.Y + 3);
 
                 // Tab 2: Kết quả
-                g.DrawString("Kết quả", NavActiveTab == 2 ? activeTabFont : tabFont, NavActiveTab == 2 ? activeBlue : inactiveText, NavTabResultsRect.X, NavTabResultsRect.Y + 3);
-                if (NavActiveTab == 2) g.FillRectangle(activeBlue, NavTabResultsRect.X, NavTabResultsRect.Y + 24, NavTabResultsRect.Width - 4, 3);
+                g.DrawString(AppL10n.T("Kết quả", "Results"), NavActiveTab == 2 ? activeTabFont : tabFont, NavActiveTab == 2 ? activeBlue : inactiveText, NavTabResultsRect.X, NavTabResultsRect.Y + 3);
+
+                float indX = (_navTabIndX >= 0f) ? _navTabIndX : ((NavActiveTab == 0) ? NavTabHeadingsRect.X : (NavActiveTab == 1 ? NavTabPagesRect.X : NavTabResultsRect.X));
+                float indW = (_navTabIndW > 0f) ? _navTabIndW : ((NavActiveTab == 0) ? 56f : (NavActiveTab == 1 ? 44f : 64f));
+                g.FillRectangle(activeBlue, indX, tabY + 24, indW, 3);
             }
 
             // 5. Tab Content Area
@@ -11135,8 +12640,8 @@ namespace ZenQOffice.UI
             int availContentH = paneH - 125;
             Rectangle contentClip = new Rectangle(0, contentY, paneW, availContentH);
 
-            var oldClip = g.Clip;
-            g.SetClip(contentClip);
+            GraphicsState navInnerClip = g.Save();
+            g.IntersectClip(contentClip);
 
             try
             {
@@ -11374,7 +12879,12 @@ namespace ZenQOffice.UI
             }
             finally
             {
-                g.Clip = oldClip;
+                g.Restore(navInnerClip);
+            }
+            }
+            finally
+            {
+                g.Restore(navSlideState);
             }
         }
 
@@ -11586,12 +13096,18 @@ namespace ZenQOffice.UI
 
         public void DrawSelectionPane(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
+            int curW = EffectiveSelectionPaneWidth;
+            if (curW <= 0) return;
             int paneW = 260;
             int paneTop = 155;
             int paneH = height - 155 - 26;
             if (paneH <= 50) return;
 
-            int paneX = width - paneW;
+            GraphicsState selSlideState = g.Save();
+            g.IntersectClip(new Rectangle(width - curW, paneTop, curW, paneH));
+            try
+            {
+            int paneX = width - curW;
             Rectangle paneRect = new Rectangle(paneX, paneTop, paneW, paneH);
 
             // 1. Nền và Viền trái
@@ -11652,8 +13168,8 @@ namespace ZenQOffice.UI
             int availListH = paneH - 78;
             Rectangle listClip = new Rectangle(paneX, listY, paneW, availListH);
 
-            var oldClip = g.Clip;
-            g.SetClip(listClip);
+            GraphicsState selInnerClip = g.Save();
+            g.IntersectClip(listClip);
 
             SelectionPaneItems.Clear();
 
@@ -11749,7 +13265,12 @@ namespace ZenQOffice.UI
             }
             finally
             {
-                g.Clip = oldClip;
+                g.Restore(selInnerClip);
+            }
+            }
+            finally
+            {
+                g.Restore(selSlideState);
             }
         }
 
@@ -11823,6 +13344,8 @@ namespace ZenQOffice.UI
         private static Font GetCachedFont(string fontName, float size, FontStyle style)
         {
             if (string.IsNullOrEmpty(fontName)) fontName = "Times New Roman";
+            if (float.IsNaN(size) || float.IsInfinity(size) || size <= 0f) size = 11f;
+            else size = Math.Max(0.5f, size);
             string key = fontName + "_" + size.ToString("F2") + "_" + (int)style;
             Font f;
             if (!FontCache.TryGetValue(key, out f))
@@ -12003,15 +13526,42 @@ namespace ZenQOffice.UI
             public float MeasuredWidth;
             public int ParaStartIndex;
             public float ParaLeftX;
+            public int ColLeftX;
+            public int ColRightX;
+            public int ColumnIndex;
+            public int PageIndex;
         }
-
         public struct LineSlot
         {
             public float StartX;
             public float Width;
+            public float LogicalWidth;
             public float LineY;
             public float LineHeight;
             public int PageIndex;
+            public int ColumnIndex;
+            public int ColLeftX;
+            public int ColRightX;
+        }
+
+        private float GetEffectiveTopMarginLogical(RibbonBar ribbon)
+        {
+            if (ViewMode == 3 || ViewMode == 4) return 16f;
+            float topM = (ribbon != null ? ribbon.GetEffectiveTopMarginInches() : 1.0f) * 96f;
+            if (CurrentHeaderPreset != HeaderFooterPreset.None || IsEditingHeaderFooter || !string.IsNullOrEmpty(HeaderText) || (HeaderRuns != null && HeaderRuns.Count > 0) || (HeaderEvenRuns != null && HeaderEvenRuns.Count > 0))
+            {
+                if (CurrentHeaderPreset != HeaderFooterPreset.Banded || HeaderBannerYOffset <= 10)
+                    topM = Math.Max(topM, 44f);
+            }
+            return topM;
+        }
+        private struct ColBandSpan
+        {
+            public int PageIndex;
+            public WriterColumnSettings Cols;
+            public float BandTopY;
+            public float BandBottomY;
+            public int MaxPopulatedColIdx;
         }
 
         private static readonly Dictionary<string, float> _fontLineSpacingRatios = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
@@ -12047,12 +13597,24 @@ namespace ZenQOffice.UI
             return ratio;
         }
 
-        private List<LineSlot> GetLineSlotsForY(ref float currentY, float lineH, int textX, int maxTextW, int startPageY, ref int currentPage, int pageH, int bottomMarginY, int topMarginY = -1, RibbonBar ribbon = null)
+        private List<LineSlot> GetLineSlotsForY(ref float currentY, float lineH, int textX, int maxTextW, int startPageY, ref int currentPage, int pageH, int bottomMarginY, int topMarginY, RibbonBar ribbon,
+            ref int activeColIdx, ref float colRegionTopY, ref float bandMaxBottomY, WriterColumnSettings activeCols, int pageTextX, float baseMaxTextW, int indentLeftPx, int indentRightPx, int colScreenX, int colScreenW, float logicalSlotMaxW = 0f)
         {
             if (topMarginY < 0) topMarginY = bottomMarginY;
+            float z = Math.Max(0.01f, ZoomLevel);
+            float tol = 2.0f * z;
+            float fGap = 10.0f * z;
+            float effLogicalMaxW = logicalSlotMaxW > 0f ? logicalSlotMaxW : (maxTextW / z);
             List<LineSlot> slots = new List<LineSlot>();
+            int curColX = colScreenX;
+            int curColW = colScreenW;
 
             // 1. Top and Bottom (WrapMode == 4): Nhảy hoàn toàn xuống dưới đáy của đối tượng
+            float logicalTopMargin = GetEffectiveTopMarginLogical(ribbon);
+            float leftMarginLogical = (ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96f;
+            float pageOriginX = pageTextX - (float)Math.Round(leftMarginLogical * z);
+            bool allowLogicalBounds = (!IsDraggingShape && DragShapeHandleIndex < 0 && !IsDraggingChart && DragChartHandleIndex < 0);
+
             bool jumped = true;
             while (jumped)
             {
@@ -12061,9 +13623,11 @@ namespace ZenQOffice.UI
                 {
                     if (sh.WrapMode == 4 && !sh.LastBounds.IsEmpty)
                     {
-                        if (currentY + lineH > sh.LastBounds.Top - 2 && currentY < sh.LastBounds.Bottom + 2)
+                        float oTop = allowLogicalBounds ? (startPageY + sh.PageNumber * (pageH + PageGap) + logicalTopMargin * z + sh.PageY * z) : sh.LastBounds.Top;
+                        float oBot = allowLogicalBounds ? (oTop + Math.Max(15f, sh.BaseHeight + sh.HeightDelta) * z) : sh.LastBounds.Bottom;
+                        if (currentY + lineH > oTop - tol && currentY < oBot + tol)
                         {
-                            currentY = sh.LastBounds.Bottom + (int)(10 * ZoomLevel);
+                            currentY = oBot + fGap;
                             jumped = true;
                             break;
                         }
@@ -12073,9 +13637,11 @@ namespace ZenQOffice.UI
                 {
                     if (ch.WrapMode == 4 && !ch.LastBounds.IsEmpty)
                     {
-                        if (currentY + lineH > ch.LastBounds.Top - 2 && currentY < ch.LastBounds.Bottom + 2)
+                        float oTop = allowLogicalBounds ? (startPageY + ch.PageNumber * (pageH + PageGap) + logicalTopMargin * z + ch.PageY * z) : ch.LastBounds.Top;
+                        float oBot = allowLogicalBounds ? (oTop + Math.Max(120f, ch.BaseHeight + ch.HeightDelta) * z) : ch.LastBounds.Bottom;
+                        if (currentY + lineH > oTop - tol && currentY < oBot + tol)
                         {
-                            currentY = ch.LastBounds.Bottom + (int)(10 * ZoomLevel);
+                            currentY = oBot + fGap;
                             jumped = true;
                             break;
                         }
@@ -12088,9 +13654,9 @@ namespace ZenQOffice.UI
                     if (tWrap == 4)
                     {
                         Rectangle tb = kvp.Value;
-                        if (!tb.IsEmpty && currentY + lineH > tb.Top - 2 && currentY < tb.Bottom + 2)
+                        if (!tb.IsEmpty && currentY + lineH > tb.Top - tol && currentY < tb.Bottom + tol)
                         {
-                            currentY = tb.Bottom + (int)(10 * ZoomLevel);
+                            currentY = tb.Bottom + fGap;
                             jumped = true;
                             break;
                         }
@@ -12106,47 +13672,85 @@ namespace ZenQOffice.UI
             }
             float logicalPageH = baseH_inches * 96f;
             float logicalBottomMargin = (ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f) * 96f;
-            float logicalTopMargin = (ribbon != null ? ribbon.GetEffectiveTopMarginInches() : 1.0f) * 96f;
 
-            float pageBottomY = startPageY + currentPage * (pageH + PageGap) + (logicalPageH - logicalBottomMargin) * ZoomLevel;
+            float pageBottomY = (ViewMode == 3 || ViewMode == 4 || ViewMode == 2) ? 1e9f : (startPageY + currentPage * (pageH + PageGap) + (logicalPageH - logicalBottomMargin) * z);
 
-            if (currentY + lineH > pageBottomY + 0.5f * ZoomLevel)
+            if (currentY + lineH > pageBottomY + 0.5f * z)
             {
-                currentPage++;
-                float newPageTopY = logicalTopMargin * ZoomLevel;
-                currentY = startPageY + currentPage * (pageH + PageGap) + newPageTopY;
+                bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
+                if (activeCols != null && activeCols.ColumnCount > 1 && activeColIdx + 1 < activeCols.ColumnCount)
+                {
+                    activeColIdx++;
+                    currentY = colRegionTopY;
+                    float _cOff, _cW;
+                    ComputeColumnBounds(activeCols, baseMaxTextW, ZoomLevel, pageTextX, activeColIdx, out _cOff, out _cW, out curColX, out curColW);
+                    textX = curColX + indentLeftPx;
+                    maxTextW = Math.Max(16, curColW - indentLeftPx - indentRightPx);
+                    effLogicalMaxW = Math.Max(16f, _cW - (indentLeftPx + indentRightPx) / z);
+                }
+                else
+                {
+                    currentPage++;
+                    activeColIdx = 0;
+                    float newPageTopY = logicalTopMargin * z;
+                    currentY = startPageY + currentPage * (pageH + PageGap) + newPageTopY;
+                    colRegionTopY = currentY;
+                    bandMaxBottomY = currentY;
+                    if (activeCols != null && activeCols.ColumnCount > 1)
+                    {
+                        float _cOff, _cW;
+                        ComputeColumnBounds(activeCols, baseMaxTextW, ZoomLevel, pageTextX, 0, out _cOff, out _cW, out curColX, out curColW);
+                        textX = curColX + indentLeftPx;
+                        maxTextW = Math.Max(16, curColW - indentLeftPx - indentRightPx);
+                        effLogicalMaxW = Math.Max(16f, _cW - (indentLeftPx + indentRightPx) / z);
+                    }
+                }
             }
 
-            // 2. Square (1), Tight (2), Through (3): Tính toán các khe trống Trái & Phải
-            Rectangle sideObstacle = Rectangle.Empty;
-            int gap = (int)(10 * ZoomLevel);
+            // 2. Square (1), Tight (2), Through (3): Tính toán các khe trống Trái & Phải theo hệ tọa độ logic bất biến zoom
+            float sideLeftLog = 0f, sideRightLog = 0f, sideBottomScreen = 0f;
+            bool hasSideObstacle = false;
+            float lineScreenLeftF = pageOriginX + leftMarginLogical * z + (curColX - pageTextX) + indentLeftPx;
+            float curIndentLeftLog = ((curColX - pageTextX) + indentLeftPx) / z;
+            float curTextLogLeft = leftMarginLogical + curIndentLeftLog;
+            float curTextLogRight = curTextLogLeft + effLogicalMaxW;
 
             foreach (var sh in DocumentShapes)
             {
                 if ((sh.WrapMode == 1 || sh.WrapMode == 2 || sh.WrapMode == 3) && !sh.LastBounds.IsEmpty)
                 {
-                    if (currentY + lineH > sh.LastBounds.Top - 2 && currentY < sh.LastBounds.Bottom + 2)
+                    float oTop = allowLogicalBounds ? (startPageY + sh.PageNumber * (pageH + PageGap) + logicalTopMargin * z + sh.PageY * z) : sh.LastBounds.Top;
+                    float oBot = allowLogicalBounds ? (oTop + Math.Max(15f, sh.BaseHeight + sh.HeightDelta) * z) : sh.LastBounds.Bottom;
+                    if (currentY + lineH > oTop - tol && currentY < oBot + tol)
                     {
-                        sideObstacle = sh.LastBounds;
+                        sideLeftLog = allowLogicalBounds ? sh.PageX : ((sh.LastBounds.Left - pageOriginX) / z);
+                        sideRightLog = allowLogicalBounds ? (sh.PageX + Math.Max(20f, sh.BaseWidth + sh.WidthDelta)) : ((sh.LastBounds.Right - pageOriginX) / z);
+                        sideBottomScreen = oBot;
+                        hasSideObstacle = true;
                         break;
                     }
                 }
             }
-            if (sideObstacle.IsEmpty)
+            if (!hasSideObstacle)
             {
                 foreach (var ch in DocumentCharts)
                 {
                     if ((ch.WrapMode == 1 || ch.WrapMode == 2 || ch.WrapMode == 3) && !ch.LastBounds.IsEmpty)
                     {
-                        if (currentY + lineH > ch.LastBounds.Top - 2 && currentY < ch.LastBounds.Bottom + 2)
+                        float oTop = allowLogicalBounds ? (startPageY + ch.PageNumber * (pageH + PageGap) + logicalTopMargin * z + ch.PageY * z) : ch.LastBounds.Top;
+                        float oBot = allowLogicalBounds ? (oTop + Math.Max(120f, ch.BaseHeight + ch.HeightDelta) * z) : ch.LastBounds.Bottom;
+                        if (currentY + lineH > oTop - tol && currentY < oBot + tol)
                         {
-                            sideObstacle = ch.LastBounds;
+                            sideLeftLog = allowLogicalBounds ? ch.PageX : ((ch.LastBounds.Left - pageOriginX) / z);
+                            sideRightLog = allowLogicalBounds ? (ch.PageX + Math.Max(200f, ch.BaseWidth + ch.HeightDelta)) : ((ch.LastBounds.Right - pageOriginX) / z);
+                            sideBottomScreen = oBot;
+                            hasSideObstacle = true;
                             break;
                         }
                     }
                 }
             }
-            if (sideObstacle.IsEmpty)
+            if (!hasSideObstacle)
             {
                 foreach (var kvp in TableFloatingBounds)
                 {
@@ -12155,46 +13759,76 @@ namespace ZenQOffice.UI
                     if (tWrap == 1 || tWrap == 2 || tWrap == 3)
                     {
                         Rectangle tb = kvp.Value;
-                        if (!tb.IsEmpty && currentY + lineH > tb.Top - 2 && currentY < tb.Bottom + 2)
+                        if (!tb.IsEmpty && currentY + lineH > tb.Top - tol && currentY < tb.Bottom + tol)
                         {
-                            sideObstacle = tb;
+                            sideLeftLog = (tb.Left - pageOriginX) / z;
+                            sideRightLog = (tb.Right - pageOriginX) / z;
+                            sideBottomScreen = tb.Bottom;
+                            hasSideObstacle = true;
                             break;
                         }
                     }
                 }
             }
 
-            if (sideObstacle.IsEmpty)
+            if (!hasSideObstacle)
             {
-                slots.Add(new LineSlot { StartX = textX, Width = maxTextW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage });
+                slots.Add(new LineSlot { StartX = textX, Width = maxTextW, LogicalWidth = effLogicalMaxW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage, ColumnIndex = activeColIdx, ColLeftX = curColX, ColRightX = curColX + curColW });
                 return slots;
             }
 
-            int minUsable = (int)(45 * ZoomLevel);
-            int leftW = sideObstacle.Left - textX - gap;
-            int rightStart = sideObstacle.Right + gap;
-            int rightW = (textX + maxTextW) - rightStart;
+            const float minUsableLog = 45.0f;
+            const float gapLog = 10.0f;
+            float leftLogW = sideLeftLog - curTextLogLeft - gapLog;
+            float rightLogStart = sideRightLog + gapLog;
+            float rightLogW = curTextLogRight - rightLogStart;
 
-            if (leftW >= minUsable)
+            if (leftLogW >= minUsableLog)
             {
-                slots.Add(new LineSlot { StartX = textX, Width = leftW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage });
+                slots.Add(new LineSlot { StartX = textX, Width = leftLogW * z, LogicalWidth = leftLogW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage, ColumnIndex = activeColIdx, ColLeftX = curColX, ColRightX = curColX + curColW });
             }
-            if (rightW >= minUsable)
+            if (rightLogW >= minUsableLog)
             {
-                slots.Add(new LineSlot { StartX = rightStart, Width = rightW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage });
+                float rightStartScreenX = pageOriginX + rightLogStart * z;
+                slots.Add(new LineSlot { StartX = rightStartScreenX, Width = rightLogW * z, LogicalWidth = rightLogW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage, ColumnIndex = activeColIdx, ColLeftX = curColX, ColRightX = curColX + curColW });
             }
 
             if (slots.Count == 0)
             {
-                currentY = sideObstacle.Bottom + gap;
-                float pageBottomY2 = startPageY + currentPage * (pageH + PageGap) + (logicalPageH - logicalBottomMargin) * ZoomLevel;
-                if (currentY + lineH > pageBottomY2 + 0.5f * ZoomLevel)
+                currentY = sideBottomScreen + fGap;
+                float pageBottomY2 = startPageY + currentPage * (pageH + PageGap) + (logicalPageH - logicalBottomMargin) * z;
+                if (currentY + lineH > pageBottomY2 + 0.5f * z)
                 {
-                    currentPage++;
-                    float newPageTopY = logicalTopMargin * ZoomLevel;
-                    currentY = startPageY + currentPage * (pageH + PageGap) + newPageTopY;
+                    bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
+                    if (activeCols != null && activeCols.ColumnCount > 1 && activeColIdx + 1 < activeCols.ColumnCount)
+                    {
+                        activeColIdx++;
+                        currentY = colRegionTopY;
+                        float _cOff, _cW;
+                        ComputeColumnBounds(activeCols, baseMaxTextW, ZoomLevel, pageTextX, activeColIdx, out _cOff, out _cW, out curColX, out curColW);
+                        textX = curColX + indentLeftPx;
+                        maxTextW = Math.Max(16, curColW - indentLeftPx - indentRightPx);
+                        effLogicalMaxW = Math.Max(16f, _cW - (indentLeftPx + indentRightPx) / z);
+                    }
+                    else
+                    {
+                        currentPage++;
+                        activeColIdx = 0;
+                        float newPageTopY = logicalTopMargin * z;
+                        currentY = startPageY + currentPage * (pageH + PageGap) + newPageTopY;
+                        colRegionTopY = currentY;
+                        bandMaxBottomY = currentY;
+                        if (activeCols != null && activeCols.ColumnCount > 1)
+                        {
+                            float _cOff, _cW;
+                            ComputeColumnBounds(activeCols, baseMaxTextW, ZoomLevel, pageTextX, 0, out _cOff, out _cW, out curColX, out curColW);
+                            textX = curColX + indentLeftPx;
+                            maxTextW = Math.Max(16, curColW - indentLeftPx - indentRightPx);
+                            effLogicalMaxW = Math.Max(16f, _cW - (indentLeftPx + indentRightPx) / z);
+                        }
+                    }
                 }
-                slots.Add(new LineSlot { StartX = textX, Width = maxTextW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage });
+                slots.Add(new LineSlot { StartX = textX, Width = maxTextW, LogicalWidth = effLogicalMaxW, LineY = currentY, LineHeight = lineH, PageIndex = currentPage, ColumnIndex = activeColIdx, ColLeftX = curColX, ColRightX = curColX + curColW });
             }
 
             return slots;
@@ -12211,8 +13845,16 @@ namespace ZenQOffice.UI
             public List<WrapLineInfo> Lines;
             public float FinalYOffset;
             public int FinalPage;
+            public int StartColIdx;
+            public int FinalColIdx;
+            public float StartColTopYOffset;
+            public float FinalColTopYOffset;
+            public float FinalBandMaxBottomYOffset;
+            public string ColSig;
+            public int SectionIdx;
         }
         private Dictionary<int, ParaLayoutCache> _paraLayoutCache = new Dictionary<int, ParaLayoutCache>();
+        private string _lastLayoutColSig = "";
         private int _lastLayoutTextVersion = -1;
         private int _lastLayoutRunsHash = 0;
         private float _lastLayoutZoom = 0;
@@ -12237,6 +13879,7 @@ namespace ZenQOffice.UI
             _lastLayoutTextX = -1;
             _lastLayoutPageX = -1;
             _lastLayoutViewMode = -1;
+            _lastLayoutColSig = "";
             _lastShapesScannedVersion = -1;
             if (_paraLayoutCache != null) _paraLayoutCache.Clear();
             DocShapeObject.ClearTagParseCache();
@@ -12244,8 +13887,20 @@ namespace ZenQOffice.UI
             if (_wordMeasureCache != null) _wordMeasureCache.Clear();
         }
 
-        private List<WrapLineInfo> LayoutParagraphLines(string para, int paraStartIndex, ref float currentY, ref int currentPage, int startPageY, int pageH, int marginY, int bottomMarginY, int textX, int maxTextW, D2DGraphics g, RibbonBar ribbon)
+        private List<WrapLineInfo> LayoutParagraphLines(string para, int paraStartIndex, ref float currentY, ref int currentPage, int startPageY, int pageH, int marginY, int bottomMarginY, int textX, int maxTextW, D2DGraphics g, RibbonBar ribbon, ref int activeColIdx, ref float colRegionTopY, ref float bandMaxBottomY, WriterColumnSettings activeCols, int activeSectionIdx, string activeColsSig)
         {
+            if (paraStartIndex > 0 && ParagraphPageBreakBefore.ContainsKey(paraStartIndex) && ParagraphPageBreakBefore[paraStartIndex])
+            {
+                float pageTopBodyY = startPageY + currentPage * (pageH + PageGap) + marginY;
+                if (currentY > pageTopBodyY + 2f || activeColIdx > 0)
+                {
+                    currentPage++;
+                    activeColIdx = 0;
+                    currentY = startPageY + currentPage * (pageH + PageGap) + marginY;
+                    colRegionTopY = currentY;
+                    bandMaxBottomY = currentY;
+                }
+            }
             float pBefore = (ParagraphSpacingsBefore.ContainsKey(paraStartIndex)) ? ParagraphSpacingsBefore[paraStartIndex] : (ribbon != null ? ribbon.ParagraphSpacingBefore : 0f);
             if (pBefore > 0)
             {
@@ -12261,13 +13916,19 @@ namespace ZenQOffice.UI
             float pRight = GetRightIndent(paraStartIndex);
 
             float yOffset = currentY - startPageY;
+            float startColTopYOffset = colRegionTopY - startPageY;
+            int startColIdx = activeColIdx;
             ParaLayoutCache cache = null;
             if (_paraLayoutCache.TryGetValue(paraStartIndex, out cache))
             {
-                if (cache.Text == para && cache.Zoom == ZoomLevel && cache.MaxW == maxTextW && cache.TextX == textX && Math.Abs(cache.CurrentYOffset - yOffset) < 0.05f)
+                if (cache.Text == para && cache.Zoom == ZoomLevel && cache.MaxW == maxTextW && cache.TextX == textX && Math.Abs(cache.CurrentYOffset - yOffset) < 0.05f
+                    && cache.SectionIdx == activeSectionIdx && cache.ColSig == activeColsSig && cache.StartColIdx == startColIdx && Math.Abs(cache.StartColTopYOffset - startColTopYOffset) < 0.05f)
                 {
                     currentY = startPageY + cache.FinalYOffset;
                     currentPage = cache.FinalPage;
+                    activeColIdx = cache.FinalColIdx;
+                    colRegionTopY = startPageY + cache.FinalColTopYOffset;
+                    bandMaxBottomY = startPageY + cache.FinalBandMaxBottomYOffset;
                     List<WrapLineInfo> cachedResult = new List<WrapLineInfo>(cache.Lines.Count);
                     foreach (var l in cache.Lines)
                     {
@@ -12298,25 +13959,18 @@ namespace ZenQOffice.UI
                 float logicalLH = Math.Max(12.0f, pFontSize * 1.333333f * fontRatio) * pLineSpacing;
                 float lH = logicalLH * ZoomLevel;
                 float indentScale = 1.333333f;
-                float baseW_inches = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
-                float baseH_inches = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
-                if (ribbon != null && ribbon.IsLandscape)
-                {
-                    baseW_inches = Math.Max(baseW_inches, baseH_inches);
-                }
-                else
-                {
-                    baseW_inches = Math.Min(baseW_inches, baseH_inches);
-                }
-                float basePageW = baseW_inches * 96f;
-                float baseLeftM = (ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96f;
-                float baseRightM = (ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f) * 96f;
-                float baseMaxTextW = (basePageW - baseLeftM - baseRightM);
+                float baseMaxTextW = GetBaseBodyLogicalWidth(ribbon);
+                float colLogOff, colLogW;
+                int colScreenX, colScreenW;
+                ComputeColumnBounds(activeCols, baseMaxTextW, ZoomLevel, textX, activeColIdx, out colLogOff, out colLogW, out colScreenX, out colScreenW);
                 float logicalIndent = (pLeft + pFirstLine + pRight) * indentScale;
-                float logicalMaxW = Math.Max(30f, baseMaxTextW - logicalIndent);
-                int effMaxW = (int)Math.Round(logicalMaxW * ZoomLevel);
-                int effStartX = textX + (int)Math.Round((pLeft + pFirstLine) * indentScale * ZoomLevel);
-                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY, ribbon);
+                float logicalMaxW = Math.Max(30f, colLogW - logicalIndent);
+                int indentLeftPx = (int)Math.Round((pLeft + pFirstLine) * indentScale * ZoomLevel);
+                int indentRightPx = (int)Math.Round(pRight * indentScale * ZoomLevel);
+                int effMaxW = Math.Max(16, (int)Math.Round(logicalMaxW * ZoomLevel));
+                int effStartX = colScreenX + indentLeftPx;
+                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY, ribbon,
+                    ref activeColIdx, ref colRegionTopY, ref bandMaxBottomY, activeCols, textX, baseMaxTextW, indentLeftPx, indentRightPx, colScreenX, colScreenW, logicalMaxW);
                 var slot = slots[0];
 
                 result.Add(new WrapLineInfo
@@ -12328,22 +13982,32 @@ namespace ZenQOffice.UI
                     Width = slot.Width,
                     LineY = slot.LineY,
                     LineHeight = lH,
-                    MaxFontSize = TypingFontSize,
+                    MaxFontSize = Math.Max(1f, TypingFontSize),
                     IsLastInPara = true,
                     MeasuredWidth = 0f,
                     ParaStartIndex = paraStartIndex,
-                    ParaLeftX = textX + (int)Math.Round((pLeft * 1.333333f) * ZoomLevel)
+                    ParaLeftX = slot.ColLeftX + (int)Math.Round((pLeft * 1.333333f) * ZoomLevel),
+                    ColLeftX = slot.ColLeftX,
+                    ColRightX = slot.ColRightX,
+                    ColumnIndex = slot.ColumnIndex,
+                    PageIndex = slot.PageIndex
                 });
                 currentY += lH;
+                bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
                 if (pAfter > 0)
                 {
                     currentY += pAfter * ZoomLevel;
+                    bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
                 }
-                
+
                 _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
                     Text = para, Zoom = ZoomLevel, MaxW = maxTextW, TextX = textX,
                     CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
                     FinalYOffset = currentY - startPageY, FinalPage = currentPage,
+                    StartColIdx = startColIdx, FinalColIdx = activeColIdx,
+                    StartColTopYOffset = startColTopYOffset, FinalColTopYOffset = colRegionTopY - startPageY,
+                    FinalBandMaxBottomYOffset = bandMaxBottomY - startPageY,
+                    ColSig = activeColsSig, SectionIdx = activeSectionIdx,
                     Lines = result.ConvertAll(l => { var cl = l; cl.LineY -= startPageY; return cl; })
                 };
                 return result;
@@ -12424,24 +14088,45 @@ namespace ZenQOffice.UI
             int tokenIdx = 0;
             while (tokenIdx < tokens.Count)
             {
-                // First line uses (pLeft + pFirstLine), following lines use (pLeft + pHanging)
-                float indentScale = 1.333333f;
-                float baseW_inches = (ribbon != null && ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
-                float baseH_inches = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
+                // Pre-check column/page transition so line wraps to exact target column width
+                float estFontRatio = GetFontLineSpacingRatio(TypingFont);
+                float estTokFS = Math.Max(TypingFontSize, tokenMaxFontSizes[tokenIdx]);
+                float estLH = Math.Max(13.5f, estTokFS * 1.333333f * estFontRatio) * pLineSpacing * ZoomLevel;
+                float peekH_in = (ribbon != null && ribbon.PaperHeightInches > 0) ? ribbon.PaperHeightInches : 11.69f;
                 if (ribbon != null && ribbon.IsLandscape)
                 {
-                    baseW_inches = Math.Max(baseW_inches, baseH_inches);
+                    float pbW = (ribbon.PaperWidthInches > 0) ? ribbon.PaperWidthInches : 8.27f;
+                    peekH_in = Math.Min(pbW, peekH_in);
                 }
-                else
+                float peekBottomMargin = (ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f) * 96f;
+                float peekTopMargin = GetEffectiveTopMarginLogical(ribbon);
+                float peekPageBottomY = startPageY + currentPage * (pageH + PageGap) + (peekH_in * 96f - peekBottomMargin) * ZoomLevel;
+                if (currentY + estLH > peekPageBottomY + 0.5f * ZoomLevel)
                 {
-                    baseW_inches = Math.Min(baseW_inches, baseH_inches);
+                    bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
+                    if (activeCols != null && activeCols.ColumnCount > 1 && activeColIdx + 1 < activeCols.ColumnCount)
+                    {
+                        activeColIdx++;
+                        currentY = colRegionTopY;
+                    }
+                    else
+                    {
+                        currentPage++;
+                        activeColIdx = 0;
+                        currentY = startPageY + currentPage * (pageH + PageGap) + peekTopMargin * ZoomLevel;
+                        colRegionTopY = currentY;
+                        bandMaxBottomY = currentY;
+                    }
                 }
-                float basePageW = baseW_inches * 96f;
-                float baseLeftM = (ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96f;
-                float baseRightM = (ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f) * 96f;
-                float baseMaxTextW = (basePageW - baseLeftM - baseRightM);
+
+                // First line uses (pLeft + pFirstLine), following lines use (pLeft + pHanging)
+                float indentScale = 1.333333f;
+                float baseMaxTextW = GetBaseBodyLogicalWidth(ribbon);
+                float colLogOff, colLogW;
+                int colScreenX, colScreenW;
+                ComputeColumnBounds(activeCols, baseMaxTextW, ZoomLevel, textX, activeColIdx, out colLogOff, out colLogW, out colScreenX, out colScreenW);
                 float logicalIndent = (result.Count == 0) ? (pLeft + pFirstLine + pRight) * indentScale : (pLeft + pHanging + pRight) * indentScale;
-                float logicalMaxW = Math.Max(30f, baseMaxTextW - logicalIndent);
+                float logicalMaxW = Math.Max(30f, colLogW - logicalIndent);
 
                 // Indent lines that wrap alongside the Drop Cap
                 if (dcInfo != null && !dcInfo.InMargin && result.Count < dcInfo.Lines)
@@ -12449,10 +14134,13 @@ namespace ZenQOffice.UI
                     logicalMaxW = Math.Max(30f, logicalMaxW - dcIndentW);
                 }
 
-                int effMaxW = (int)Math.Round(logicalMaxW * ZoomLevel);
-                float logicalStartX = (result.Count == 0) ? (pLeft + pFirstLine) * indentScale : (pLeft + pHanging) * indentScale;
-                if (dcInfo != null && !dcInfo.InMargin && result.Count < dcInfo.Lines) logicalStartX += dcIndentW;
-                int effStartX = textX + (int)Math.Round(logicalStartX * ZoomLevel);
+                int effMaxW = Math.Max(16, (int)Math.Round(logicalMaxW * ZoomLevel));
+                float logicalStartInCol = (result.Count == 0) ? (pLeft + pFirstLine) * indentScale : (pLeft + pHanging) * indentScale;
+                if (dcInfo != null && !dcInfo.InMargin && result.Count < dcInfo.Lines) logicalStartInCol += dcIndentW;
+                float logicalStartX = colLogOff + logicalStartInCol;
+                int indentLeftPx = (int)Math.Round(logicalStartInCol * ZoomLevel);
+                int indentRightPx = (int)Math.Round(pRight * indentScale * ZoomLevel);
+                int effStartX = colScreenX + indentLeftPx;
 
                 // Step 1: Scan which tokens ACTUALLY fit on this line!
                 int startTok = tokenIdx;
@@ -12470,7 +14158,7 @@ namespace ZenQOffice.UI
                     // (trước đây đo độc lập từ 0 khiến tab bị tính quá rộng -> xuống dòng sai)
                     if (tok.IndexOf('\t') >= 0)
                     {
-                        float paraLeftLogical = pLeft * indentScale;
+                        float paraLeftLogical = colLogOff + pLeft * indentScale;
                         float curLogicalX = logicalStartX + logicalCurW;
                         float adv = curLogicalX;
                         int segStart = 0;
@@ -12623,7 +14311,8 @@ namespace ZenQOffice.UI
                 float lH = logicalLH * ZoomLevel;
 
                 // Step 3: Check pagination and floating obstacles for this line height
-                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY, ribbon);
+                var slots = GetLineSlotsForY(ref currentY, lH, effStartX, effMaxW, startPageY, ref currentPage, pageH, bottomMarginY, marginY, ribbon,
+                    ref activeColIdx, ref colRegionTopY, ref bandMaxBottomY, activeCols, textX, baseMaxTextW, indentLeftPx, indentRightPx, colScreenX, colScreenW, logicalMaxW);
 
                 // Step 4: Populate line(s) into slots
                 foreach (var slot in slots)
@@ -12635,7 +14324,7 @@ namespace ZenQOffice.UI
                     float slotLogicalCurW = 0;
                     int firstInSlot = tokenIdx;
                     float slotMaxFS = 11.0f;
-                    float slotLogicalSlotW = (slot.Width >= effMaxW - 5) ? logicalMaxW : (slot.Width / Math.Max(0.01f, ZoomLevel));
+                    float slotLogicalSlotW = slot.LogicalWidth > 0f ? slot.LogicalWidth : ((slot.Width >= effMaxW - 5 && slot.ColumnIndex == activeColIdx) ? logicalMaxW : (slot.Width / Math.Max(0.01f, ZoomLevel)));
 
                     while (tokenIdx < endTok)
                     {
@@ -12671,22 +14360,32 @@ namespace ZenQOffice.UI
                         IsLastInPara = isLast,
                         MeasuredWidth = (float)Math.Round(slotLogicalCurW * ZoomLevel),
                         ParaStartIndex = paraStartIndex,
-                        ParaLeftX = textX + (int)Math.Round((pLeft * 1.333333f) * ZoomLevel)
+                        ParaLeftX = slot.ColLeftX + (int)Math.Round((pLeft * 1.333333f) * ZoomLevel),
+                        ColLeftX = slot.ColLeftX,
+                        ColRightX = slot.ColRightX,
+                        ColumnIndex = slot.ColumnIndex,
+                        PageIndex = slot.PageIndex
                     });
                 }
 
                 currentY += lH;
+                bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
             }
 
             if (pAfter > 0)
             {
                 currentY += pAfter * ZoomLevel;
+                bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
             }
 
             _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
                 Text = para, Zoom = ZoomLevel, MaxW = maxTextW, TextX = textX,
                 CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
                 FinalYOffset = currentY - startPageY, FinalPage = currentPage,
+                StartColIdx = startColIdx, FinalColIdx = activeColIdx,
+                StartColTopYOffset = startColTopYOffset, FinalColTopYOffset = colRegionTopY - startPageY,
+                FinalBandMaxBottomYOffset = bandMaxBottomY - startPageY,
+                ColSig = activeColsSig, SectionIdx = activeSectionIdx,
                 Lines = result.ConvertAll(l => { var cl = l; cl.LineY -= startPageY; return cl; })
             };
 
@@ -12698,7 +14397,7 @@ namespace ZenQOffice.UI
             List<WrappedLine> lines = new List<WrappedLine>();
             if (string.IsNullOrEmpty(para))
             {
-                lines.Add(new WrappedLine { Text = "", StartIndex = paraStartIndex, Length = 0, IsLastInPara = true, MaxFontSize = TypingFontSize });
+                lines.Add(new WrappedLine { Text = "", StartIndex = paraStartIndex, Length = 0, IsLastInPara = true, MaxFontSize = Math.Max(1f, TypingFontSize) });
                 return lines;
             }
 
@@ -12718,7 +14417,7 @@ namespace ZenQOffice.UI
                 if (wordFormat.Bold) style |= FontStyle.Bold;
                 if (wordFormat.Italic) style |= FontStyle.Italic;
 
-                using (Font wordFont = new Font(wordFormat.FontName, wordFormat.FontSize * ZoomLevel, style))
+                using (Font wordFont = new Font(wordFormat.FontName, Math.Max(0.5f, wordFormat.FontSize * ZoomLevel), style))
                 {
                     string testLine = string.IsNullOrEmpty(currentLine) ? word : currentLine + " " + word;
                     SizeF size = g.MeasureString(testLine, wordFont, Point.Empty, StringFormat.GenericTypographic);
@@ -12871,12 +14570,24 @@ namespace ZenQOffice.UI
             }
         }
 
+        public bool HasColumnSelection(out int tblIdx, out int minCol, out int maxCol)
+        {
+            tblIdx = SelectedColumnTableIndex;
+            if (SelectedColumnTableIndex >= 0 && SelectedColumnIndex >= 0)
+            {
+                int endCol = SelectedColumnEndIndex >= 0 ? SelectedColumnEndIndex : SelectedColumnIndex;
+                minCol = Math.Min(SelectedColumnIndex, endCol);
+                maxCol = Math.Max(SelectedColumnIndex, endCol);
+                return true;
+            }
+            minCol = -1;
+            maxCol = -1;
+            return false;
+        }
+
         public void DeleteSelectedColumns()
         {
-            if (SelectedColumnTableIndex < 0 || SelectedColumnIndex < 0) return;
-            int tblIdx = SelectedColumnTableIndex;
-            int minCol = Math.Min(SelectedColumnIndex, SelectedColumnEndIndex);
-            int maxCol = Math.Max(SelectedColumnIndex, SelectedColumnEndIndex);
+            if (!HasColumnSelection(out int tblIdx, out int minCol, out int maxCol)) return;
             SelectedColumnTableIndex = -1;
             SelectedColumnIndex = -1;
             SelectedColumnEndIndex = -1;
@@ -12950,7 +14661,7 @@ namespace ZenQOffice.UI
             }
             int stdW = (int)Math.Round(baseW * 96f);
             int stdH = (int)Math.Round(baseH * 96f);
-            if (ViewMode == 2) { stdW = Math.Max(700, (int)((canvasW - 80) / Math.Max(0.2f, ZoomLevel))); } // Web mode
+            if (ViewMode == 2 || ViewMode == 3 || ViewMode == 4) { int effAvailW = Math.Max(500, canvasW - (EffectiveNavPaneWidth) - (EffectiveSelectionPaneWidth) - 54); stdW = Math.Max(640, (int)(effAvailW / Math.Max(0.2f, ZoomLevel))); } // Web, Draft, Outline continuous width
 
             pageW = (int)Math.Round(stdW * ZoomLevel);
             pageH = (int)Math.Round(stdH * ZoomLevel);
@@ -12963,8 +14674,8 @@ namespace ZenQOffice.UI
             rightMarginX = (int)Math.Round(rightMarginInches * 96 * ZoomLevel);
             marginY = (int)Math.Round(topMarginInches * 96 * ZoomLevel);
 
-            int navOffset = ShowNavigationPane ? 280 : 0;
-            int selPaneOffset = ShowSelectionPane ? 260 : 0;
+            int navOffset = EffectiveNavPaneWidth;
+            int selPaneOffset = EffectiveSelectionPaneWidth;
             int effectiveCanvasW = canvasW - navOffset - selPaneOffset;
 
             if (ViewMode == 0)
@@ -12994,7 +14705,7 @@ namespace ZenQOffice.UI
             // and the tab selector at (navOffset+2), leaving the workspace background and Navigation Pane completely unobstructed!
 
             // 1. Tab Selector Button on the Far Left Corner (Ô vuông chọn kiểu Tab Stop)
-            int navOffset = ShowNavigationPane ? 280 : 0;
+            int navOffset = EffectiveNavPaneWidth;
             int tabBtnW = 22;
             int tabBtnX = navOffset + 2;
             RulerTabSelectorRect = new Rectangle(tabBtnX, rulerY, tabBtnW, rulerH);
@@ -13013,7 +14724,7 @@ namespace ZenQOffice.UI
 
             // Clip horizontal ruler body so it never overlaps the Tab button or Navigation Pane/Selection Pane
             int rClipX = navOffset + tabBtnW + 4;
-            int rClipW = Math.Max(0, canvasW - rClipX - (ShowSelectionPane ? 260 : 0));
+            int rClipW = Math.Max(0, canvasW - rClipX - (EffectiveSelectionPaneWidth));
             GraphicsState rulerClipState = g.Save();
             g.SetClip(new Rectangle(rClipX, rulerY, rClipW, rulerH));
 
@@ -13027,10 +14738,27 @@ namespace ZenQOffice.UI
                 g.FillRectangle(greyBrush, pageX, rulerY, marginX, rulerH);
             }
 
-            // 2.2. Middle Editable White Zone
+            // 2.2. Middle Editable White Zone (+ Word Column Spacing Grey Bands)
             using (SolidBrush whiteBrush = new SolidBrush(Color.White))
             {
                 g.FillRectangle(whiteBrush, pageX + marginX, rulerY, bodyW, rulerH);
+            }
+            WriterColumnSettings rulerCols = GetCurrentSectionColumns(ribbon);
+            if (rulerCols != null && rulerCols.ColumnCount > 1 && bodyW > 40)
+            {
+                float rBaseW = GetBaseBodyLogicalWidth(ribbon);
+                using (SolidBrush colGapBrush = new SolidBrush(Color.FromArgb(226, 230, 237)))
+                using (Pen colEdgePen = new Pen(Color.FromArgb(195, 202, 214)))
+                {
+                    for (int gIdx = 0; gIdx < rulerCols.ColumnCount - 1; gIdx++)
+                    {
+                        int gx, gw, gmid;
+                        GetColumnGapBounds(rulerCols, rBaseW, ZoomLevel, pageX + marginX, gIdx, out gx, out gw, out gmid);
+                        g.FillRectangle(colGapBrush, gx, rulerY, gw, rulerH);
+                        g.DrawLine(colEdgePen, gx, rulerY, gx, rulerY + rulerH);
+                        g.DrawLine(colEdgePen, gx + gw, rulerY, gx + gw, rulerY + rulerH);
+                    }
+                }
             }
 
             // 2.3. Right Margin Grey Zone
@@ -13265,7 +14993,7 @@ namespace ZenQOffice.UI
 
         public void DrawVerticalRuler(D2DGraphics g, int pageX, int pageW, int pageH, int marginY, int bottomMarginY, int canvasW, int canvasH, RibbonBar ribbon)
         {
-            int navOffset = ShowNavigationPane ? 280 : 0;
+            int navOffset = EffectiveNavPaneWidth;
             int vRulerW = 22;
             int vRulerX = navOffset + 2;
             int topY = (ribbon != null && ribbon.ShowRuler ? 180 : 156);
@@ -13492,12 +15220,92 @@ namespace ZenQOffice.UI
             catch { }
         }
 
+        private static bool TryGetObjectTagSpanAt(string text, int index, bool includeEndBoundary, out int tagStart, out int tagEnd)
+        {
+            tagStart = -1;
+            tagEnd = -1;
+            if (string.IsNullOrEmpty(text)) return false;
+
+            int clamped = Math.Max(0, Math.Min(text.Length - 1, index));
+            int lineStart = (clamped > 0) ? text.LastIndexOf('\n', clamped) + 1 : 0;
+            int scanFrom = Math.Min(text.Length - 1, clamped);
+            int candidate = scanFrom;
+            while (candidate >= lineStart)
+            {
+                int bang = text.LastIndexOf("![", candidate, candidate - lineStart + 1, StringComparison.Ordinal);
+                if (bang < 0) break;
+
+                if (bang + 8 <= text.Length)
+                {
+                    bool isObjTag = text.IndexOf("![SHAPE:", bang, Math.Min(8, text.Length - bang), StringComparison.Ordinal) == bang ||
+                                    text.IndexOf("![IMAGE:", bang, Math.Min(8, text.Length - bang), StringComparison.Ordinal) == bang ||
+                                    text.IndexOf("![CHART:", bang, Math.Min(8, text.Length - bang), StringComparison.Ordinal) == bang ||
+                                    text.IndexOf("![NOTEBOX:", bang, Math.Min(10, text.Length - bang), StringComparison.Ordinal) == bang;
+                    if (isObjTag)
+                    {
+                        int endIdx = DocShapeObject.FindTagEnd(text, bang);
+                        if (endIdx > bang)
+                        {
+                            bool hits = includeEndBoundary ? (index >= bang && index <= endIdx) : (index > bang && index <= endIdx);
+                            if (hits)
+                            {
+                                tagStart = bang;
+                                tagEnd = endIdx;
+                                return true;
+                            }
+                            if (endIdx < index) return false;
+                        }
+                    }
+                }
+                if (bang == 0 || bang <= lineStart) break;
+                candidate = bang - 1;
+            }
+            return false;
+        }
+
+        private int SnapCursorOutOfObjectTag(int pos, int directionHint = 0, string textOverride = null)
+        {
+            string full = textOverride ?? (PieceTable != null ? PieceTable.GetText() : "");
+            if (string.IsNullOrEmpty(full)) return 0;
+            pos = Math.Max(0, Math.Min(full.Length, pos));
+            if (TryGetObjectTagSpanAt(full, pos, includeEndBoundary: false, out int tagStart, out int tagEnd))
+            {
+                if (directionHint < 0) return tagStart;
+                if (directionHint > 0) return Math.Min(full.Length, tagEnd + 1);
+                return (pos - tagStart <= (tagEnd + 1 - pos)) ? tagStart : Math.Min(full.Length, tagEnd + 1);
+            }
+            return pos;
+        }
+
+        private static void ExpandRangeToWholeObjectTags(string text, ref int start, ref int end)
+        {
+            if (string.IsNullOrEmpty(text) || start >= end) return;
+            if (TryGetObjectTagSpanAt(text, start, includeEndBoundary: false, out int sTagStart, out _))
+            {
+                start = sTagStart;
+            }
+            if (TryGetObjectTagSpanAt(text, end - 1, includeEndBoundary: false, out _, out int eTagEnd))
+            {
+                end = Math.Min(text.Length, eTagEnd + 1);
+            }
+        }
+
         private void DeleteSelection()
         {
             if (SelectionStart != SelectionEnd)
             {
-                int min = Math.Min(SelectionStart, SelectionEnd);
-                int len = Math.Abs(SelectionEnd - SelectionStart);
+                string full = PieceTable != null ? PieceTable.GetText() : "";
+                int min = Math.Max(0, Math.Min(full.Length, Math.Min(SelectionStart, SelectionEnd)));
+                int max = Math.Max(0, Math.Min(full.Length, Math.Max(SelectionStart, SelectionEnd)));
+                ExpandRangeToWholeObjectTags(full, ref min, ref max);
+                int len = Math.Max(0, max - min);
+                if (len <= 0)
+                {
+                    SelectionStart = min;
+                    SelectionEnd = min;
+                    CursorPosition = min;
+                    return;
+                }
                 if (TrackChanges)
                 {
                     string delText = PieceTable != null ? PieceTable.GetSubstring(min, len) : "";
@@ -13538,9 +15346,10 @@ namespace ZenQOffice.UI
             LastViewHeight = height;
 
             // 1. Workspace Background
-            Color wsBg = Color.FromArgb(243, 243, 243); // #F3F3F3 Fluent Light Canvas Background
-            if (ViewMode == 0) wsBg = Color.FromArgb(37, 37, 37); // MS Word Dark Reading Mode Background (#252525)
-            else if (ViewMode == 2) wsBg = Color.FromArgb(240, 240, 240); // Web mode clean bg
+            Color wsBg = Color.FromArgb(243, 243, 243);
+            if (ViewMode == 0) wsBg = Color.FromArgb(37, 37, 37);
+            else if (ViewMode == 2) wsBg = Color.FromArgb(240, 240, 240);
+            else if (ViewMode == 3 || ViewMode == 4) wsBg = Color.White;
 
             int wsH = Math.Max(0, height - 155 - 26);
             using (SolidBrush bgBrush = new SolidBrush(wsBg))
@@ -13548,13 +15357,174 @@ namespace ZenQOffice.UI
                 g.FillRectangle(bgBrush, 0, 155, canvasW, wsH);
             }
 
-            int docContentTop = (ribbon != null && ribbon.ShowRuler) ? 181 : 155;
-            int maxScrollX = GetMaxScrollX(width);
-            int docContentH = Math.Max(0, height - docContentTop - 26 - (maxScrollX > 0 ? 12 : 0));
-            GraphicsState docClipState = g.Save();
-            g.SetClip(new Rectangle(0, docContentTop, width, docContentH));
+            _outlineToolbarHits.Clear();
+            _outlineToggleHits.Clear();
 
-            // 2. Compute Paper Bounds based on ViewMode (Read, Print, Web)
+            int baseTop = (ribbon != null && ribbon.ShowRuler) ? 181 : 155;
+            if (ViewMode == 4)
+            {
+                DrawOutlineToolbar(g, width, baseTop, ribbon);
+                baseTop += 30;
+            }
+            int maxScrollX = GetMaxScrollX(width);
+            int wsBottom = Math.Max(baseTop + 60, height - 26 - (maxScrollX > 0 ? 12 : 0));
+
+            int pageX, pageW, pageH, marginX, rightMarginX, marginY;
+            GetPageLayoutMetrics(canvasW, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
+            float bottomMarginInches = ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f;
+            int bottomMarginY = (int)Math.Round(bottomMarginInches * 96 * ZoomLevel);
+
+            if (!IsSplitView)
+            {
+                SplitSplitterBounds = Rectangle.Empty;
+                SecondaryScrollBarBounds = Rectangle.Empty;
+                SecondaryScrollBarThumbBounds = Rectangle.Empty;
+                DrawViewportPane(g, width, height, ribbon, baseTop, wsBottom, ScrollY, 0, true);
+                _pane0RenderedLines = new List<RenderedLineInfo>(RenderedLines);
+                _pane0TableCellHits = new List<TableCellHit>(TableCellHits);
+                _pane0TableBoundsList = new List<Rectangle>(TableBoundsList);
+            }
+            else
+            {
+                int navOffset = EffectiveNavPaneWidth;
+                int selPaneOffset = EffectiveSelectionPaneWidth;
+                int splitterH = 6;
+                int availH = Math.Max(80, wsBottom - baseTop - splitterH);
+                int topH = Math.Max(40, Math.Min(availH - 40, (int)Math.Round(availH * SplitRatio)));
+                int splitY = baseTop + topH;
+                SplitSplitterBounds = new Rectangle(navOffset, splitY, Math.Max(40, width - navOffset - selPaneOffset), splitterH);
+
+                // Top Pane (Pane 0)
+                DrawViewportPane(g, width, height, ribbon, baseTop, splitY, ScrollY, 0, ActiveSplitPane == 0);
+                _pane0RenderedLines = new List<RenderedLineInfo>(RenderedLines);
+                _pane0TableCellHits = new List<TableCellHit>(TableCellHits);
+                _pane0TableBoundsList = new List<Rectangle>(TableBoundsList);
+                int topCaretX = CurrentCaretScreenX, topCaretY = CurrentCaretScreenY, topCaretH = CurrentCaretScreenH;
+
+                // Draggable Splitter Bar
+                using (SolidBrush spBg = new SolidBrush(Color.FromArgb(221, 226, 234)))
+                    g.FillRectangle(spBg, SplitSplitterBounds);
+                using (Pen spLine = new Pen(Color.FromArgb(180, 188, 200), 1.0f))
+                {
+                    g.DrawLine(spLine, SplitSplitterBounds.Left, SplitSplitterBounds.Top, SplitSplitterBounds.Right, SplitSplitterBounds.Top);
+                    g.DrawLine(spLine, SplitSplitterBounds.Left, SplitSplitterBounds.Bottom - 1, SplitSplitterBounds.Right, SplitSplitterBounds.Bottom - 1);
+                }
+                int gripW = 40;
+                int gripX = SplitSplitterBounds.Left + (SplitSplitterBounds.Width - gripW) / 2;
+                using (SolidBrush gripBr = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                    g.FillRectangle(gripBr, gripX, SplitSplitterBounds.Top + 2, gripW, 2);
+
+                // Bottom Pane (Pane 1)
+                DrawViewportPane(g, width, height, ribbon, splitY + splitterH, wsBottom, SecondaryScrollY, 1, ActiveSplitPane == 1);
+                _pane1RenderedLines = new List<RenderedLineInfo>(RenderedLines);
+                _pane1TableCellHits = new List<TableCellHit>(TableCellHits);
+                _pane1TableBoundsList = new List<Rectangle>(TableBoundsList);
+
+                // Keep ActiveSplitPane collections live for keyboard navigation & typing
+                if (ActiveSplitPane == 0)
+                {
+                    RenderedLines = new List<RenderedLineInfo>(_pane0RenderedLines);
+                    TableCellHits = new List<TableCellHit>(_pane0TableCellHits);
+                    TableBoundsList = new List<Rectangle>(_pane0TableBoundsList);
+                    CurrentCaretScreenX = topCaretX;
+                    CurrentCaretScreenY = topCaretY;
+                    CurrentCaretScreenH = topCaretH;
+                }
+            }
+
+            // 8. MS WORD NAVIGATION PANE (Tìm kiếm & Điều hướng)
+            if (EffectiveNavPaneWidth > 0)
+            {
+                DrawNavigationPane(g, width, height, ribbon);
+            }
+
+            // 9. MS WORD SELECTION PANE (Ngăn Lựa Chọn)
+            if (EffectiveSelectionPaneWidth > 0)
+            {
+                DrawSelectionPane(g, width, height, ribbon);
+            }
+
+            // 10. INTERACTIVE RULERS (Cố định ở đỉnh & cạnh trái, luôn vẽ đè lên trên trang khi cuộn)
+            if (ribbon != null && ribbon.ShowRuler)
+            {
+                DrawInteractiveRuler(g, pageX, pageW, marginX, rightMarginX, width, height, ribbon);
+                DrawVerticalRuler(g, pageX, pageW, pageH, marginY, bottomMarginY, width, height, ribbon);
+            }
+
+            // 11. MODERN WORD-STYLE SCROLLBARS (Hỗ trợ cả 1 khung & Split View 2 khung độc lập)
+            if (IsSplitView && !SplitSplitterBounds.IsEmpty)
+            {
+                DrawWordScrollBarForPane(g, width, baseTop, SplitSplitterBounds.Top, height, ScrollY, 0, ribbon,
+                    IsHoveringScrollBar, IsDraggingScrollBar && _activeScrollBarDragPane == 0, out ScrollBarBounds, out ScrollBarThumbBounds);
+                DrawWordScrollBarForPane(g, width, SplitSplitterBounds.Bottom, wsBottom, height, SecondaryScrollY, 1, ribbon,
+                    IsHoveringSecondaryScrollBar, IsDraggingSecondaryScrollBar || (IsDraggingScrollBar && _activeScrollBarDragPane == 1), out SecondaryScrollBarBounds, out SecondaryScrollBarThumbBounds);
+            }
+            else
+            {
+                DrawWordScrollBar(g, width, height, ribbon);
+            }
+            DrawWordHScrollBar(g, width, height, ribbon);
+        }
+
+        private void DrawOutlineToolbar(D2DGraphics g, int width, int y, RibbonBar ribbon)
+        {
+            int navOffset = EffectiveNavPaneWidth;
+            int selOffset = EffectiveSelectionPaneWidth;
+            int rulerOffset = (ribbon != null && ribbon.ShowRuler) ? 26 : 0;
+            int barX = navOffset + rulerOffset;
+            int barW = Math.Max(100, width - barX - selOffset);
+            Rectangle barRect = new Rectangle(barX, y, barW, 30);
+            using (SolidBrush bg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                g.FillRectangle(bg, barRect);
+            using (Pen bPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                g.DrawLine(bPen, barRect.Left, barRect.Bottom - 1, barRect.Right, barRect.Bottom - 1);
+
+            using (Font lblFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (Font btnFont = new Font("Segoe UI", 8.2f, FontStyle.Regular))
+            using (SolidBrush titleBr = new SolidBrush(Color.FromArgb(30, 58, 138)))
+            {
+                int leftPad = barX + 10;
+                g.DrawString("Đề cương:", lblFont, titleBr, leftPad, y + 7);
+                int cx = leftPad + 72;
+                var items = new Tuple<string, string, bool>[]
+                {
+                    Tuple.Create("Cấp 1", "Level:1", OutlineFilterMaxLevel == 1),
+                    Tuple.Create("Cấp 2", "Level:2", OutlineFilterMaxLevel == 2),
+                    Tuple.Create("Cấp 3", "Level:3", OutlineFilterMaxLevel == 3),
+                    Tuple.Create("Tất cả", "Level:9", OutlineFilterMaxLevel >= 9),
+                    Tuple.Create("Mở rộng hết", "ExpandAll", false),
+                    Tuple.Create("Thu gọn hết", "CollapseAll", false),
+                    Tuple.Create("Đóng Đề cương", "CloseOutline", false),
+                };
+                for (int i = 0; i < items.Length; i++)
+                {
+                    int bw = (int)Math.Ceiling(g.MeasureString(items[i].Item1, btnFont).Width) + 16;
+                    Rectangle br = new Rectangle(cx, y + 4, bw, 22);
+                    bool active = items[i].Item3;
+                    bool isClose = items[i].Item2 == "CloseOutline";
+                    using (SolidBrush bFill = new SolidBrush(active ? Color.FromArgb(219, 234, 254) : (isClose ? Color.FromArgb(254, 226, 226) : Color.White)))
+                    using (Pen bBorder = new Pen(active ? Color.FromArgb(37, 99, 235) : (isClose ? Color.FromArgb(239, 68, 68) : Color.FromArgb(203, 213, 225)), 1f))
+                    using (SolidBrush bTxt = new SolidBrush(active ? Color.FromArgb(29, 78, 216) : (isClose ? Color.FromArgb(185, 28, 28) : Color.FromArgb(51, 65, 85))))
+                    {
+                        g.FillRectangle(bFill, br);
+                        g.DrawRectangle(bBorder, br);
+                        g.DrawString(items[i].Item1, btnFont, bTxt, br.X + 8, br.Y + 3);
+                    }
+                    _outlineToolbarHits.Add(new KeyValuePair<Rectangle, string>(br, items[i].Item2));
+                    cx += bw + 6;
+                }
+            }
+        }
+
+        private void DrawViewportPane(D2DGraphics g, int width, int height, RibbonBar ribbon, int paneTopY, int paneBottomY, int paneScrollY, int paneIndex, bool showCaret)
+        {
+            int paneH = Math.Max(0, paneBottomY - paneTopY);
+            if (paneH <= 0) return;
+
+            int canvasW = width;
+            GraphicsState docClipState = g.Save();
+            g.SetClip(new Rectangle(0, paneTopY, width, paneH));
+
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
             GetPageLayoutMetrics(canvasW, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
             float bottomMarginInches = ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f;
@@ -13568,30 +15538,261 @@ namespace ZenQOffice.UI
                     marginY = Math.Max(marginY, (int)(44 * ZoomLevel));
                 }
             }
+            if (ViewMode == 3 || ViewMode == 4)
+            {
+                marginY = (int)Math.Round(16f * ZoomLevel);
+            }
             int maxTextW = pageW - marginX - rightMarginX;
             int startPageY;
             if (ViewMode == 0)
             {
-                ScrollX = 0f;
-                SmoothScrollX = 0f;
-                TargetScrollX = 0f;
-                int effH = height > 0 ? height : (LastViewHeight > 0 ? LastViewHeight : 800);
-                int availableH = effH - 155 - 26;
-                int padY = Math.Max(16, (availableH - pageH) / 2);
-                startPageY = 155 + padY - ScrollY;
+                ScrollX = 0f; SmoothScrollX = 0f; TargetScrollX = 0f;
+                int padY = Math.Max(16, (paneH - pageH) / 2);
+                startPageY = paneTopY + padY - paneScrollY;
             }
             else
             {
-                startPageY = (ribbon != null && ribbon.ShowRuler ? 190 : 165) - ScrollY;
+                startPageY = paneTopY + 9 - paneScrollY;
             }
             int textX = pageX + marginX;
             CurrentRenderTextX = textX;
-            
+            CurrentRenderPageX = pageX;
+            CurrentRenderStartPageY = startPageY;
+            CurrentRenderPageH = pageH;
+            CurrentRenderTopMarginY = GetEffectiveTopMarginLogical(ribbon) * ZoomLevel;
+
+            int colsPerRow = GetMultiplePagesColsPerRow(canvasW, pageW, ribbon);
+            bool isMultiGrid = (ViewMode == 1 && IsMultiplePagesView && colsPerRow > 1);
+
+            if (ViewMode == 3 || ViewMode == 4)
+            {
+                // Continuous clean white paper surface without shadows or page gaps
+                using (SolidBrush cBg = new SolidBrush(Color.White))
+                {
+                    g.FillRectangle(cBg, Math.Max(0, pageX - 6), paneTopY, pageW + 12, paneH);
+                }
+            }
+            else if (!isMultiGrid)
+            {
+                int pageCount = Math.Max(1, CalculatedPageCount);
+                if (ViewMode == 0)
+                {
+                    ReadModePageIndex = Math.Max(0, Math.Min(pageCount - 1, ReadModePageIndex));
+                    CurrentActivePage = ReadModePageIndex + 1;
+                    DrawPageCanvas(g, pageX, startPageY, pageW, pageH, ribbon, ReadModePageIndex + 1, pageCount, false);
+                    int arrowY = paneTopY + paneH / 2;
+                    Rectangle leftBtn = new Rectangle(20, arrowY - 25, 45, 45);
+                    bool canPrev = (ReadModePageIndex > 0);
+                    using (SolidBrush circleBg = new SolidBrush(canPrev ? Color.FromArgb(70, 255, 255, 255) : Color.FromArgb(20, 255, 255, 255))) g.FillEllipse(circleBg, leftBtn);
+                    using (Pen circlePen = new Pen(canPrev ? Color.FromArgb(180, 255, 255, 255) : Color.FromArgb(40, 255, 255, 255), 1.2f)) g.DrawEllipse(circlePen, leftBtn);
+                    using (Font arrowFont = new Font("Segoe UI Symbol", 13.0f, FontStyle.Bold))
+                    using (SolidBrush arrowBrush = new SolidBrush(canPrev ? Color.White : Color.FromArgb(70, 255, 255, 255)))
+                        g.DrawString("◀", arrowFont, arrowBrush, leftBtn.X + 11, leftBtn.Y + 10);
+
+                    Rectangle rightBtn = new Rectangle(canvasW - 65, arrowY - 25, 45, 45);
+                    bool canNext = (ReadModePageIndex < pageCount - 1);
+                    using (SolidBrush circleBg = new SolidBrush(canNext ? Color.FromArgb(70, 255, 255, 255) : Color.FromArgb(20, 255, 255, 255))) g.FillEllipse(circleBg, rightBtn);
+                    using (Pen circlePen = new Pen(canNext ? Color.FromArgb(180, 255, 255, 255) : Color.FromArgb(40, 255, 255, 255), 1.2f)) g.DrawEllipse(circlePen, rightBtn);
+                    using (Font arrowFont = new Font("Segoe UI Symbol", 13.0f, FontStyle.Bold))
+                    using (SolidBrush arrowBrush = new SolidBrush(canNext ? Color.White : Color.FromArgb(70, 255, 255, 255)))
+                        g.DrawString("▶", arrowFont, arrowBrush, rightBtn.X + 13, rightBtn.Y + 10);
+                }
+                else
+                {
+                    int startPg = Math.Max(0, (paneTopY - startPageY - pageH) / (pageH + PageGap));
+                    int endPg = Math.Min(pageCount - 1, (paneBottomY - startPageY) / (pageH + PageGap) + 1);
+                    for (int pg = startPg; pg <= endPg; pg++)
+                    {
+                        int pgY = startPageY + pg * (pageH + PageGap);
+                        DrawPageCanvas(g, pageX, pgY, pageW, pageH, ribbon, pg + 1, pageCount, false);
+                    }
+                }
+            }
+
+            if (!isMultiGrid)
+            {
+                GraphicsState readModeState = null;
+                if (ViewMode == 0)
+                {
+                    readModeState = g.Save();
+                    g.SetClip(new Rectangle(pageX, startPageY, pageW, pageH));
+                    g.TranslateTransform(0, -ReadModePageIndex * (pageH + PageGap));
+                }
+                RenderPaneBodyPass(g, width, height, ribbon, paneTopY, paneBottomY, pageX, pageW, pageH, marginX, rightMarginX, marginY, bottomMarginY, startPageY, textX, maxTextW, showCaret, -1);
+                if (readModeState != null)
+                {
+                    g.Restore(readModeState);
+                }
+            }
+            else
+            {
+                // Pass 1: layout calculation (no graphics) to obtain exact finalPages
+                RenderPaneBodyPass(g, width, height, ribbon, -9999999, -9999998, pageX, pageW, pageH, marginX, rightMarginX, marginY, bottomMarginY, startPageY, textX, maxTextW, false, -2);
+                int finalPages = Math.Max(1, CalculatedPageCount);
+
+                var accumLines = new List<RenderedLineInfo>();
+                var accumHits = new List<TableCellHit>();
+                var accumTableBounds = new List<Rectangle>();
+                int finalCaretX = CurrentCaretScreenX, finalCaretY = CurrentCaretScreenY, finalCaretH = CurrentCaretScreenH;
+
+                for (int visPg = 0; visPg < finalPages; visPg++)
+                {
+                    Rectangle visRect = GetPageVisualBounds(visPg, canvasW, ribbon, startPageY, pageX, pageW, pageH);
+                    if (visRect.Bottom < paneTopY || visRect.Top > paneBottomY) continue;
+
+                    DrawPageCanvas(g, visRect.X, visRect.Y, pageW, pageH, ribbon, visPg + 1, finalPages, false);
+
+                    int linearPgY = startPageY + visPg * (pageH + PageGap);
+                    int dx = visRect.X - pageX;
+                    int dy = visRect.Y - linearPgY;
+
+                    GraphicsState pgClip = g.Save();
+                    Rectangle visClip = Rectangle.Intersect(visRect, new Rectangle(0, paneTopY, width, paneH));
+                    if (!visClip.IsEmpty)
+                    {
+                        g.SetClip(visClip);
+                        g.TranslateTransform(dx, dy);
+                        RenderPaneBodyPass(g, width, linearPgY + pageH + 20, ribbon, linearPgY - 2, linearPgY + pageH + 2, pageX, pageW, pageH, marginX, rightMarginX, marginY, bottomMarginY, startPageY, textX, maxTextW, showCaret, visPg);
+                    }
+                    g.Restore(pgClip);
+
+                    DrawPageHeaderFooterWithScope(g, visRect.X, visRect.Y, pageW, pageH, ribbon, visPg + 1, finalPages);
+
+                    // Collect & translate hit-test coordinates from linear coordinates to visRect coordinates
+                    for (int li = 0; li < RenderedLines.Count; li++)
+                    {
+                        var rl = RenderedLines[li];
+                        if (rl.PageIndex == visPg)
+                        {
+                            rl.ScreenX += dx;
+                            rl.ScreenY += dy;
+                            rl.ColLeftX += dx;
+                            rl.ColRightX += dx;
+                            accumLines.Add(rl);
+                        }
+                    }
+                    for (int hi = 0; hi < TableCellHits.Count; hi++)
+                    {
+                        var h = TableCellHits[hi];
+                        if (h.CellRect.Bottom >= linearPgY - 10 && h.CellRect.Top <= linearPgY + pageH + 10)
+                        {
+                            h.CellRect = new Rectangle(h.CellRect.X + dx, h.CellRect.Y + dy, h.CellRect.Width, h.CellRect.Height);
+                            if (!h.TextRect.IsEmpty)
+                                h.TextRect = new RectangleF(h.TextRect.X + dx, h.TextRect.Y + dy, h.TextRect.Width, h.TextRect.Height);
+                            accumHits.Add(h);
+                        }
+                    }
+                    for (int ti = 0; ti < TableBoundsList.Count; ti++)
+                    {
+                        var tb = TableBoundsList[ti];
+                        if (tb.Bottom >= linearPgY - 10 && tb.Top <= linearPgY + pageH + 10)
+                        {
+                            accumTableBounds.Add(new Rectangle(tb.X + dx, tb.Y + dy, tb.Width, tb.Height));
+                        }
+                    }
+                    foreach (var sh in DocumentShapes)
+                    {
+                        if (sh != null && sh.PageNumber == visPg && !sh.LastBounds.IsEmpty)
+                            sh.LastBounds = new Rectangle(sh.LastBounds.X + dx, sh.LastBounds.Y + dy, sh.LastBounds.Width, sh.LastBounds.Height);
+                    }
+                    foreach (var ch in DocumentCharts)
+                    {
+                        if (ch != null && ch.PageNumber == visPg && !ch.LastBounds.IsEmpty)
+                            ch.LastBounds = new Rectangle(ch.LastBounds.X + dx, ch.LastBounds.Y + dy, ch.LastBounds.Width, ch.LastBounds.Height);
+                    }
+                    if (CurrentCaretScreenY >= linearPgY - 10 && CurrentCaretScreenY <= linearPgY + pageH + 10)
+                    {
+                        finalCaretX = CurrentCaretScreenX + dx;
+                        finalCaretY = CurrentCaretScreenY + dy;
+                        finalCaretH = CurrentCaretScreenH;
+                    }
+                }
+
+                RenderedLines = accumLines;
+                TableCellHits = accumHits;
+                TableBoundsList = accumTableBounds;
+                CurrentCaretScreenX = finalCaretX;
+                CurrentCaretScreenY = finalCaretY;
+                CurrentCaretScreenH = finalCaretH;
+            }
+
+            DrawRemoteCollabCarets(g);
+            g.Restore(docClipState);
+        }
+
+        private void DrawRemoteCollabCarets(D2DGraphics g)
+        {
+            if (RemoteCollabPresences == null || RemoteCollabPresences.Count == 0 || RenderedLines == null || RenderedLines.Count == 0)
+                return;
+            string docText = PieceTable != null ? (PieceTable.GetText() ?? "") : "";
+            using Font tagFont = new Font("Segoe UI", 7.8f, FontStyle.Bold);
+            using Font measureFont = new Font("Calibri", 11f * Math.Max(0.25f, ZoomLevel), FontStyle.Regular);
+
+            foreach (var p in RemoteCollabPresences)
+            {
+                if (p == null || p.IsStale) continue;
+                if (!int.TryParse(p.SelectedId, out int charPos)) continue;
+                charPos = Math.Max(0, Math.Min(docText.Length, charPos));
+
+                RenderedLineInfo? matched = null;
+                foreach (var rl in RenderedLines)
+                {
+                    if (charPos >= rl.StartCharIndex && charPos <= rl.StartCharIndex + rl.Length)
+                    {
+                        matched = rl;
+                        break;
+                    }
+                }
+                if (!matched.HasValue && RenderedLines.Count > 0)
+                {
+                    if (charPos >= RenderedLines[RenderedLines.Count - 1].StartCharIndex)
+                        matched = RenderedLines[RenderedLines.Count - 1];
+                }
+                if (!matched.HasValue) continue;
+
+                var line = matched.Value;
+                int offsetInLine = Math.Max(0, Math.Min(line.Length, charPos - line.StartCharIndex));
+                float caretX = line.ScreenX;
+                if (offsetInLine > 0 && line.StartCharIndex + offsetInLine <= docText.Length)
+                {
+                    string prefix = docText.Substring(line.StartCharIndex, offsetInLine);
+                    float w = g.MeasureString(prefix, measureFont).Width;
+                    caretX = Math.Min(Math.Max(line.ColLeftX, line.ScreenX + w), Math.Max(line.ColRightX, line.ScreenX + w));
+                }
+
+                Color peerCol = Color.FromArgb(37, 99, 235);
+                try { peerCol = ColorTranslator.FromHtml(p.ColorHex); } catch { }
+
+                float caretH = Math.Max(14f, line.ScreenH);
+                using (Pen caretPen = new Pen(peerCol, 2.2f))
+                    g.DrawLine(caretPen, caretX, line.ScreenY, caretX, line.ScreenY + caretH);
+
+                string label = "@" + (p.Username ?? "peer");
+                SizeF sz = g.MeasureString(label, tagFont);
+                RectangleF badge = new RectangleF(caretX - 1f, Math.Max(158f, line.ScreenY - 16f), sz.Width + 10f, 16f);
+                using (GraphicsPath gp = new GraphicsPath())
+                {
+                    float d = 8f;
+                    gp.AddArc(badge.X, badge.Y, d, d, 180, 90);
+                    gp.AddArc(badge.Right - d, badge.Y, d, d, 270, 90);
+                    gp.AddArc(badge.Right - d, badge.Bottom - d, d, d, 0, 90);
+                    gp.AddArc(badge.X, badge.Bottom - d, d, d, 90, 90);
+                    gp.CloseFigure();
+                    using SolidBrush br = new SolidBrush(peerCol);
+                    g.FillPath(br, gp);
+                }
+                g.DrawString(label, tagFont, Brushes.White, badge.X + 5f, badge.Y + 1.5f);
+            }
+        }
+
+        private void RenderPaneBodyPass(D2DGraphics g, int width, int height, RibbonBar ribbon, int visTopY, int visBotY, int pageX, int pageW, int pageH, int marginX, int rightMarginX, int marginY, int bottomMarginY, int startPageY, int textX, int maxTextW, bool showCaret, int onlyTargetPage)
+        {
+            int canvasW = width;
             int currentTextVersion = PieceTable.Version;
             int runsHash = FormattedRuns.Count;
             if (FormattedRuns.Count > 0) runsHash ^= FormattedRuns[0].FontSize.GetHashCode() ^ FormattedRuns[FormattedRuns.Count - 1].Length;
-            
-            bool layoutDirty = (currentTextVersion != _lastLayoutTextVersion || runsHash != _lastLayoutRunsHash || ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW || textX != _lastLayoutTextX || pageX != _lastLayoutPageX || ViewMode != _lastLayoutViewMode || IsDraggingShape || DragShapeHandleIndex >= 0 || IsDraggingChart || DragChartHandleIndex >= 0 || IsDraggingMove);
+            string curDocColSig = BuildDocumentColumnsSignature();
+            bool layoutDirty = (currentTextVersion != _lastLayoutTextVersion || runsHash != _lastLayoutRunsHash || ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW || textX != _lastLayoutTextX || pageX != _lastLayoutPageX || ViewMode != _lastLayoutViewMode || curDocColSig != _lastLayoutColSig || _outlineLayoutVersion != _lastLayoutOutlineVersion || IsMultiplePagesView != _lastLayoutMultiplePages || IsDraggingShape || DragShapeHandleIndex >= 0 || IsDraggingChart || DragChartHandleIndex >= 0 || IsDraggingMove);
             if (layoutDirty)
             {
                 _paraLayoutCache.Clear();
@@ -13607,7 +15808,6 @@ namespace ZenQOffice.UI
                 float unzoomedMaxTextW = (ribbon != null ? (ribbon.PaperWidthInches - ribbon.GetEffectiveLeftMarginInches() - ribbon.GetEffectiveRightMarginInches()) : 6.5f) * 96f;
                 if (ZoomLevel != _lastLayoutZoom || maxTextW != _lastLayoutMaxW || ViewMode != _lastLayoutViewMode)
                 {
-                    // Zoom or page width changed: force table column/row recalculation at new scale
                     TableColWidths.Clear();
                     TableRowHeights.Clear();
                     if (Math.Abs(unzoomedMaxTextW - _lastLayoutUnzoomedMaxW) > 1.0f || ViewMode != _lastLayoutViewMode)
@@ -13624,10 +15824,12 @@ namespace ZenQOffice.UI
                 _lastLayoutTextX = textX;
                 _lastLayoutPageX = pageX;
                 _lastLayoutViewMode = ViewMode;
+                _lastLayoutColSig = curDocColSig;
+                _lastLayoutOutlineVersion = _outlineLayoutVersion;
+                _lastLayoutMultiplePages = IsMultiplePagesView;
             }
 
-            float currentY = startPageY + marginY;
-
+            float currentY = startPageY + GetEffectiveTopMarginLogical(ribbon) * ZoomLevel;
             if (_cachedParagraphs == null || currentTextVersion != _cachedParagraphsVersion)
             {
                 string fullText = PieceTable.GetText();
@@ -13657,7 +15859,6 @@ namespace ZenQOffice.UI
             TableWrapBtnHits.Clear();
             int currentTableCount = 0;
 
-            // Pre-populate TableFloatingBounds for Wrap Around tables so earlier paragraphs wrap around them
             foreach (var kvp in TableWrapModes)
             {
                 if (kvp.Value == 1)
@@ -13683,92 +15884,8 @@ namespace ZenQOffice.UI
                     }
                 }
             }
-
-            // Single-Pass High Performance Engine: Calculate necessary pages including floating shapes/charts!
-            int maxNeededPages = 1;
-            foreach (var sh in DocumentShapes)
-            {
-                if (sh.Visible && sh.PageNumber + 1 > maxNeededPages) maxNeededPages = sh.PageNumber + 1;
-            }
-            foreach (var ch in DocumentCharts)
-            {
-                if (ch.Visible && ch.PageNumber + 1 > maxNeededPages) maxNeededPages = ch.PageNumber + 1;
-            }
-            int pageCount = Math.Max(maxNeededPages, CalculatedPageCount);
-            TotalPageCount = pageCount;
-            if (ViewMode == 0)
-            {
-                ReadModePageIndex = Math.Max(0, Math.Min(pageCount - 1, ReadModePageIndex));
-                CurrentActivePage = ReadModePageIndex + 1;
-            }
-            else
-            {
-                CurrentActivePage = Math.Max(1, Math.Min(pageCount, (int)((ScrollY + (height / 2)) / (pageH + PageGap)) + 1));
-            }
-            CalculatedPageCount = pageCount;
-            if (ViewMode == 0)
-            {
-                // MS Word Read Mode (📖): Render Centered Book Page
-                DrawPageCanvas(g, pageX, startPageY, pageW, pageH, ribbon, ReadModePageIndex + 1, pageCount);
-
-                // Draw Semi-Transparent Page Navigation Arrow Buttons (◀ and ▶)
-                int arrowY = 155 + (height - 183) / 2;
-                
-                // Left Arrow (◀)
-                Rectangle leftBtn = new Rectangle(20, arrowY - 25, 45, 45);
-                bool canPrev = (ReadModePageIndex > 0);
-                using (SolidBrush circleBg = new SolidBrush(canPrev ? Color.FromArgb(70, 255, 255, 255) : Color.FromArgb(20, 255, 255, 255)))
-                {
-                    g.FillEllipse(circleBg, leftBtn);
-                }
-                using (Pen circlePen = new Pen(canPrev ? Color.FromArgb(180, 255, 255, 255) : Color.FromArgb(40, 255, 255, 255), 1.2f))
-                {
-                    g.DrawEllipse(circlePen, leftBtn);
-                }
-                using (Font arrowFont = new Font("Segoe UI Symbol", 13.0f, FontStyle.Bold))
-                using (SolidBrush arrowBrush = new SolidBrush(canPrev ? Color.White : Color.FromArgb(70, 255, 255, 255)))
-                {
-                    g.DrawString("◀", arrowFont, arrowBrush, leftBtn.X + 11, leftBtn.Y + 10);
-                }
-
-                // Right Arrow (▶)
-                Rectangle rightBtn = new Rectangle(canvasW - 65, arrowY - 25, 45, 45);
-                bool canNext = (ReadModePageIndex < pageCount - 1);
-                using (SolidBrush circleBg = new SolidBrush(canNext ? Color.FromArgb(70, 255, 255, 255) : Color.FromArgb(20, 255, 255, 255)))
-                {
-                    g.FillEllipse(circleBg, rightBtn);
-                }
-                using (Pen circlePen = new Pen(canNext ? Color.FromArgb(180, 255, 255, 255) : Color.FromArgb(40, 255, 255, 255), 1.2f))
-                {
-                    g.DrawEllipse(circlePen, rightBtn);
-                }
-                using (Font arrowFont = new Font("Segoe UI Symbol", 13.0f, FontStyle.Bold))
-                using (SolidBrush arrowBrush = new SolidBrush(canNext ? Color.White : Color.FromArgb(70, 255, 255, 255)))
-                {
-                    g.DrawString("▶", arrowFont, arrowBrush, rightBtn.X + 13, rightBtn.Y + 10);
-                }
-            }
-            else
-            {
-                int startPg = Math.Max(0, (150 - startPageY - pageH) / (pageH + PageGap));
-                int endPg = Math.Min(pageCount - 1, (height - startPageY) / (pageH + PageGap) + 1);
-                for (int pg = startPg; pg <= endPg; pg++)
-                {
-                    int pgY = startPageY + pg * (pageH + PageGap);
-                    DrawPageCanvas(g, pageX, pgY, pageW, pageH, ribbon, pg + 1, pageCount);
-                }
-            }
-
-            GraphicsState readModeState = null;
-            if (ViewMode == 0)
-            {
-                readModeState = g.Save();
-                g.SetClip(new Rectangle(pageX, startPageY, pageW, pageH));
-                g.TranslateTransform(0, -ReadModePageIndex * (pageH + PageGap));
-            }
-
             // Pre-pass: Scan all Shape and Chart tags from paragraphs to register/update DocShapeObject & DocChartObject before text layout!
-            if (layoutDirty || _lastShapesScannedVersion != currentTextVersion)
+            if (_lastShapesScannedVersion != currentTextVersion)
             {
                 for (int pScan = 0; pScan < paragraphs.Length; pScan++)
                 {
@@ -13797,13 +15914,19 @@ namespace ZenQOffice.UI
                         DocShapeObject.ParseShapeTag(tagStr, out sId, out sType, out sPath, out tX, out tY, out tW, out tH, out tWrap, out tPage, out tStyle, out tYRel);
                         if (string.IsNullOrEmpty(sId)) sId = "Shape_" + pScan + "_" + tagStart;
                         DocShapeObject sObj = GetOrCreateDocShape(sId, sType);
+                        sObj.ApplyCachedTagMetadata();
                         if (!IsDraggingShape && (sObj != ActiveShape || DragShapeHandleIndex < 0))
                         {
                             if (tX >= 0) sObj.PageX = tX;
                             if (tPage >= 0)
                             {
-                                if (tY >= 0) sObj.PageY = tY;
+                                if (tY >= 0 || tYRel == 0) sObj.PageY = tY >= 0 ? tY : sObj.PageY;
                                 sObj.PageNumber = tPage;
+                                sObj.PositionCalculated = true;
+                            }
+                            else if (tWrap > 0 && tYRel == 0 && tY >= 0)
+                            {
+                                sObj.PageY = tY;
                             }
                             if (tW > 0) sObj.BaseWidth = tW;
                             if (tH > 0) sObj.BaseHeight = tH;
@@ -13826,16 +15949,18 @@ namespace ZenQOffice.UI
                 _lastShapesScannedVersion = currentTextVersion;
             }
 
+            float effTopMZoomed = GetEffectiveTopMarginLogical(ribbon) * ZoomLevel;
+            bool anyShapeNeedsPostResolve = false;
             // Pre-calculate LastBounds for all Floating charts (WrapMode != 0) before text layout!
             foreach (var ch in DocumentCharts)
             {
                 if (ch.WrapMode != 0)
                 {
-                    int cW = Math.Max((int)(200 * ZoomLevel), (int)((ch.BaseWidth + ch.WidthDelta) * ZoomLevel));
-                    int cH = Math.Max((int)(120 * ZoomLevel), (int)((ch.BaseHeight + ch.HeightDelta) * ZoomLevel));
-                    int pTopY = startPageY + ch.PageNumber * (pageH + PageGap) + marginY;
-                    int cX = pageX + (int)(ch.PageX * ZoomLevel);
-                    int cY = pTopY + (int)(ch.PageY * ZoomLevel);
+                    int cW = Math.Max((int)Math.Round(200f * ZoomLevel), (int)Math.Round((ch.BaseWidth + ch.WidthDelta) * ZoomLevel));
+                    int cH = Math.Max((int)Math.Round(120f * ZoomLevel), (int)Math.Round((ch.BaseHeight + ch.HeightDelta) * ZoomLevel));
+                    float pTopY = startPageY + ch.PageNumber * (pageH + PageGap) + effTopMZoomed;
+                    int cX = pageX + (int)Math.Round(ch.PageX * ZoomLevel);
+                    int cY = (int)Math.Round(pTopY + ch.PageY * ZoomLevel);
                     ch.LastBounds = new Rectangle(cX, cY, cW, cH);
                 }
                 else
@@ -13847,13 +15972,13 @@ namespace ZenQOffice.UI
             // Pre-calculate LastBounds for all Floating shapes (WrapMode != 0) before text layout!
             foreach (var sh in DocumentShapes)
             {
-                if (sh.WrapMode != 0)
+                if (sh.WrapMode != 0 && sh.PositionCalculated)
                 {
-                    int sW = Math.Max((int)(20 * ZoomLevel), (int)((sh.BaseWidth + sh.WidthDelta) * ZoomLevel));
-                    int sH = Math.Max((int)(15 * ZoomLevel), (int)((sh.BaseHeight + sh.HeightDelta) * ZoomLevel));
-                    int pTopY = startPageY + sh.PageNumber * (pageH + PageGap) + marginY;
-                    int sX = pageX + (int)(sh.PageX * ZoomLevel);
-                    int sY = pTopY + (int)(sh.PageY * ZoomLevel);
+                    int sW = Math.Max((int)Math.Round(20f * ZoomLevel), (int)Math.Round((sh.BaseWidth + sh.WidthDelta) * ZoomLevel));
+                    int sH = Math.Max((int)Math.Round(15f * ZoomLevel), (int)Math.Round((sh.BaseHeight + sh.HeightDelta) * ZoomLevel));
+                    float pTopY = startPageY + sh.PageNumber * (pageH + PageGap) + effTopMZoomed;
+                    int sX = pageX + (int)Math.Round(sh.PageX * ZoomLevel);
+                    int sY = (int)Math.Round(pTopY + sh.PageY * ZoomLevel);
                     sh.LastBounds = new Rectangle(sX, sY, sW, sH);
                 }
                 else
@@ -13865,17 +15990,17 @@ namespace ZenQOffice.UI
             // PASS 1: Render Behind-Text Shapes & Charts (WrapMode == 5) beneath text
             foreach (var sh in DocumentShapes)
             {
-                if (sh.WrapMode == 5 && !sh.LastBounds.IsEmpty)
+                if (onlyTargetPage != -2 && (onlyTargetPage < 0 || sh.PageNumber == onlyTargetPage) && sh.WrapMode == 5 && !sh.LastBounds.IsEmpty)
                 {
-                    if (sh.LastBounds.Bottom >= 150 && sh.LastBounds.Top <= height)
+                    if (sh.LastBounds.Bottom >= visTopY && sh.LastBounds.Top <= visBotY)
                         ShapeRenderer.DrawShape(g, sh, sh.LastBounds, ribbon, ZoomLevel);
                 }
             }
             foreach (var ch in DocumentCharts)
             {
-                if (ch.WrapMode == 5 && !ch.LastBounds.IsEmpty)
+                if (onlyTargetPage != -2 && (onlyTargetPage < 0 || ch.PageNumber == onlyTargetPage) && ch.WrapMode == 5 && !ch.LastBounds.IsEmpty)
                 {
-                    if (ch.LastBounds.Bottom >= 150 && ch.LastBounds.Top <= height)
+                    if (ch.LastBounds.Bottom >= visTopY && ch.LastBounds.Top <= visBotY)
                         DrawDocumentChart(g, ch, ch.LastBounds.X, ch.LastBounds.Y, ch.LastBounds.Width, ch.LastBounds.Height, ribbon);
                 }
             }
@@ -13891,7 +16016,7 @@ namespace ZenQOffice.UI
                     if (stroke != null && stroke.IsHighlighter && stroke.Points != null && stroke.Points.Count > 0)
                     {
                         int sPageY = startPageY + stroke.PageIndex * (pageH + PageGap);
-                        if (sPageY + pageH >= 150 && sPageY <= height)
+                        if (sPageY + pageH >= visTopY && sPageY <= visBotY)
                         {
                             DrawInkStroke(g, stroke, pageX, sPageY, ZoomLevel);
                         }
@@ -13913,26 +16038,80 @@ namespace ZenQOffice.UI
             int docLineNumber = 0;
             int lastLinePage = -1;
             int pageLineNumber = 0;
+            _pageSectionIndices.Clear();
+            _pageSectionIndices[0] = 0;
+            int activeSectionIdx = 0;
+            WriterColumnSettings activeCols = GetEffectiveColumnSettings(activeSectionIdx, ribbon);
+            string activeColsSig = activeCols.CacheSignature();
+            int activeColIdx = 0;
+            float colRegionTopY = currentY;
+            float bandMaxBottomY = currentY;
+            int activeBandId = 0;
+            float baseBodyLogicalW = GetBaseBodyLogicalWidth(ribbon);
+            Dictionary<long, ColBandSpan> colBandSpans = new Dictionary<long, ColBandSpan>();
 
             using (SolidBrush selBrush = new SolidBrush(Color.FromArgb(180, 213, 254)))
             {
+            int[] outlineParaLevels = null;
+            bool[] outlineParaVisible = null;
+            if (ViewMode == 4)
+            {
+                outlineParaLevels = new int[paragraphs.Length];
+                outlineParaVisible = new bool[paragraphs.Length];
+                int scanIdx = 0;
+                int collapsedParentDepth = 99;
+                for (int op = 0; op < paragraphs.Length; op++)
+                {
+                    int lvl = GetParagraphOutlineLevel(paragraphs[op], scanIdx);
+                    outlineParaLevels[op] = lvl;
+                    bool vis = true;
+                    if (OutlineFilterMaxLevel < 9 && (lvl == 0 || lvl > OutlineFilterMaxLevel))
+                    {
+                        vis = false;
+                    }
+                    if (collapsedParentDepth < 99)
+                    {
+                        if (lvl > 0 && lvl <= collapsedParentDepth)
+                        {
+                            collapsedParentDepth = 99;
+                        }
+                        else
+                        {
+                            vis = false;
+                        }
+                    }
+                    outlineParaVisible[op] = vis;
+                    if (vis && lvl > 0 && CollapsedOutlineParaStarts.Contains(scanIdx))
+                    {
+                        collapsedParentDepth = lvl;
+                    }
+                    scanIdx += paragraphs[op].Length + 1;
+                }
+            }
+
                 for (int p = 0; p < paragraphs.Length; p++)
                 {
                     string para = paragraphs[p];
+                    if (ViewMode == 4 && outlineParaVisible != null && !outlineParaVisible[p])
+                    {
+                        paraStartIndex += para.Length + 1;
+                        continue;
+                    }
 
                     // High-Performance Viewport Virtualization: Skip off-screen cached paragraphs at the very beginning of the loop!
                     ParaLayoutCache pCache = null;
                     float yOffset = currentY - startPageY;
-                    if (_paraLayoutCache.TryGetValue(paraStartIndex, out pCache))
+                    if (!para.StartsWith("[--- ") && _paraLayoutCache.TryGetValue(paraStartIndex, out pCache))
                     {
-                        if (pCache.Text == para && pCache.Zoom == ZoomLevel && pCache.MaxW == maxTextW && Math.Abs(pCache.CurrentYOffset - yOffset) < 0.05f)
+                        if (pCache.Text == para && pCache.Zoom == ZoomLevel && pCache.MaxW == maxTextW && Math.Abs(pCache.CurrentYOffset - yOffset) < 0.05f
+                            && pCache.SectionIdx == activeSectionIdx && pCache.ColSig == activeColsSig && pCache.StartColIdx == activeColIdx && Math.Abs(pCache.StartColTopYOffset - (colRegionTopY - startPageY)) < 0.05f)
                         {
                             float readModeOffset = (ViewMode == 0) ? (ReadModePageIndex * (pageH + PageGap)) : 0f;
                             float paraScreenTop = startPageY + pCache.CurrentYOffset - readModeOffset;
                             float paraScreenBottom = startPageY + pCache.FinalYOffset - readModeOffset;
                             bool isOffscreen = (ViewMode == 0)
                                 ? (paraScreenBottom < startPageY - 20 || paraScreenTop > startPageY + pageH + 20)
-                                : (paraScreenBottom < -100 || paraScreenTop > height + 100);
+                                : (paraScreenBottom < visTopY - 100 || paraScreenTop > visBotY + 100);
                             bool containsCursor = (CursorPosition >= paraStartIndex && CursorPosition <= paraStartIndex + para.Length);
                             bool containsSelection = hasSelection && (selMax >= paraStartIndex && selMin <= paraStartIndex + para.Length);
 
@@ -13940,6 +16119,9 @@ namespace ZenQOffice.UI
                             {
                                 currentY = startPageY + pCache.FinalYOffset;
                                 currentPage = pCache.FinalPage;
+                                activeColIdx = pCache.FinalColIdx;
+                                colRegionTopY = startPageY + pCache.FinalColTopYOffset;
+                                bandMaxBottomY = startPageY + pCache.FinalBandMaxBottomYOffset;
                                 paraStartIndex += para.Length + 1;
                                 continue;
                             }
@@ -13951,6 +16133,29 @@ namespace ZenQOffice.UI
                     string pTrim = isPotentialBreak ? para.Trim() : "";
                     if (isPotentialBreak && (pTrim == "[--- PAGE BREAK ---]" || para.Contains("TRANG TRẮNG MỚI")))
                     {
+                        if (ViewMode == 3 || ViewMode == 4)
+                        {
+                            float pbY = currentY + 10f * ZoomLevel;
+                            if (pbY >= visTopY - 20 && pbY <= visBotY + 20)
+                            {
+                                using (Pen pbPen = new Pen(Color.FromArgb(156, 163, 175), 1.0f) { DashStyle = DashStyle.Dot })
+                                {
+                                    g.DrawLine(pbPen, textX, pbY, textX + maxTextW, pbY);
+                                }
+                                using (Font pFont = new Font("Segoe UI", 8.0f * ZoomLevel, FontStyle.Italic))
+                                {
+                                    string pbLbl = " Ngắt trang (Page Break) ";
+                                    SizeF lbSz = g.MeasureString(pbLbl, pFont);
+                                    float lx = textX + Math.Max(0, (maxTextW - lbSz.Width) / 2f);
+                                    using (SolidBrush wBg = new SolidBrush(Color.White))
+                                        g.FillRectangle(wBg, lx - 4, pbY - lbSz.Height / 2f, lbSz.Width + 8, lbSz.Height);
+                                    g.DrawString(pbLbl, pFont, Brushes.DimGray, lx, pbY - lbSz.Height / 2f);
+                                }
+                            }
+                            currentY += 22f * ZoomLevel;
+                            paraStartIndex += para.Length + 1;
+                            continue;
+                        }
                         int gapMidY = startPageY + currentPage * (pageH + PageGap) + pageH + PageGap / 2;
                         if (ShowFormattingMarks && gapMidY >= 140 && gapMidY <= height + 20)
                         {
@@ -13963,14 +16168,11 @@ namespace ZenQOffice.UI
                         }
                         int startCurrentPage = currentPage;
                         currentPage++;
+                        activeColIdx = 0;
                         currentY = startPageY + currentPage * (pageH + PageGap) + marginY;
-                        
-                        _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
-                            Text = para, Zoom = ZoomLevel, MaxW = maxTextW,
-                            CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
-                            FinalYOffset = currentY - startPageY, FinalPage = currentPage,
-                            Lines = new List<WrapLineInfo>()
-                        };
+                        colRegionTopY = currentY;
+                        bandMaxBottomY = currentY;
+                        activeBandId++;
 
                         paraStartIndex += para.Length + 1;
                         continue;
@@ -13979,21 +16181,29 @@ namespace ZenQOffice.UI
                     {
                         if (ShowFormattingMarks && currentY >= 140 && currentY <= height + 20)
                         {
+                            float _cOff, _cW;
+                            int _cX, _cSW;
+                            ComputeColumnBounds(activeCols, baseBodyLogicalW, ZoomLevel, textX, activeColIdx, out _cOff, out _cW, out _cX, out _cSW);
                             using (Font pFont = new Font("Segoe UI", 8.0f * ZoomLevel, FontStyle.Italic))
                             {
-                                g.DrawString("············································································· Ngắt cột (Column Break) ·····················································", pFont, Brushes.DimGray, pageX + marginX, currentY);
+                                g.DrawString("···· Ngắt cột ····", pFont, Brushes.DimGray, _cX, currentY);
                             }
                         }
-                        int startCurrentPage = currentPage;
-                        currentPage++;
-                        currentY = startPageY + currentPage * (pageH + PageGap) + marginY;
-                        
-                        _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
-                            Text = para, Zoom = ZoomLevel, MaxW = maxTextW,
-                            CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
-                            FinalYOffset = currentY - startPageY, FinalPage = currentPage,
-                            Lines = new List<WrapLineInfo>()
-                        };
+                        bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
+                        if (activeCols != null && activeCols.ColumnCount > 1 && activeColIdx + 1 < activeCols.ColumnCount)
+                        {
+                            activeColIdx++;
+                            currentY = colRegionTopY;
+                        }
+                        else
+                        {
+                            currentPage++;
+                            activeColIdx = 0;
+                            currentY = startPageY + currentPage * (pageH + PageGap) + marginY;
+                            colRegionTopY = currentY;
+                            bandMaxBottomY = currentY;
+                            activeBandId++;
+                        }
 
                         paraStartIndex += para.Length + 1;
                         continue;
@@ -14021,6 +16231,33 @@ namespace ZenQOffice.UI
                     }
                     else if (isPotentialBreak && pTrim == "[--- SECTION BREAK (NEXT PAGE) ---]")
                     {
+                        if (ViewMode == 3 || ViewMode == 4)
+                        {
+                            float sbY = currentY + 11f * ZoomLevel;
+                            if (sbY >= visTopY - 20 && sbY <= visBotY + 20)
+                            {
+                                using (Pen sbPen = new Pen(Color.FromArgb(59, 130, 246), 1.0f) { DashStyle = DashStyle.Dash })
+                                {
+                                    g.DrawLine(sbPen, textX, sbY - 1.5f, textX + maxTextW, sbY - 1.5f);
+                                    g.DrawLine(sbPen, textX, sbY + 1.5f, textX + maxTextW, sbY + 1.5f);
+                                }
+                                using (Font pFont = new Font("Segoe UI", 8.0f * ZoomLevel, FontStyle.Italic))
+                                {
+                                    SizeF lbSz = g.MeasureString(" Ngắt phân đoạn (Next Page) ", pFont);
+                                    float lx = textX + Math.Max(0, (maxTextW - lbSz.Width) / 2f);
+                                    using (SolidBrush wBg = new SolidBrush(Color.White))
+                                        g.FillRectangle(wBg, lx - 4, sbY - lbSz.Height / 2f, lbSz.Width + 8, lbSz.Height);
+                                    using (SolidBrush bTxt = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                                        g.DrawString(" Ngắt phân đoạn (Next Page) ", pFont, bTxt, lx, sbY - lbSz.Height / 2f);
+                                }
+                            }
+                            activeSectionIdx++;
+                            activeCols = GetEffectiveColumnSettings(activeSectionIdx, ribbon);
+                            activeColsSig = activeCols.CacheSignature();
+                            currentY += 24f * ZoomLevel;
+                            paraStartIndex += para.Length + 1;
+                            continue;
+                        }
                         int gapMidY = startPageY + currentPage * (pageH + PageGap) + pageH + PageGap / 2;
                         if (ShowFormattingMarks && gapMidY >= 140 && gapMidY <= height + 20)
                         {
@@ -14033,33 +16270,71 @@ namespace ZenQOffice.UI
                         }
                         int startCurrentPage = currentPage;
                         currentPage++;
+                        activeColIdx = 0;
+                        activeSectionIdx++;
+                        _pageSectionIndices[currentPage] = activeSectionIdx;
+                        activeCols = GetEffectiveColumnSettings(activeSectionIdx, ribbon);
+                        activeColsSig = activeCols.CacheSignature();
                         currentY = startPageY + currentPage * (pageH + PageGap) + marginY;
-                        
-                        _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
-                            Text = para, Zoom = ZoomLevel, MaxW = maxTextW,
-                            CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
-                            FinalYOffset = currentY - startPageY, FinalPage = currentPage,
-                            Lines = new List<WrapLineInfo>()
-                        };
+                        colRegionTopY = currentY;
+                        bandMaxBottomY = currentY;
+                        activeBandId++;
 
                         paraStartIndex += para.Length + 1;
                         continue;
                     }
                     else if (isPotentialBreak && pTrim == "[--- SECTION BREAK (CONTINUOUS) ---]")
                     {
+                        bandMaxBottomY = Math.Max(bandMaxBottomY, currentY);
+                        currentY = bandMaxBottomY;
                         if (ShowFormattingMarks && currentY >= 140 && currentY <= height + 20)
                         {
                             using (Font pFont = new Font("Segoe UI", 8.0f * ZoomLevel, FontStyle.Italic))
                             {
-                                g.DrawString(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: Ngắt phân đoạn (Liên tục / Continuous) ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::", pFont, Brushes.DarkSlateGray, pageX + marginX, currentY);
+                                g.DrawString(":::::::: Ngắt phân đoạn (Liên tục / Continuous) ::::::::", pFont, Brushes.DarkSlateGray, pageX + marginX, currentY);
                             }
                             currentY += (int)(20 * ZoomLevel);
                         }
+                        activeColIdx = 0;
+                        activeSectionIdx++;
+                        _pageSectionIndices[currentPage] = activeSectionIdx;
+                        activeCols = GetEffectiveColumnSettings(activeSectionIdx, ribbon);
+                        activeColsSig = activeCols.CacheSignature();
+                        colRegionTopY = currentY;
+                        bandMaxBottomY = currentY;
+                        activeBandId++;
                         paraStartIndex += para.Length + 1;
                         continue;
                     }
                     else if (isPotentialBreak && pTrim == "[--- SECTION BREAK (EVEN PAGE) ---]")
                     {
+                        if (ViewMode == 3 || ViewMode == 4)
+                        {
+                            float sbY = currentY + 11f * ZoomLevel;
+                            if (sbY >= visTopY - 20 && sbY <= visBotY + 20)
+                            {
+                                using (Pen sbPen = new Pen(Color.FromArgb(59, 130, 246), 1.0f) { DashStyle = DashStyle.Dash })
+                                {
+                                    g.DrawLine(sbPen, textX, sbY - 1.5f, textX + maxTextW, sbY - 1.5f);
+                                    g.DrawLine(sbPen, textX, sbY + 1.5f, textX + maxTextW, sbY + 1.5f);
+                                }
+                                using (Font pFont = new Font("Segoe UI", 8.0f * ZoomLevel, FontStyle.Italic))
+                                {
+                                    SizeF lbSz = g.MeasureString(" Ngắt phân đoạn (Even Page) ", pFont);
+                                    float lx = textX + Math.Max(0, (maxTextW - lbSz.Width) / 2f);
+                                    using (SolidBrush wBg = new SolidBrush(Color.White))
+                                        g.FillRectangle(wBg, lx - 4, sbY - lbSz.Height / 2f, lbSz.Width + 8, lbSz.Height);
+                                    using (SolidBrush bTxt = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                                        g.DrawString(" Ngắt phân đoạn (Even Page) ", pFont, bTxt, lx, sbY - lbSz.Height / 2f);
+                                }
+                            }
+                            activeSectionIdx++;
+                            activeCols = GetEffectiveColumnSettings(activeSectionIdx, ribbon);
+                            activeColsSig = activeCols.CacheSignature();
+                            currentY += 24f * ZoomLevel;
+                            paraStartIndex += para.Length + 1;
+                            continue;
+                        }
                         int gapMidY = startPageY + currentPage * (pageH + PageGap) + pageH + PageGap / 2;
                         if (ShowFormattingMarks && gapMidY >= 140 && gapMidY <= height + 20)
                         {
@@ -14073,20 +16348,48 @@ namespace ZenQOffice.UI
                         int startCurrentPage = currentPage;
                         currentPage++;
                         if ((currentPage + 1) % 2 != 0) currentPage++;
+                        activeColIdx = 0;
+                        activeSectionIdx++;
+                        _pageSectionIndices[currentPage] = activeSectionIdx;
+                        activeCols = GetEffectiveColumnSettings(activeSectionIdx, ribbon);
+                        activeColsSig = activeCols.CacheSignature();
                         currentY = startPageY + currentPage * (pageH + PageGap) + marginY;
-                        
-                        _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
-                            Text = para, Zoom = ZoomLevel, MaxW = maxTextW,
-                            CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
-                            FinalYOffset = currentY - startPageY, FinalPage = currentPage,
-                            Lines = new List<WrapLineInfo>()
-                        };
+                        colRegionTopY = currentY;
+                        bandMaxBottomY = currentY;
+                        activeBandId++;
 
                         paraStartIndex += para.Length + 1;
                         continue;
                     }
                     else if (isPotentialBreak && pTrim == "[--- SECTION BREAK (ODD PAGE) ---]")
                     {
+                        if (ViewMode == 3 || ViewMode == 4)
+                        {
+                            float sbY = currentY + 11f * ZoomLevel;
+                            if (sbY >= visTopY - 20 && sbY <= visBotY + 20)
+                            {
+                                using (Pen sbPen = new Pen(Color.FromArgb(59, 130, 246), 1.0f) { DashStyle = DashStyle.Dash })
+                                {
+                                    g.DrawLine(sbPen, textX, sbY - 1.5f, textX + maxTextW, sbY - 1.5f);
+                                    g.DrawLine(sbPen, textX, sbY + 1.5f, textX + maxTextW, sbY + 1.5f);
+                                }
+                                using (Font pFont = new Font("Segoe UI", 8.0f * ZoomLevel, FontStyle.Italic))
+                                {
+                                    SizeF lbSz = g.MeasureString(" Ngắt phân đoạn (Odd Page) ", pFont);
+                                    float lx = textX + Math.Max(0, (maxTextW - lbSz.Width) / 2f);
+                                    using (SolidBrush wBg = new SolidBrush(Color.White))
+                                        g.FillRectangle(wBg, lx - 4, sbY - lbSz.Height / 2f, lbSz.Width + 8, lbSz.Height);
+                                    using (SolidBrush bTxt = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                                        g.DrawString(" Ngắt phân đoạn (Odd Page) ", pFont, bTxt, lx, sbY - lbSz.Height / 2f);
+                                }
+                            }
+                            activeSectionIdx++;
+                            activeCols = GetEffectiveColumnSettings(activeSectionIdx, ribbon);
+                            activeColsSig = activeCols.CacheSignature();
+                            currentY += 24f * ZoomLevel;
+                            paraStartIndex += para.Length + 1;
+                            continue;
+                        }
                         int gapMidY = startPageY + currentPage * (pageH + PageGap) + pageH + PageGap / 2;
                         if (ShowFormattingMarks && gapMidY >= 140 && gapMidY <= height + 20)
                         {
@@ -14100,14 +16403,15 @@ namespace ZenQOffice.UI
                         int startCurrentPage = currentPage;
                         currentPage++;
                         if ((currentPage + 1) % 2 == 0) currentPage++;
+                        activeColIdx = 0;
+                        activeSectionIdx++;
+                        _pageSectionIndices[currentPage] = activeSectionIdx;
+                        activeCols = GetEffectiveColumnSettings(activeSectionIdx, ribbon);
+                        activeColsSig = activeCols.CacheSignature();
                         currentY = startPageY + currentPage * (pageH + PageGap) + marginY;
-                        
-                        _paraLayoutCache[paraStartIndex] = new ParaLayoutCache {
-                            Text = para, Zoom = ZoomLevel, MaxW = maxTextW,
-                            CurrentYOffset = yOffset, CurrentPage = startCurrentPage,
-                            FinalYOffset = currentY - startPageY, FinalPage = currentPage,
-                            Lines = new List<WrapLineInfo>()
-                        };
+                        colRegionTopY = currentY;
+                        bandMaxBottomY = currentY;
+                        activeBandId++;
 
                         paraStartIndex += para.Length + 1;
                         continue;
@@ -14147,36 +16451,30 @@ namespace ZenQOffice.UI
                             else
                             {
                                 // Floating: check if tagY is paragraph relative (tagYRel == 1) or absolute (tagYRel == 0)
-                                if (!shapeObj.FixPosition)
+                                if (!shapeObj.PositionCalculated)
                                 {
-                                    if (tagX >= 0 && !shapeObj.PositionCalculated) shapeObj.PageX = tagX;
+                                    if (tagX >= 0) shapeObj.PageX = tagX;
                                     if (tagY >= 0)
                                     {
-                                        if (tagYRel == 1) 
+                                        if (tagYRel == 1 && !shapeObj.FixPosition)
                                         {
-                                            if (!shapeObj.PositionCalculated)
-                                            {
-                                                int pTopY = startPageY + currentPage * (pageH + PageGap) + marginY;
-                                                shapeObj.PageY = (int)((currentY - pTopY) / ZoomLevel) + tagY;
-                                                shapeObj.PageNumber = currentPage;
-                                                shapeObj.PositionCalculated = true; // Lock position to prevent jitter
-                                            }
+                                            float pTopY = startPageY + currentPage * (pageH + PageGap) + GetEffectiveTopMarginLogical(ribbon) * ZoomLevel;
+                                            shapeObj.PageY = (int)Math.Round((currentY - pTopY) / Math.Max(0.01f, ZoomLevel)) + tagY;
+                                            shapeObj.PageNumber = currentPage;
                                         }
-                                        else 
+                                        else
                                         {
-                                            if (!shapeObj.PositionCalculated)
-                                            {
-                                                shapeObj.PageY = tagY;
-                                                shapeObj.PageNumber = currentPage;
-                                                shapeObj.PositionCalculated = true;
-                                            }
+                                            shapeObj.PageY = tagY;
+                                            shapeObj.PageNumber = (tagPage >= 0) ? tagPage : currentPage;
                                         }
                                     }
-                                    // Anchor to current page (the page where the anchor paragraph appears)
-                                    if (!shapeObj.PositionCalculated) shapeObj.PageNumber = currentPage;
+                                    else
+                                    {
+                                        shapeObj.PageNumber = (tagPage >= 0) ? tagPage : currentPage;
+                                    }
+                                    shapeObj.PositionCalculated = true; // Lock position to prevent jitter
+                                    anyShapeNeedsPostResolve = true;
                                 }
-                                // If tagPage is explicitly set (user moved image), override page
-                                if (tagPage >= 0 && tagPage != -1) shapeObj.PageNumber = tagPage;
                             }
                         }
 
@@ -14881,7 +17179,7 @@ namespace ZenQOffice.UI
                             int effTableY = (ViewMode == 0) ? (tableY - ReadModePageIndex * (pageH + PageGap)) : tableY;
                             bool isTableVisible = (ViewMode == 0)
                                 ? (effTableY + tableH >= startPageY - 20 && effTableY <= startPageY + pageH + 20)
-                                : (tableY + tableH >= 140 && tableY <= height + 20);
+                                : (tableY + tableH >= visTopY - 20 && tableY <= visBotY + 20);
                             if (!isTableVisible && !isTableHoveredOrActive)
                             {
                                 if (tWrap == 0)
@@ -15013,6 +17311,62 @@ namespace ZenQOffice.UI
                                     lStart += tLine.Length + 1;
                                 }
 
+                                // Pass 0: Fill all visible cell backgrounds & column selection highlights BEFORE drawing any collapsed borders
+                                // so shaded cells never obscure shared borders of adjacent rows/columns.
+                                foreach (var fragment in tableFragments)
+                                {
+                                    int fr = fragment.Row;
+                                    bool isFrVisible = (fragment.Y + fragment.Height >= visTopY - 60 && fragment.Y <= visBotY + 60);
+                                    if (!isFrVisible) continue;
+
+                                    var bgState = g.Save();
+                                    g.IntersectClip(new Rectangle(tableX - 4, fragment.Y - 4, tableW + 8, fragment.Height + 8));
+                                    while (DocumentTables.Count <= tblIdx) DocumentTables.Add(new DocTableObject());
+                                    DocTableObject tBgObj = DocumentTables[tblIdx];
+                                    while (tBgObj.Rows.Count <= fr) tBgObj.Rows.Add(new DocTableRow());
+
+                                    for (int fc = 0; fc < numCols; fc++)
+                                    {
+                                        while (tBgObj.Rows[fr].Cells.Count <= fc)
+                                        {
+                                            tBgObj.Rows[fr].Cells.Add(new DocTableCell
+                                            {
+                                                HasBorderTop = (fr == 0) ? tBgObj.HasBorderTop : tBgObj.HasBorderInsideH,
+                                                BorderTopStyle = (fr == 0) ? tBgObj.BorderTopStyle : tBgObj.BorderInsideHStyle,
+                                                HasBorderBottom = (fr == numRows - 1) ? tBgObj.HasBorderBottom : tBgObj.HasBorderInsideH,
+                                                BorderBottomStyle = (fr == numRows - 1) ? tBgObj.BorderBottomStyle : tBgObj.BorderInsideHStyle,
+                                                HasBorderLeft = (fc == 0) ? tBgObj.HasBorderLeft : tBgObj.HasBorderInsideV,
+                                                BorderLeftStyle = (fc == 0) ? tBgObj.BorderLeftStyle : tBgObj.BorderInsideVStyle,
+                                                HasBorderRight = (fc == numCols - 1) ? tBgObj.HasBorderRight : tBgObj.HasBorderInsideV,
+                                                BorderRightStyle = (fc == numCols - 1) ? tBgObj.BorderRightStyle : tBgObj.BorderInsideVStyle
+                                            });
+                                        }
+                                        DocTableCell cBgData = tBgObj.Rows[fr].Cells[fc];
+                                        Rectangle bgCellRect = new Rectangle(colXPos[fc], fragment.Y, TableColWidths[tblIdx][fc], fragment.Height);
+
+                                        if (thisTableDragging)
+                                        {
+                                            using (SolidBrush dragBg = new SolidBrush(Color.FromArgb(80, 255, 255, 255)))
+                                                g.FillRectangle(dragBg, bgCellRect);
+                                        }
+                                        else if (cBgData != null && cBgData.BackgroundColor != Color.Transparent && cBgData.BackgroundColor != Color.Empty)
+                                        {
+                                            using (SolidBrush bgB = new SolidBrush(cBgData.BackgroundColor))
+                                                g.FillRectangle(bgB, bgCellRect);
+                                        }
+
+                                        bool isColSel = (SelectedColumnTableIndex == tblIdx &&
+                                            fc >= Math.Min(SelectedColumnIndex, SelectedColumnEndIndex) &&
+                                            fc <= Math.Max(SelectedColumnIndex, SelectedColumnEndIndex));
+                                        if (isColSel)
+                                        {
+                                            using (SolidBrush colSelBrush = new SolidBrush(Color.FromArgb(90, 0, 120, 215)))
+                                                g.FillRectangle(colSelBrush, bgCellRect);
+                                        }
+                                    }
+                                    g.Restore(bgState);
+                                }
+
                                 foreach(var fragment in tableFragments)
                                 {
                                     int r=fragment.Row;
@@ -15022,7 +17376,7 @@ namespace ZenQOffice.UI
                                     int cellY = fragment.Y-fragment.Offset;
                                     int cellH = (TableRowHeights.ContainsKey(tblIdx) && r < TableRowHeights[tblIdx].Count) ? TableRowHeights[tblIdx][r] : (int)(24 * ZoomLevel);
                                     // Viewport culling: skip measuring & rendering off-screen rows for buttery smooth 60fps scrolling
-                                    bool isRowVisible = (fragment.Y + fragment.Height >= -60 && fragment.Y <= height + 60);
+                                    bool isRowVisible = (fragment.Y + fragment.Height >= visTopY - 60 && fragment.Y <= visBotY + 60);
 
                                     string lineStr = (r < cleanDataLines.Count) ? cleanDataLines[r] : "";
                                     int rowLineStart = (r < cleanLineStarts.Count) ? cleanLineStarts[r] : 0;
@@ -15058,37 +17412,10 @@ namespace ZenQOffice.UI
                                             });
                                         }
                                         DocTableCell cellData = tObj.Rows[r].Cells[c];
-
-                                        Color bgColor = Color.Transparent;
-                                        if (cellData != null && cellData.BackgroundColor != Color.Transparent && cellData.BackgroundColor != Color.Empty)
-                                        {
-                                            bgColor = cellData.BackgroundColor;
-                                        }
+                                        Color bgColor = (cellData != null && cellData.BackgroundColor != Color.Transparent && cellData.BackgroundColor != Color.Empty) ? cellData.BackgroundColor : Color.Transparent;
 
                                         if (isRowVisible)
                                         {
-                                        // Fill Solid Background
-                                        if (thisTableDragging)
-                                        {
-                                            g.FillRectangle(new SolidBrush(Color.FromArgb(80, 255, 255, 255)), cellRect);
-                                        }
-                                        else if (bgColor != Color.Transparent)
-                                        {
-                                            using (SolidBrush bgB = new SolidBrush(bgColor)) g.FillRectangle(bgB, cellRect);
-                                        }
-
-                                        // Draw Column Selection Highlight (MS Word table column selection)
-                                        bool isColSelected = (SelectedColumnTableIndex == tblIdx &&
-                                            c >= Math.Min(SelectedColumnIndex, SelectedColumnEndIndex) &&
-                                            c <= Math.Max(SelectedColumnIndex, SelectedColumnEndIndex));
-                                        if (isColSelected)
-                                        {
-                                            using (SolidBrush colSelBrush = new SolidBrush(Color.FromArgb(90, 0, 120, 215)))
-                                            {
-                                                g.FillRectangle(colSelBrush, cellRect);
-                                            }
-                                        }
-
                                         // Collapsed border model: handle page split boundaries properly
                                         bool isNewPageRow = (r > 0 && rowYPos[r] > rowYPos[r - 1] + TableRowHeights[tblIdx][r - 1] + 1);
                                         bool isLastRowOnPage = (r == numRows - 1 || (r < numRows - 1 && rowYPos[r + 1] > rowYPos[r] + TableRowHeights[tblIdx][r] + 1));
@@ -15854,33 +18181,20 @@ namespace ZenQOffice.UI
                             g.Restore(tableRenderState);
 
                             // Draw Table Layout Options Floating Button (Top-Right) and Resize Handle (Bottom-Right) ONLY when hovered, selected or dragged
-                            Rectangle wrapBtnRect = new Rectangle(tableX + tableW + 6, tableY, 22, 22);
+                            Rectangle wrapBtnRect = new Rectangle(tableX + tableW + 6, tableY, 24, 24);
                             TableWrapBtnHits.Add(new TableWrapBtnHit { Rect = wrapBtnRect, TableIndex = tblIdx });
                             bool isWrapOpen = (ActiveTableLayoutOptionsIndex == tblIdx);
                             if (isTableHoveredOrActive)
                             {
-                                using (SolidBrush btnBg = new SolidBrush(isWrapOpen ? Color.FromArgb(215, 235, 255) : Color.White))
-                                using (Pen btnBorder = new Pen(isWrapOpen ? Color.FromArgb(0, 120, 215) : Color.FromArgb(180, 180, 180), 1))
-                                {
-                                    g.FillRectangle(btnBg, wrapBtnRect);
-                                    g.DrawRectangle(btnBorder, wrapBtnRect);
-                                }
-                                using (Pen archPen = new Pen(Color.FromArgb(0, 102, 204), 2.2f))
-                                using (Pen linePen = new Pen(Color.FromArgb(0, 120, 215), 1.4f))
-                                {
-                                    g.DrawLine(linePen, wrapBtnRect.X + 4, wrapBtnRect.Y + 5, wrapBtnRect.X + 18, wrapBtnRect.Y + 5);
-                                    ShapeRenderer.DrawVectorArch(g, archPen, wrapBtnRect.X + 5, wrapBtnRect.Y + 8, 12, 10);
-                                    g.DrawLine(linePen, wrapBtnRect.X + 4, wrapBtnRect.Y + 18, wrapBtnRect.X + 18, wrapBtnRect.Y + 18);
-                                }
+                                ShapeRenderer.DrawLayoutTriggerButton(g, wrapBtnRect, isWrapOpen);
 
-                                // Draw Resize Handle (Bottom-Right)
-                                int handleSz = (int)(9.0f * ZoomLevel);
-                                Rectangle handleRect = new Rectangle(tableX + tableW - handleSz / 2, tableY + tableH - handleSz / 2, handleSz, handleSz);
-                                using (SolidBrush hBrush = new SolidBrush(Color.White))
-                                using (Pen handlePen = new Pen(Color.FromArgb(0, 102, 204), 1.5f))
+                                // Draw Resize Handle (Bottom-Right) - clean Slides-style white circle with gray border
+                                float handleSz = Math.Max(7f, 8.5f * Math.Min(1.2f, Math.Max(0.8f, ZoomLevel)));
+                                RectangleF handleRect = new RectangleF(tableX + tableW - handleSz / 2f, tableY + tableH - handleSz / 2f, handleSz, handleSz);
+                                using (Pen handlePen = new Pen(Color.FromArgb(136, 142, 150), 1.15f))
                                 {
-                                    g.FillRectangle(hBrush, handleRect);
-                                    g.DrawRectangle(handlePen, handleRect);
+                                    g.FillEllipse(Brushes.White, handleRect);
+                                    g.DrawEllipse(handlePen, handleRect);
                                 }
                             }
 
@@ -15901,7 +18215,42 @@ namespace ZenQOffice.UI
                         }
                     }
 
-                    var wrappedLines = LayoutParagraphLines(para, paraStartIndex, ref currentY, ref currentPage, startPageY, pageH, marginY, bottomMarginY, textX, maxTextW, g, ribbon);
+                    int pOutlineLvl = (ViewMode == 4 && outlineParaLevels != null) ? outlineParaLevels[p] : 0;
+                    int pOutlineIndent = (ViewMode == 4) ? (int)Math.Round((pOutlineLvl > 0 ? (pOutlineLvl - 1) * 22f : Math.Min(3, Math.Max(1, OutlineFilterMaxLevel)) * 22f) * ZoomLevel) : 0;
+                    int effParaTextX = textX + pOutlineIndent;
+                    int effParaMaxW = Math.Max(160, maxTextW - pOutlineIndent);
+                    var wrappedLines = LayoutParagraphLines(para, paraStartIndex, ref currentY, ref currentPage, startPageY, pageH, marginY, bottomMarginY, effParaTextX, effParaMaxW, g, ribbon, ref activeColIdx, ref colRegionTopY, ref bandMaxBottomY, activeCols, activeSectionIdx, activeColsSig);
+                    if (ViewMode == 4 && wrappedLines.Count > 0)
+                    {
+                        float fLineY = wrappedLines[0].LineY;
+                        if (fLineY >= visTopY - 24 && fLineY <= visBotY + 24)
+                        {
+                            int mx = effParaTextX - 20;
+                            int my = (int)Math.Round(fLineY + Math.Max(2f, wrappedLines[0].LineHeight * 0.25f));
+                            if (pOutlineLvl > 0)
+                            {
+                                bool isCol = CollapsedOutlineParaStarts.Contains(paraStartIndex);
+                                Rectangle tRect = new Rectangle(mx, my, 13, 13);
+                                _outlineToggleHits.Add(new KeyValuePair<Rectangle, int>(tRect, paraStartIndex));
+                                using (SolidBrush tBg = new SolidBrush(isCol ? Color.FromArgb(219, 234, 254) : Color.FromArgb(241, 245, 249)))
+                                using (Pen tPen = new Pen(Color.FromArgb(59, 130, 246), 1.0f))
+                                {
+                                    g.FillRectangle(tBg, tRect);
+                                    g.DrawRectangle(tPen, tRect);
+                                    g.DrawLine(tPen, tRect.X + 3, tRect.Y + 6, tRect.X + 10, tRect.Y + 6);
+                                    if (isCol) g.DrawLine(tPen, tRect.X + 6, tRect.Y + 3, tRect.X + 6, tRect.Y + 10);
+                                }
+                            }
+                            else
+                            {
+                                using (Pen dotPen = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
+                                {
+                                    g.DrawEllipse(dotPen, mx + 4, my + 4, 5, 5);
+                                }
+                            }
+                        }
+                    }
+                    _pageSectionIndices[currentPage] = activeSectionIdx;
 
                     // Render Drop Cap letter if enabled on this paragraph
                     if (ParagraphDropCaps.ContainsKey(paraStartIndex) && wrappedLines.Count > 0 && !string.IsNullOrEmpty(para))
@@ -15923,7 +18272,8 @@ namespace ZenQOffice.UI
                             }
                             float dcFS = baseFS * (dcInfo.Lines - 0.2f) * ZoomLevel;
                             float dcLetterW = (MeasureSubstringWidth(g, dcChar.ToString(), paraStartIndex, 0, 1) * (dcInfo.Lines - 0.2f) + 8f) * ZoomLevel;
-                            float dcDrawX = dcInfo.InMargin ? (textX - dcLetterW) : textX;
+                            float dcColX = wrappedLines[0].ColLeftX > 0 ? wrappedLines[0].ColLeftX : textX;
+                            float dcDrawX = dcInfo.InMargin ? (dcColX - dcLetterW) : dcColX;
                             float dcDrawY = wrappedLines[0].LineY;
 
                             using (Font dcFont = new Font("Segoe UI", Math.Max(18f, dcFS), FontStyle.Bold))
@@ -15937,12 +18287,12 @@ namespace ZenQOffice.UI
                     for (int lIdx = 0; lIdx < wrappedLines.Count; lIdx++)
                     {
                         var line = wrappedLines[lIdx];
-                        using var mathLineScope=WriterMath.BeginLine(g,line.Text,GetCachedFont(TypingFont,line.MaxFontSize*ZoomLevel,FontStyle.Regular),line.LineY);
+                        using var mathLineScope=WriterMath.BeginLine(g,line.Text,GetCachedFont(TypingFont,Math.Max(0.5f,line.MaxFontSize*ZoomLevel),FontStyle.Regular),line.LineY);
                         float dynamicLineHeight = line.LineHeight;
                         float effLineY = (ViewMode == 0) ? (line.LineY - ReadModePageIndex * (pageH + PageGap)) : line.LineY;
                         bool isLineVisible = (ViewMode == 0)
                             ? (effLineY + dynamicLineHeight >= startPageY - 10 && effLineY <= startPageY + pageH + 10)
-                            : (effLineY + dynamicLineHeight >= 155 && effLineY <= height - 26);
+                            : (effLineY + dynamicLineHeight >= visTopY && effLineY <= visBotY);
                         bool hasCursor = (CursorPosition >= line.StartIndex && CursorPosition <= line.StartIndex + line.Length);
 
                         docLineNumber++;
@@ -15965,7 +18315,8 @@ namespace ZenQOffice.UI
                             {
                                 string numStr = displayNum.ToString();
                                 SizeF lnSz = g.MeasureString(numStr, lnFont);
-                                float lnX = textX - lnSz.Width - (12.0f * ZoomLevel);
+                                float lnAnchorX = line.ColLeftX > 0 ? line.ColLeftX : textX;
+                                float lnX = lnAnchorX - lnSz.Width - ((line.ColumnIndex > 0 ? 7.0f : 12.0f) * ZoomLevel);
                                 g.DrawString(numStr, lnFont, lnBrush, lnX, line.LineY);
                             }
                         }
@@ -16273,8 +18624,9 @@ namespace ZenQOffice.UI
                             drawY = (float)Math.Round(drawY);
 
                             Font runFont = GetCachedFont(fmt.FontName, effectiveFontSize * ZoomLevel, style);
+                            Font logicalRunFont = Math.Abs(ZoomLevel - 1.0f) < 0.001f ? runFont : GetCachedFont(fmt.FontName, effectiveFontSize, style);
                             SizeF runSize = (runStr.IndexOf('\t') < 0)
-                                ? MeasureStringWithTabs(g, runStr, runFont, ZoomLevel)
+                                ? new SizeF(MeasureStringWithTabs(g, runStr, logicalRunFont, 1.0f).Width * ZoomLevel, runFont.Height)
                                 : MeasureStringWithTabs(g, runStr, runFont, ZoomLevel, curX, line.ParaLeftX, line.ParaStartIndex);
                             float runW = runSize.Width;
 
@@ -16297,7 +18649,7 @@ namespace ZenQOffice.UI
                                     {
                                         float tmpX = curX;
                                         string[] wordParts = runStr.Split(' ');
-                                        float spaceW = MeasureStringWithTabs(g, " ", runFont, ZoomLevel).Width;
+                                        float spaceW = MeasureStringWithTabs(g, " ", logicalRunFont, 1.0f).Width * ZoomLevel;
                                         int mathWordOffset=0;
                                         for (int wp = 0; wp < wordParts.Length; wp++)
                                         {
@@ -16309,7 +18661,7 @@ namespace ZenQOffice.UI
                                             if (wordParts[wp].Length > 0)
                                             {
                                                 DrawStringWithTabs(g, wordParts[wp], runFont, runBrush, tmpX, drawY, ZoomLevel);
-                                                float wSzW = MeasureStringWithTabs(g, wordParts[wp], runFont, ZoomLevel).Width;
+                                                float wSzW = MeasureStringWithTabs(g, wordParts[wp], logicalRunFont, 1.0f).Width * ZoomLevel;
                                                 tmpX += wSzW;
                                             }
                                             mathWordOffset+=wordParts[wp].Length+1;
@@ -16518,8 +18870,36 @@ namespace ZenQOffice.UI
                             ScreenY = (int)Math.Round(line.LineY),
                             ScreenH = (int)Math.Round(dynamicLineHeight),
                             ScreenX = (int)lineStartX,
-                            ExtraSpaceW = extraSpaceW
+                            ExtraSpaceW = extraSpaceW,
+                            ColLeftX = line.ColLeftX > 0 ? line.ColLeftX : textX,
+                            ColRightX = line.ColRightX > 0 ? line.ColRightX : (textX + maxTextW),
+                            PageIndex = linePage,
+                            ColumnIndex = line.ColumnIndex
                         });
+
+                        if (activeCols != null && activeCols.ColumnCount > 1 && activeCols.LineBetween)
+                        {
+                            long spanKey = ((long)linePage << 32) | (uint)activeBandId;
+                            ColBandSpan span;
+                            if (!colBandSpans.TryGetValue(spanKey, out span))
+                            {
+                                span = new ColBandSpan
+                                {
+                                    PageIndex = linePage,
+                                    Cols = activeCols,
+                                    BandTopY = line.LineY,
+                                    BandBottomY = line.LineY + dynamicLineHeight,
+                                    MaxPopulatedColIdx = line.ColumnIndex
+                                };
+                            }
+                            else
+                            {
+                                span.BandTopY = Math.Min(span.BandTopY, line.LineY);
+                                span.BandBottomY = Math.Max(span.BandBottomY, line.LineY + dynamicLineHeight);
+                                if (line.ColumnIndex > span.MaxPopulatedColIdx) span.MaxPopulatedColIdx = line.ColumnIndex;
+                            }
+                            colBandSpans[spanKey] = span;
+                        }
                     }
 
                     // Draw Paragraph Borders (Top, Bottom, Left, Right / Box / Horizontal Line)
@@ -16535,9 +18915,11 @@ namespace ZenQOffice.UI
                             {
                                 float pLeftIndent = ParagraphLeftIndents.ContainsKey(paraStartIndex) ? ParagraphLeftIndents[paraStartIndex] : 0f;
                                 float pRightIndent = ParagraphRightIndents.ContainsKey(paraStartIndex) ? ParagraphRightIndents[paraStartIndex] : 0f;
-                                int bStartX = textX + (int)Math.Round(pLeftIndent * ZoomLevel);
-                                int bEndX = textX + maxTextW - (int)Math.Round(pRightIndent * ZoomLevel);
-                                if (bEndX <= bStartX) bEndX = textX + maxTextW;
+                                int pColX = wrappedLines[0].ColLeftX > 0 ? wrappedLines[0].ColLeftX : textX;
+                                int pColW = (wrappedLines[0].ColRightX > pColX) ? (wrappedLines[0].ColRightX - pColX) : maxTextW;
+                                int bStartX = pColX + (int)Math.Round(pLeftIndent * ZoomLevel);
+                                int bEndX = pColX + pColW - (int)Math.Round(pRightIndent * ZoomLevel);
+                                if (bEndX <= bStartX) bEndX = pColX + pColW;
 
                                 if (bdr.IsHorizontalLine)
                                 {
@@ -16564,9 +18946,11 @@ namespace ZenQOffice.UI
                         int bdrY = (int)Math.Round(currentY + 3 * ZoomLevel);
                         float pLeftIndent = ParagraphLeftIndents.ContainsKey(paraStartIndex) ? ParagraphLeftIndents[paraStartIndex] : 0f;
                         float pRightIndent = ParagraphRightIndents.ContainsKey(paraStartIndex) ? ParagraphRightIndents[paraStartIndex] : 0f;
-                        int bStartX = textX + (int)Math.Round(pLeftIndent * ZoomLevel);
-                        int bEndX = textX + maxTextW - (int)Math.Round(pRightIndent * ZoomLevel);
-                        if (bEndX <= bStartX) bEndX = textX + maxTextW;
+                        int pColX = (wrappedLines.Count > 0 && wrappedLines[0].ColLeftX > 0) ? wrappedLines[0].ColLeftX : textX;
+                        int pColW = (wrappedLines.Count > 0 && wrappedLines[0].ColRightX > pColX) ? (wrappedLines[0].ColRightX - pColX) : maxTextW;
+                        int bStartX = pColX + (int)Math.Round(pLeftIndent * ZoomLevel);
+                        int bEndX = pColX + pColW - (int)Math.Round(pRightIndent * ZoomLevel);
+                        if (bEndX <= bStartX) bEndX = pColX + pColW;
                         using (Pen bPen = new Pen(borderCol, Math.Max(1.5f, 1.5f * ZoomLevel)))
                         {
                             g.DrawLine(bPen, bStartX, bdrY, bEndX, bdrY);
@@ -16576,6 +18960,35 @@ namespace ZenQOffice.UI
 
                     paraStartIndex += para.Length + 1;
                     DocParagraphGaps.Add(new ParagraphGap { ScreenY = (int)Math.Round(currentY), CharIndex = paraStartIndex, VirtualEntersNeeded = 0 });
+                }
+            }
+
+            // Draw vertical column divider lines (LineBetween) for populated multi-column bands
+            if (colBandSpans.Count > 0)
+            {
+                float divW = Math.Max(1.0f, 1.0f * ZoomLevel);
+                using (Pen divPen = new Pen(Color.FromArgb(148, 163, 184), divW))
+                {
+                    foreach (var span in colBandSpans.Values)
+                    {
+                        if (span.Cols == null || span.Cols.ColumnCount <= 1 || !span.Cols.LineBetween) continue;
+                        if (ViewMode == 0 && span.PageIndex != ReadModePageIndex) continue;
+                        if (span.BandBottomY <= span.BandTopY + 2f) continue;
+
+                        int maxSepIdx = Math.Min(span.Cols.ColumnCount - 2, span.MaxPopulatedColIdx - 1);
+                        if (maxSepIdx < 0) continue;
+
+                        float drawTop = span.BandTopY + (2.0f * ZoomLevel);
+                        float drawBot = span.BandBottomY - (2.0f * ZoomLevel);
+                        if (drawBot <= drawTop) continue;
+
+                        for (int sIdx = 0; sIdx <= maxSepIdx; sIdx++)
+                        {
+                            int gx, gw, midX;
+                            GetColumnGapBounds(span.Cols, baseBodyLogicalW, ZoomLevel, textX, sIdx, out gx, out gw, out midX);
+                            g.DrawLine(divPen, midX, drawTop, midX, drawBot);
+                        }
+                    }
                 }
             }
 
@@ -16618,8 +19031,38 @@ namespace ZenQOffice.UI
             {
                 if (ch.PageNumber + 1 > finalPages) finalPages = ch.PageNumber + 1;
             }
+            _lastContinuousContentBottomY = currentY - startPageY;
             CalculatedPageCount = finalPages;
             TotalPageCount = finalPages;
+            if (anyShapeNeedsPostResolve && onlyTargetPage == -1 && ParentControl != null && ParentControl.IsHandleCreated)
+            {
+                _paraLayoutCache.Clear();
+                try { ParentControl.BeginInvoke((MethodInvoker)delegate { this.Invalidate(); ParentControl?.Invalidate(); }); } catch { }
+            }
+            for (int hfPg = 0; hfPg < finalPages; hfPg++)
+            {
+                if (!_pageSectionIndices.ContainsKey(hfPg))
+                {
+                    _pageSectionIndices[hfPg] = hfPg > 0 && _pageSectionIndices.ContainsKey(hfPg - 1) ? _pageSectionIndices[hfPg - 1] : 0;
+                }
+            }
+            if (onlyTargetPage == -1)
+            {
+            if (ViewMode == 0)
+            {
+                DrawPageHeaderFooterWithScope(g, pageX, startPageY + ReadModePageIndex * (pageH + PageGap), pageW, pageH, ribbon, ReadModePageIndex + 1, finalPages);
+            }
+            else if (ViewMode != 3 && ViewMode != 4)
+            {
+                int startPgHf = Math.Max(0, (150 - startPageY - pageH) / (pageH + PageGap));
+                int endPgHf = Math.Min(finalPages - 1, (height - startPageY) / (pageH + PageGap) + 1);
+                for (int pgHf = startPgHf; pgHf <= endPgHf; pgHf++)
+                {
+                    int pgYHf = startPageY + pgHf * (pageH + PageGap);
+                    DrawPageHeaderFooterWithScope(g, pageX, pgYHf, pageW, pageH, ribbon, pgHf + 1, finalPages);
+                }
+            }
+            }
             if (ViewMode == 0)
             {
                 ReadModePageIndex = Math.Max(0, Math.Min(finalPages - 1, ReadModePageIndex));
@@ -16631,7 +19074,7 @@ namespace ZenQOffice.UI
             }
 
             // Draw End of Document Marker in Read Mode (ViewMode == 0)
-            if (ViewMode == 0 && ReadModePageIndex == finalPages - 1)
+            if (onlyTargetPage != -2 && ViewMode == 0 && ReadModePageIndex == finalPages - 1)
             {
                 using (Font endFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
                 using (SolidBrush sqBrush = new SolidBrush(Color.FromArgb(0, 120, 212)))
@@ -16644,18 +19087,18 @@ namespace ZenQOffice.UI
             // PASS 2: Render Floating Shapes & Charts that wrap text (Square, Tight, Through, Top/Bottom)
             foreach (var sh in DocumentShapes)
             {
-                if (sh.Visible && sh.WrapMode != 0 && sh.WrapMode != 5 && sh.WrapMode != 6 && !sh.LastBounds.IsEmpty)
+                if (onlyTargetPage != -2 && (onlyTargetPage < 0 || sh.PageNumber == onlyTargetPage) && sh.Visible && sh.WrapMode != 0 && sh.WrapMode != 5 && sh.WrapMode != 6 && !sh.LastBounds.IsEmpty)
                 {
-                    bool isShapeVis = (ViewMode == 0) ? (sh.PageNumber == ReadModePageIndex) : (sh.LastBounds.Bottom >= 150 && sh.LastBounds.Top <= height);
+                    bool isShapeVis = (ViewMode == 0) ? (sh.PageNumber == ReadModePageIndex) : (sh.LastBounds.Bottom >= visTopY && sh.LastBounds.Top <= visBotY);
                     if (isShapeVis)
                         ShapeRenderer.DrawShape(g, sh, sh.LastBounds, ribbon, ZoomLevel);
                 }
             }
             foreach (var ch in DocumentCharts)
             {
-                if (ch.Visible && ch.WrapMode != 0 && ch.WrapMode != 5 && ch.WrapMode != 6 && !ch.LastBounds.IsEmpty)
+                if (onlyTargetPage != -2 && (onlyTargetPage < 0 || ch.PageNumber == onlyTargetPage) && ch.Visible && ch.WrapMode != 0 && ch.WrapMode != 5 && ch.WrapMode != 6 && !ch.LastBounds.IsEmpty)
                 {
-                    bool isChartVis = (ViewMode == 0) ? (ch.PageNumber == ReadModePageIndex) : (ch.LastBounds.Bottom >= 150 && ch.LastBounds.Top <= height);
+                    bool isChartVis = (ViewMode == 0) ? (ch.PageNumber == ReadModePageIndex) : (ch.LastBounds.Bottom >= visTopY && ch.LastBounds.Top <= visBotY);
                     if (isChartVis)
                         DrawDocumentChart(g, ch, ch.LastBounds.X, ch.LastBounds.Y, ch.LastBounds.Width, ch.LastBounds.Height, ribbon);
                 }
@@ -16664,18 +19107,18 @@ namespace ZenQOffice.UI
             // PASS 3: Render In-Front-Of-Text Shapes & Charts (WrapMode == 6) over the text
             foreach (var sh in DocumentShapes)
             {
-                if (sh.Visible && sh.WrapMode == 6 && !sh.LastBounds.IsEmpty)
+                if (onlyTargetPage != -2 && (onlyTargetPage < 0 || sh.PageNumber == onlyTargetPage) && sh.Visible && sh.WrapMode == 6 && !sh.LastBounds.IsEmpty)
                 {
-                    bool isShapeVis = (ViewMode == 0) ? (sh.PageNumber == ReadModePageIndex) : (sh.LastBounds.Bottom >= 150 && sh.LastBounds.Top <= height);
+                    bool isShapeVis = (ViewMode == 0) ? (sh.PageNumber == ReadModePageIndex) : (sh.LastBounds.Bottom >= visTopY && sh.LastBounds.Top <= visBotY);
                     if (isShapeVis)
                         ShapeRenderer.DrawShape(g, sh, sh.LastBounds, ribbon, ZoomLevel);
                 }
             }
             foreach (var ch in DocumentCharts)
             {
-                if (ch.Visible && ch.WrapMode == 6 && !ch.LastBounds.IsEmpty)
+                if (onlyTargetPage != -2 && (onlyTargetPage < 0 || ch.PageNumber == onlyTargetPage) && ch.Visible && ch.WrapMode == 6 && !ch.LastBounds.IsEmpty)
                 {
-                    bool isChartVis = (ViewMode == 0) ? (ch.PageNumber == ReadModePageIndex) : (ch.LastBounds.Bottom >= 150 && ch.LastBounds.Top <= height);
+                    bool isChartVis = (ViewMode == 0) ? (ch.PageNumber == ReadModePageIndex) : (ch.LastBounds.Bottom >= visTopY && ch.LastBounds.Top <= visBotY);
                     if (isChartVis)
                         DrawDocumentChart(g, ch, ch.LastBounds.X, ch.LastBounds.Y, ch.LastBounds.Width, ch.LastBounds.Height, ribbon);
                 }
@@ -16692,7 +19135,7 @@ namespace ZenQOffice.UI
                     if (stroke != null && !stroke.IsHighlighter && stroke.Points != null && stroke.Points.Count > 0)
                     {
                         int sPageY = startPageY + stroke.PageIndex * (pageH + PageGap);
-                        if (sPageY + pageH >= 150 && sPageY <= height)
+                        if (sPageY + pageH >= visTopY && sPageY <= visBotY)
                         {
                             DrawInkStroke(g, stroke, pageX, sPageY, ZoomLevel);
                         }
@@ -16710,22 +19153,67 @@ namespace ZenQOffice.UI
             }
 
             DrawEquationFrame(g);
-            // 5. Draw Blinking Caret Bar — Microsoft Word Elegant 1px Pure Black Flat Caret
+            // 5. Draw Blinking Caret Bar — Microsoft Word 365 Smooth Typing Caret
             CurrentCaretScreenX = cursorX;
             CurrentCaretScreenY = cursorY;
             CurrentCaretScreenH = cursorH;
-            if (CursorVisible && ActiveShape == null && ActiveChart == null && !hasSelection && ViewMode != 0 && !IsEditingHeaderFooter)
+            if (showCaret && ActiveShape == null && ActiveChart == null && !hasSelection && ViewMode != 0 && !IsEditingHeaderFooter)
             {
-                float cursorW = (ZoomLevel >= 1.5f) ? 1.5f : 1.0f;
-                SmoothingMode prevSmooth = g.SmoothingMode;
-                g.SmoothingMode = SmoothingMode.None;
-                using (Pen cursorPen = new Pen(Color.Black, cursorW))
+                double caretNow = FluentMotion.NowMs;
+                bool resetCaret = !_caretAnimInit || Math.Abs(SmoothScrollY - _caretLastScrollY) > 1.5f ||
+                    Math.Abs(SmoothScrollX - _caretLastScrollX) > 1.5f || Math.Abs(ZoomLevel - _caretLastZoom) > 0.01f ||
+                    Math.Abs(cursorX - _caretCurX) > 360f || Math.Abs(cursorY - _caretCurY) > 160f;
+                if (resetCaret)
                 {
-                    cursorPen.StartCap = LineCap.Flat;
-                    cursorPen.EndCap = LineCap.Flat;
-                    g.DrawLine(cursorPen, cursorX, cursorY, cursorX, cursorY + cursorH);
+                    _caretAnimInit = true;
+                    _caretStartX = _caretCurX = _caretTargetX = cursorX;
+                    _caretStartY = _caretCurY = _caretTargetY = cursorY;
+                    _caretStartH = _caretCurH = _caretTargetH = cursorH;
+                    _caretGlideStartMs = -10000.0;
                 }
-                g.SmoothingMode = prevSmooth;
+                else if (Math.Abs(cursorX - _caretTargetX) > 0.4f || Math.Abs(cursorY - _caretTargetY) > 0.4f || Math.Abs(cursorH - _caretTargetH) > 0.4f)
+                {
+                    _caretStartX = _caretCurX;
+                    _caretStartY = _caretCurY;
+                    _caretStartH = _caretCurH;
+                    _caretTargetX = cursorX;
+                    _caretTargetY = cursorY;
+                    _caretTargetH = cursorH;
+                    _caretGlideStartMs = caretNow;
+                }
+                _caretLastScrollX = SmoothScrollX;
+                _caretLastScrollY = SmoothScrollY;
+                _caretLastZoom = ZoomLevel;
+
+                double caretElapsed = caretNow - _caretGlideStartMs;
+                bool isGlidingCaret = caretElapsed >= 0 && caretElapsed < CaretGlideDurationMs;
+                if (isGlidingCaret)
+                {
+                    float e = FluentMotion.EaseOutCubic((float)(caretElapsed / CaretGlideDurationMs));
+                    _caretCurX = FluentMotion.Lerp(_caretStartX, _caretTargetX, e);
+                    _caretCurY = FluentMotion.Lerp(_caretStartY, _caretTargetY, e);
+                    _caretCurH = FluentMotion.Lerp(_caretStartH, _caretTargetH, e);
+                }
+                else
+                {
+                    _caretCurX = cursorX;
+                    _caretCurY = cursorY;
+                    _caretCurH = cursorH;
+                }
+
+                if (CursorVisible || isGlidingCaret)
+                {
+                    float cursorW = (ZoomLevel >= 1.5f) ? 1.5f : 1.0f;
+                    SmoothingMode prevSmooth = g.SmoothingMode;
+                    g.SmoothingMode = SmoothingMode.None;
+                    using (Pen cursorPen = new Pen(Color.Black, cursorW))
+                    {
+                        cursorPen.StartCap = LineCap.Flat;
+                        cursorPen.EndCap = LineCap.Flat;
+                        g.DrawLine(cursorPen, _caretCurX, _caretCurY, _caretCurX, _caretCurY + _caretCurH);
+                    }
+                    g.SmoothingMode = prevSmooth;
+                }
             }
 
             // 5b. Inline image drag cursor indicator — Word-style blue vertical bar
@@ -16755,11 +19243,11 @@ namespace ZenQOffice.UI
             {
                 using (Pen changeBarPen = new Pen(Color.FromArgb(192, 0, 0), Math.Max(2.0f, 2.0f * ZoomLevel)))
                 {
-                    int barMarginX = textX - (int)(14 * ZoomLevel);
+
                     for (int li = 0; li < RenderedLines.Count; li++)
                     {
                         var rLine = RenderedLines[li];
-                        if (rLine.ScreenY + rLine.ScreenH < 150 || rLine.ScreenY > height) continue;
+                        if (rLine.ScreenY + rLine.ScreenH < visTopY || rLine.ScreenY > visBotY) continue;
 
                         int lStart = rLine.StartCharIndex;
                         int lEnd = lStart + rLine.Length;
@@ -16776,6 +19264,7 @@ namespace ZenQOffice.UI
                         }
                         if (hasRev)
                         {
+                            int barMarginX = (rLine.ColLeftX > 0 ? rLine.ColLeftX : textX) - (int)(10 * ZoomLevel);
                             g.DrawLine(changeBarPen, barMarginX, rLine.ScreenY, barMarginX, rLine.ScreenY + rLine.ScreenH);
                         }
                     }
@@ -16785,9 +19274,16 @@ namespace ZenQOffice.UI
 
 
             // 6.5. IN FRONT OF TEXT: Draw Banner On Top of Document Text (Che phủ hoàn toàn văn bản bên dưới)
-            if (IsEditingHeaderFooter && CurrentHeaderPreset == HeaderFooterPreset.Banded && HeaderWrapMode == 6)
+            if (IsEditingHeaderFooter && HeaderWrapMode == 6 && ViewMode != 3 && ViewMode != 4)
             {
-                DrawBandedHeaderBanner(g, pageX, startPageY, pageW, pageH, ribbon, 0);
+                int edPg = Math.Max(0, ActiveHeaderFooterPageIndex);
+                var hfEdScope = BeginPageHeaderFooterScope(edPg);
+                try
+                {
+                    if (CurrentHeaderPreset == HeaderFooterPreset.Banded)
+                        DrawBandedHeaderBanner(g, pageX, startPageY + edPg * (pageH + PageGap), pageW, pageH, ribbon, edPg);
+                }
+                finally { EndPageHeaderFooterScope(hfEdScope, false); }
             }
 
             // 7. TOPMOST OVERLAY: Render Layout Options Popup Dialog if opened (Đảm bảo nằm trên mọi lớp chữ và canvas)
@@ -16800,81 +19296,13 @@ namespace ZenQOffice.UI
                 int bY_pop = startPageY + (int)(10 * ZoomLevel) + (int)(HeaderBannerYOffset * ZoomLevel);
 
                 Rectangle wrapBtnRect = new Rectangle(bX_pop + bW_pop + 4, bY_pop, 22, 22);
-
-                int popW = 185;
-                int popH = 250;
-                int popX = wrapBtnRect.Right + 8;
-                int popY = wrapBtnRect.Top - 5;
-
-                g.FillRectangle(Brushes.White, popX, popY, popW, popH);
-                using (Pen popBorder = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                {
-                    g.DrawRectangle(popBorder, popX, popY, popW, popH);
-
-                    // Left pointer notch triangle pointing to wrap button
-                    Point[] pointerPts = new Point[]
-                    {
-                        new Point(popX, popY + 12),
-                        new Point(popX - 6, popY + 18),
-                        new Point(popX, popY + 24)
-                    };
-                    g.FillPolygon(Brushes.White, pointerPts);
-                    g.DrawLine(popBorder, popX, popY + 12, popX - 6, popY + 18);
-                    g.DrawLine(popBorder, popX - 6, popY + 18, popX, popY + 24);
-                }
-
-                using (Font headerFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-                using (Font sectionFont = new Font("Segoe UI", 8.0f, FontStyle.Bold))
-                using (Font itemFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-                {
-                    // Title & Close Button
-                    g.DrawString("Tùy chọn bố trí", headerFont, new SolidBrush(Color.FromArgb(0, 95, 184)), popX + 12, popY + 10);
-                    using (Pen closePen = new Pen(Color.FromArgb(100, 100, 100), 1.5f))
-                    {
-                        g.DrawLine(closePen, popX + popW - 20, popY + 12, popX + popW - 10, popY + 22);
-                        g.DrawLine(closePen, popX + popW - 10, popY + 12, popX + popW - 20, popY + 22);
-                    }
-
-                    // Section 1: Cùng dòng với văn bản (In Line with Text)
-                    Rectangle sec1Bar = new Rectangle(popX + 10, popY + 36, popW - 20, 18);
-                    using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241)))
-                    {
-                        g.FillRectangle(secBarBrush, sec1Bar);
-                    }
-                    g.DrawString("Cùng dòng với văn bản", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec1Bar.X + 6, sec1Bar.Y + 2);
-
-                    Rectangle inlineCard = new Rectangle(popX + 14, popY + 58, 42, 34);
-                    DrawVectorWrapCard(g, 0, inlineCard, HeaderWrapMode == 0);
-
-                    // Section 2: Ngắt dòng văn bản (With Text Wrapping)
-                    Rectangle sec2Bar = new Rectangle(popX + 10, popY + 98, popW - 20, 18);
-                    using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241)))
-                    {
-                        g.FillRectangle(secBarBrush, sec2Bar);
-                    }
-                    g.DrawString("Ngắt dòng văn bản", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec2Bar.X + 6, sec2Bar.Y + 2);
-
-                    // 6 Vector Wrapping Cards (3 cols x 2 rows)
-                    for (int r = 0; r < 2; r++)
-                    {
-                        for (int c = 0; c < 3; c++)
-                        {
-                            int wIdx = r == 0 ? (1 + c) : (4 + c);
-                            Rectangle cardBox = new Rectangle(popX + 14 + c * 52, popY + 120 + r * 38, 42, 34);
-                            DrawVectorWrapCard(g, wIdx, cardBox, HeaderWrapMode == wIdx);
-                        }
-                    }
-
-                    // Vector Radio 1: Di chuyển cùng văn bản
-                    int r1Y = popY + 204;
-                    DrawVectorRadioButton(g, popX + 14, r1Y, !HeaderFixPosition, "Di chuyển cùng văn bản", itemFont);
-                    DrawVectorInfoIcon(g, popX + popW - 26, r1Y + 2);
-
-                    // Vector Radio 2: Cố định vị trí trên trang
-                    int r2Y = popY + 228;
-                    DrawVectorRadioButton(g, popX + 14, r2Y, HeaderFixPosition, "Cố định vị trí trên trang", itemFont);
-                    DrawVectorInfoIcon(g, popX + popW - 26, r2Y + 2);
-                }
+                var geo = ShapeRenderer.GetLayoutPopupGeometry(wrapBtnRect, showSeeMore: false);
+                ShapeRenderer.DrawFluentLayoutPopupCore(
+                    g,
+                    geo,
+                    HeaderWrapMode,
+                    HeaderFixPosition,
+                    AppL10n.T("Tùy chọn bố trí", "Layout Options"));
             }
 
             // 7.5. TOPMOST OVERLAYS: Render Shape & Chart Popup Dialogs on top of all text and pages
@@ -16946,39 +19374,10 @@ namespace ZenQOffice.UI
             }
 
             // 7.9. RENDER DOCUMENT COMMENTS & RIGHT MARGIN MARKUP CALLOUTS
-            DrawDocumentComments(g, pageX, pageW, startPageY, pageH, finalPages, ribbon);
-
-            if (readModeState != null)
-            {
-                g.Restore(readModeState);
-                readModeState = null;
-            }
-
-            g.Restore(docClipState);
-
-            // 8. MS WORD NAVIGATION PANE (Tìm kiếm & Điều hướng)
-            if (ShowNavigationPane)
-            {
-                DrawNavigationPane(g, width, height, ribbon);
-            }
-
-            // 9. MS WORD SELECTION PANE (Ngăn Lựa Chọn)
-            if (ShowSelectionPane)
-            {
-                DrawSelectionPane(g, width, height, ribbon);
-            }
-
-            // 10. INTERACTIVE RULERS (Cố định ở đỉnh & cạnh trái, luôn vẽ đè lên trên trang khi cuộn)
-            if (ribbon != null && ribbon.ShowRuler)
-            {
-                DrawInteractiveRuler(g, pageX, pageW, marginX, rightMarginX, width, height, ribbon);
-                DrawVerticalRuler(g, pageX, pageW, pageH, marginY, bottomMarginY, width, height, ribbon);
-            }
-
-            // 11. MODERN WORD-STYLE SCROLLBARS (Thanh cuộn dọc và ngang phong cách Word)
-            DrawWordScrollBar(g, width, height, ribbon);
-            DrawWordHScrollBar(g, width, height, ribbon);
+            if (onlyTargetPage == -1 && ViewMode != 3 && ViewMode != 4) DrawDocumentComments(g, pageX, pageW, startPageY, pageH, finalPages, ribbon);
         }
+
+
 
         private void DrawInkStroke(D2DGraphics g, DocInkStroke stroke, int pageX, int pageY, float zoom)
         {
@@ -17138,8 +19537,8 @@ namespace ZenQOffice.UI
                 int calloutY = lineY - 2;
                 bool isHovered = (HoveredCommentId == c.Id || ActiveCommentId == c.Id || EditingReplyCommentId == c.Id);
 
-                string authorInitial = !string.IsNullOrEmpty(c.Author) ? c.Author.Substring(0, 1).ToUpper() : "D";
-                string authorName = !string.IsNullOrEmpty(c.Author) ? c.Author : "Danh";
+                string authorInitial = !string.IsNullOrEmpty(c.Author) ? c.Author.Substring(0, 1).ToUpper() : "U";
+                string authorName = !string.IsNullOrEmpty(c.Author) ? c.Author : "Người dùng";
 
                 // Calculate relative time string
                 TimeSpan elapsed = DateTime.Now - c.CreatedTime;
@@ -17370,7 +19769,7 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawPageCanvas(D2DGraphics g, int x, int y, int w, int h, RibbonBar ribbon, int pageNumber = 1, int totalPages = 1)
+        private void DrawPageCanvas(D2DGraphics g, int x, int y, int w, int h, RibbonBar ribbon, int pageNumber = 1, int totalPages = 1, bool includeHeaderFooter = true)
         {
             bool isEvenPage = (pageNumber % 2 == 0);
 
@@ -17394,6 +19793,187 @@ namespace ZenQOffice.UI
                 g.DrawRectangle(pageBorder, x, y, w, h);
             }
 
+            if (includeHeaderFooter)
+            {
+                DrawPageHeaderFooterWithScope(g, x, y, w, h, ribbon, pageNumber, totalPages);
+            }
+
+            if (ribbon != null && ribbon.HasPageBorder)
+            {
+                using (Pen borderPen = new Pen(ribbon.PageBorderColor, Math.Max(1.0f, ribbon.PageBorderWidth * ZoomLevel)))
+                {
+                    if (ribbon.PageBorderStyleType == 2) // Shadow
+                    {
+                        using (SolidBrush shB = new SolidBrush(Color.FromArgb(100, 120, 120, 120)))
+                        {
+                            g.FillRectangle(shB, x + 16, y + h - 10, w - 20, 5);
+                            g.FillRectangle(shB, x + w - 10, y + 16, 5, h - 20);
+                        }
+                    }
+                    g.DrawRectangle(borderPen, x + 8, y + 8, w - 16, h - 16);
+                    if (ribbon.PageBorderStyleType == 3 || ribbon.PageBorderStyleType == 4) // 3-D / Double
+                    {
+                        g.DrawRectangle(borderPen, x + 12, y + 12, w - 24, h - 24);
+                    }
+                }
+            }
+
+            // Document Gridlines (Lưới căn chỉnh ô vuông trang giấy chuẩn Word)
+            bool effGrid = ShowDocumentGridlines || (ribbon != null && ribbon.ShowGridlines);
+            if (effGrid)
+            {
+                int leftM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96.0f * ZoomLevel);
+                int rightM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f) * 96.0f * ZoomLevel);
+                int topM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveTopMarginInches() : 1.0f) * 96.0f * ZoomLevel);
+                int botM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f) * 96.0f * ZoomLevel);
+
+                int gridX1 = x + leftM;
+                int gridX2 = x + w - rightM;
+                int gridY1 = y + topM;
+                int gridY2 = y + h - botM;
+
+                if (gridX2 > gridX1 && gridY2 > gridY1)
+                {
+                    float cellSize = 18.0f * ZoomLevel;
+                    using (Pen gridPen = new Pen(Color.FromArgb(226, 232, 240), 1.0f) { DashStyle = DashStyle.Dot })
+                    {
+                        for (float gx = gridX1; gx <= gridX2; gx += cellSize)
+                        {
+                            g.DrawLine(gridPen, gx, gridY1, gx, gridY2);
+                        }
+                        for (float gy = gridY1; gy <= gridY2; gy += cellSize)
+                        {
+                            g.DrawLine(gridPen, gridX1, gy, gridX2, gy);
+                        }
+                    }
+                }
+            }
+
+            Image effWmImg = WatermarkImage ?? (ribbon != null ? ribbon.WatermarkImage : null);
+            if (effWmImg != null)
+            {
+                GraphicsState state = g.Save();
+                g.SetClip(new Rectangle(x, y, w, h));
+
+                float scale = (WatermarkImageScale > 0) ? WatermarkImageScale : (ribbon != null && ribbon.WatermarkImageScale > 0 ? ribbon.WatermarkImageScale : 0f);
+                bool washout = (ribbon != null) ? ribbon.WatermarkWashout : WatermarkWashout;
+
+                float imgW, imgH;
+                if (scale > 0)
+                {
+                    imgW = effWmImg.Width * scale * ZoomLevel;
+                    imgH = effWmImg.Height * scale * ZoomLevel;
+                }
+                else
+                {
+                    float maxW = w * 0.70f;
+                    float maxH = h * 0.70f;
+                    float ratio = Math.Min(maxW / Math.Max(1, effWmImg.Width), maxH / Math.Max(1, effWmImg.Height));
+                    imgW = effWmImg.Width * ratio;
+                    imgH = effWmImg.Height * ratio;
+                }
+
+                float drawX = x + (w - imgW) / 2f;
+                float drawY = y + (h - imgH) / 2f;
+
+                float alpha = washout ? 0.22f : 0.85f;
+                using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
+                {
+                    System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix();
+                    cm.Matrix33 = alpha;
+                    if (washout)
+                    {
+                        cm.Matrix00 = 0.8f; cm.Matrix11 = 0.8f; cm.Matrix22 = 0.8f;
+                        cm.Matrix40 = 0.2f; cm.Matrix41 = 0.2f; cm.Matrix42 = 0.2f;
+                    }
+                    ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                    g.DrawImage(effWmImg, new Rectangle((int)drawX, (int)drawY, (int)imgW, (int)imgH), 0, 0, effWmImg.Width, effWmImg.Height, GraphicsUnit.Pixel, ia);
+                }
+                g.Restore(state);
+            }
+
+            if (ribbon != null && !string.IsNullOrEmpty(ribbon.WatermarkText))
+            {
+                GraphicsState state = g.Save();
+                g.SetClip(new Rectangle(x, y, w, h));
+
+                float baseFontSize = (ribbon.WatermarkIsDiagonal ? 50.0f : 44.0f) * ZoomLevel;
+                float maxAvailableW = ribbon.WatermarkIsDiagonal ? (float)Math.Sqrt(w * w + h * h) * 0.72f : (w * 0.82f);
+
+                using (Font testFont = new Font("Arial", baseFontSize, FontStyle.Bold))
+                {
+                    SizeF measuredSz = g.MeasureString(ribbon.WatermarkText, testFont);
+                    float finalFontSize = baseFontSize;
+                    if (measuredSz.Width > maxAvailableW && measuredSz.Width > 0)
+                    {
+                        finalFontSize = Math.Max(12.0f * ZoomLevel, baseFontSize * (maxAvailableW / measuredSz.Width));
+                    }
+
+                    using (Font wmFont = new Font("Arial", finalFontSize, FontStyle.Bold))
+                    using (SolidBrush wmBrush = new SolidBrush(Color.FromArgb(38, 120, 120, 120)))
+                    {
+                        g.TranslateTransform(x + w / 2f, y + h / 2f);
+                        if (ribbon.WatermarkIsDiagonal)
+                        {
+                            g.RotateTransform(-45f);
+                        }
+                        SizeF sz = g.MeasureString(ribbon.WatermarkText, wmFont);
+                        g.DrawString(ribbon.WatermarkText, wmFont, wmBrush, -sz.Width / 2f, -sz.Height / 2f);
+                    }
+                }
+                g.Restore(state);
+            }
+
+            // Live Ghost Table Insert Preview Overlay
+            if (TablePreviewCols > 0 && TablePreviewRows > 0)
+            {
+                int cols = TablePreviewCols;
+                int rows = TablePreviewRows;
+
+                int leftM = (int)(ribbon.GetEffectiveLeftMarginInches() * 72.0f * ZoomLevel);
+                int rightM = (int)(ribbon.GetEffectiveRightMarginInches() * 72.0f * ZoomLevel);
+                int topM = (int)(ribbon.GetEffectiveTopMarginInches() * 72.0f * ZoomLevel);
+
+                float tw = w - leftM - rightM;
+                float th = Math.Min(h * 0.40f, rows * (28f * ZoomLevel));
+                float tx = x + leftM;
+                float ty = y + topM + (int)(90 * ZoomLevel);
+
+                float cellW = tw / cols;
+                float cellH = th / rows;
+
+                using (SolidBrush headerTopBrush = new SolidBrush(Color.FromArgb(170, 37, 99, 235)))
+                using (SolidBrush rowOddBrush = new SolidBrush(Color.FromArgb(120, 219, 234, 254)))
+                using (SolidBrush rowEvenBrush = new SolidBrush(Color.FromArgb(90, 255, 255, 255)))
+                using (Pen gridPen = new Pen(Color.FromArgb(200, 37, 99, 235), 1.2f))
+                using (Pen outerPen = new Pen(Color.FromArgb(240, 29, 78, 216), 2.0f))
+                {
+                    g.FillRectangle(headerTopBrush, tx, ty, tw, cellH);
+                    for (int r = 1; r < rows; r++)
+                    {
+                        SolidBrush b = (r % 2 == 1) ? rowOddBrush : rowEvenBrush;
+                        g.FillRectangle(b, tx, ty + r * cellH, tw, cellH);
+                    }
+                    for (int r = 0; r <= rows; r++)
+                    {
+                        g.DrawLine(gridPen, tx, ty + r * cellH, tx + tw, ty + r * cellH);
+                    }
+                    for (int c = 0; c <= cols; c++)
+                    {
+                        g.DrawLine(gridPen, tx + c * cellW, ty, tx + c * cellW, ty + th);
+                    }
+                    g.DrawRectangle(outerPen, tx, ty, tw, th);
+                }
+            }
+        }
+
+
+        private void DrawPageHeaderFooterWithScope(D2DGraphics g, int x, int y, int w, int h, RibbonBar ribbon, int pageNumber, int totalPages)
+        {
+            var hfScope = BeginPageHeaderFooterScope(Math.Max(0, pageNumber - 1));
+            try
+            {
+                bool isEvenPage = (pageNumber % 2 == 0);
             // Real Header & Footer Presets Rendering (Blank, Three Columns, Austin, Banded)
             if (CurrentHeaderPreset != HeaderFooterPreset.None || IsEditingHeaderFooter || !string.IsNullOrEmpty(HeaderText) || (HeaderRuns != null && HeaderRuns.Count > 0) || (HeaderEvenRuns != null && HeaderEvenRuns.Count > 0))
             {
@@ -17407,12 +19987,30 @@ namespace ZenQOffice.UI
                         g.DrawLine(dashPen, x, dashY, x + w, dashY);
                     }
 
-                    Rectangle tagRect = new Rectangle(x + (int)(5 * ZoomLevel), dashY - (int)(13 * ZoomLevel), (int)(70 * ZoomLevel), (int)(18 * ZoomLevel));
-                    g.FillRectangle(Brushes.White, tagRect);
-                    g.DrawRectangle(Pens.LightGray, tagRect);
+                    int hSecIdx = GetSectionIndexForPage(pageNumber - 1);
+                    bool hMultiSec = hSecIdx > 0 || HasMultipleSections();
+                    string hTagLabel = hMultiSec ? ("Đầu trang - Phần " + (hSecIdx + 1)) : "Đầu trang";
                     using (Font tagFont = new Font("Segoe UI", 8.0f))
                     {
-                        g.DrawString("Đầu trang", tagFont, Brushes.DimGray, tagRect.X + 6, tagRect.Y + 1);
+                        int hTagW = (int)Math.Max(70 * ZoomLevel, g.MeasureString(hTagLabel, tagFont).Width + 14);
+                        Rectangle tagRect = new Rectangle(x + (int)(5 * ZoomLevel), dashY - (int)(13 * ZoomLevel), hTagW, (int)(18 * ZoomLevel));
+                        g.FillRectangle(Brushes.White, tagRect);
+                        g.DrawRectangle(Pens.LightGray, tagRect);
+                        g.DrawString(hTagLabel, tagFont, Brushes.DimGray, tagRect.X + 6, tagRect.Y + 1);
+                        if (hSecIdx > 0 && IsSectionHeaderLinkedToPrevious(hSecIdx))
+                        {
+                            string linkLbl = "Giống phần trước";
+                            int linkW = (int)Math.Max(95, g.MeasureString(linkLbl, tagFont).Width + 12);
+                            Rectangle linkRect = new Rectangle(x + w - linkW - (int)(5 * ZoomLevel), dashY - (int)(13 * ZoomLevel), linkW, (int)(18 * ZoomLevel));
+                            using (SolidBrush lbBg = new SolidBrush(Color.FromArgb(239, 246, 255)))
+                            using (Pen lbPen = new Pen(Color.FromArgb(147, 197, 253)))
+                            using (SolidBrush lbTxt = new SolidBrush(Color.FromArgb(30, 64, 175)))
+                            {
+                                g.FillRectangle(lbBg, linkRect);
+                                g.DrawRectangle(lbPen, linkRect);
+                                g.DrawString(linkLbl, tagFont, lbTxt, linkRect.X + 6, linkRect.Y + 1);
+                            }
+                        }
                     }
                 }
 
@@ -17865,12 +20463,30 @@ namespace ZenQOffice.UI
                         g.DrawLine(dashPen, x, dashY, x + w, dashY);
                     }
 
-                    Rectangle fTagRect = new Rectangle(x + (int)(5 * ZoomLevel), dashY, (int)(70 * ZoomLevel), (int)(18 * ZoomLevel));
-                    g.FillRectangle(Brushes.White, fTagRect);
-                    g.DrawRectangle(Pens.LightGray, fTagRect);
+                    int fSecIdx = GetSectionIndexForPage(pageNumber - 1);
+                    bool fMultiSec = fSecIdx > 0 || HasMultipleSections();
+                    string fTagLabel = fMultiSec ? ("Chân trang - Phần " + (fSecIdx + 1)) : "Chân trang";
                     using (Font tagFont = new Font("Segoe UI", 8.0f))
                     {
-                        g.DrawString("Chân trang", tagFont, Brushes.DimGray, fTagRect.X + 6, fTagRect.Y + 1);
+                        int fTagW = (int)Math.Max(70 * ZoomLevel, g.MeasureString(fTagLabel, tagFont).Width + 14);
+                        Rectangle fTagRect = new Rectangle(x + (int)(5 * ZoomLevel), dashY, fTagW, (int)(18 * ZoomLevel));
+                        g.FillRectangle(Brushes.White, fTagRect);
+                        g.DrawRectangle(Pens.LightGray, fTagRect);
+                        g.DrawString(fTagLabel, tagFont, Brushes.DimGray, fTagRect.X + 6, fTagRect.Y + 1);
+                        if (fSecIdx > 0 && IsSectionFooterLinkedToPrevious(fSecIdx))
+                        {
+                            string linkLbl = "Giống phần trước";
+                            int linkW = (int)Math.Max(95, g.MeasureString(linkLbl, tagFont).Width + 12);
+                            Rectangle linkRect = new Rectangle(x + w - linkW - (int)(5 * ZoomLevel), dashY, linkW, (int)(18 * ZoomLevel));
+                            using (SolidBrush lbBg = new SolidBrush(Color.FromArgb(239, 246, 255)))
+                            using (Pen lbPen = new Pen(Color.FromArgb(147, 197, 253)))
+                            using (SolidBrush lbTxt = new SolidBrush(Color.FromArgb(30, 64, 175)))
+                            {
+                                g.FillRectangle(lbBg, linkRect);
+                                g.DrawRectangle(lbPen, linkRect);
+                                g.DrawString(linkLbl, tagFont, lbTxt, linkRect.X + 6, linkRect.Y + 1);
+                            }
+                        }
                     }
                 }
 
@@ -18293,172 +20909,11 @@ namespace ZenQOffice.UI
                     }
                 }
             }
-            if (ribbon != null && ribbon.HasPageBorder)
-            {
-                using (Pen borderPen = new Pen(ribbon.PageBorderColor, Math.Max(1.0f, ribbon.PageBorderWidth * ZoomLevel)))
-                {
-                    if (ribbon.PageBorderStyleType == 2) // Shadow
-                    {
-                        using (SolidBrush shB = new SolidBrush(Color.FromArgb(100, 120, 120, 120)))
-                        {
-                            g.FillRectangle(shB, x + 16, y + h - 10, w - 20, 5);
-                            g.FillRectangle(shB, x + w - 10, y + 16, 5, h - 20);
-                        }
-                    }
-                    g.DrawRectangle(borderPen, x + 8, y + 8, w - 16, h - 16);
-                    if (ribbon.PageBorderStyleType == 3 || ribbon.PageBorderStyleType == 4) // 3-D / Double
-                    {
-                        g.DrawRectangle(borderPen, x + 12, y + 12, w - 24, h - 24);
-                    }
-                }
+
             }
-
-            // Document Gridlines (Lưới căn chỉnh ô vuông trang giấy chuẩn Word)
-            bool effGrid = ShowDocumentGridlines || (ribbon != null && ribbon.ShowGridlines);
-            if (effGrid)
+            finally
             {
-                int leftM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveLeftMarginInches() : 1.0f) * 96.0f * ZoomLevel);
-                int rightM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveRightMarginInches() : 1.0f) * 96.0f * ZoomLevel);
-                int topM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveTopMarginInches() : 1.0f) * 96.0f * ZoomLevel);
-                int botM = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f) * 96.0f * ZoomLevel);
-
-                int gridX1 = x + leftM;
-                int gridX2 = x + w - rightM;
-                int gridY1 = y + topM;
-                int gridY2 = y + h - botM;
-
-                if (gridX2 > gridX1 && gridY2 > gridY1)
-                {
-                    float cellSize = 18.0f * ZoomLevel;
-                    using (Pen gridPen = new Pen(Color.FromArgb(226, 232, 240), 1.0f) { DashStyle = DashStyle.Dot })
-                    {
-                        for (float gx = gridX1; gx <= gridX2; gx += cellSize)
-                        {
-                            g.DrawLine(gridPen, gx, gridY1, gx, gridY2);
-                        }
-                        for (float gy = gridY1; gy <= gridY2; gy += cellSize)
-                        {
-                            g.DrawLine(gridPen, gridX1, gy, gridX2, gy);
-                        }
-                    }
-                }
-            }
-
-            Image effWmImg = WatermarkImage ?? (ribbon != null ? ribbon.WatermarkImage : null);
-            if (effWmImg != null)
-            {
-                GraphicsState state = g.Save();
-                g.SetClip(new Rectangle(x, y, w, h));
-
-                float scale = (WatermarkImageScale > 0) ? WatermarkImageScale : (ribbon != null && ribbon.WatermarkImageScale > 0 ? ribbon.WatermarkImageScale : 0f);
-                bool washout = (ribbon != null) ? ribbon.WatermarkWashout : WatermarkWashout;
-
-                float imgW, imgH;
-                if (scale > 0)
-                {
-                    imgW = effWmImg.Width * scale * ZoomLevel;
-                    imgH = effWmImg.Height * scale * ZoomLevel;
-                }
-                else
-                {
-                    float maxW = w * 0.70f;
-                    float maxH = h * 0.70f;
-                    float ratio = Math.Min(maxW / Math.Max(1, effWmImg.Width), maxH / Math.Max(1, effWmImg.Height));
-                    imgW = effWmImg.Width * ratio;
-                    imgH = effWmImg.Height * ratio;
-                }
-
-                float drawX = x + (w - imgW) / 2f;
-                float drawY = y + (h - imgH) / 2f;
-
-                float alpha = washout ? 0.22f : 0.85f;
-                using (System.Drawing.Imaging.ImageAttributes ia = new System.Drawing.Imaging.ImageAttributes())
-                {
-                    System.Drawing.Imaging.ColorMatrix cm = new System.Drawing.Imaging.ColorMatrix();
-                    cm.Matrix33 = alpha;
-                    if (washout)
-                    {
-                        cm.Matrix00 = 0.8f; cm.Matrix11 = 0.8f; cm.Matrix22 = 0.8f;
-                        cm.Matrix40 = 0.2f; cm.Matrix41 = 0.2f; cm.Matrix42 = 0.2f;
-                    }
-                    ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
-                    g.DrawImage(effWmImg, new Rectangle((int)drawX, (int)drawY, (int)imgW, (int)imgH), 0, 0, effWmImg.Width, effWmImg.Height, GraphicsUnit.Pixel, ia);
-                }
-                g.Restore(state);
-            }
-
-            if (ribbon != null && !string.IsNullOrEmpty(ribbon.WatermarkText))
-            {
-                GraphicsState state = g.Save();
-                g.SetClip(new Rectangle(x, y, w, h));
-
-                float baseFontSize = (ribbon.WatermarkIsDiagonal ? 50.0f : 44.0f) * ZoomLevel;
-                float maxAvailableW = ribbon.WatermarkIsDiagonal ? (float)Math.Sqrt(w * w + h * h) * 0.72f : (w * 0.82f);
-
-                using (Font testFont = new Font("Arial", baseFontSize, FontStyle.Bold))
-                {
-                    SizeF measuredSz = g.MeasureString(ribbon.WatermarkText, testFont);
-                    float finalFontSize = baseFontSize;
-                    if (measuredSz.Width > maxAvailableW && measuredSz.Width > 0)
-                    {
-                        finalFontSize = Math.Max(12.0f * ZoomLevel, baseFontSize * (maxAvailableW / measuredSz.Width));
-                    }
-
-                    using (Font wmFont = new Font("Arial", finalFontSize, FontStyle.Bold))
-                    using (SolidBrush wmBrush = new SolidBrush(Color.FromArgb(38, 120, 120, 120)))
-                    {
-                        g.TranslateTransform(x + w / 2f, y + h / 2f);
-                        if (ribbon.WatermarkIsDiagonal)
-                        {
-                            g.RotateTransform(-45f);
-                        }
-                        SizeF sz = g.MeasureString(ribbon.WatermarkText, wmFont);
-                        g.DrawString(ribbon.WatermarkText, wmFont, wmBrush, -sz.Width / 2f, -sz.Height / 2f);
-                    }
-                }
-                g.Restore(state);
-            }
-
-            // Live Ghost Table Insert Preview Overlay
-            if (TablePreviewCols > 0 && TablePreviewRows > 0)
-            {
-                int cols = TablePreviewCols;
-                int rows = TablePreviewRows;
-
-                int leftM = (int)(ribbon.GetEffectiveLeftMarginInches() * 72.0f * ZoomLevel);
-                int rightM = (int)(ribbon.GetEffectiveRightMarginInches() * 72.0f * ZoomLevel);
-                int topM = (int)(ribbon.GetEffectiveTopMarginInches() * 72.0f * ZoomLevel);
-
-                float tw = w - leftM - rightM;
-                float th = Math.Min(h * 0.40f, rows * (28f * ZoomLevel));
-                float tx = x + leftM;
-                float ty = y + topM + (int)(90 * ZoomLevel);
-
-                float cellW = tw / cols;
-                float cellH = th / rows;
-
-                using (SolidBrush headerTopBrush = new SolidBrush(Color.FromArgb(170, 37, 99, 235)))
-                using (SolidBrush rowOddBrush = new SolidBrush(Color.FromArgb(120, 219, 234, 254)))
-                using (SolidBrush rowEvenBrush = new SolidBrush(Color.FromArgb(90, 255, 255, 255)))
-                using (Pen gridPen = new Pen(Color.FromArgb(200, 37, 99, 235), 1.2f))
-                using (Pen outerPen = new Pen(Color.FromArgb(240, 29, 78, 216), 2.0f))
-                {
-                    g.FillRectangle(headerTopBrush, tx, ty, tw, cellH);
-                    for (int r = 1; r < rows; r++)
-                    {
-                        SolidBrush b = (r % 2 == 1) ? rowOddBrush : rowEvenBrush;
-                        g.FillRectangle(b, tx, ty + r * cellH, tw, cellH);
-                    }
-                    for (int r = 0; r <= rows; r++)
-                    {
-                        g.DrawLine(gridPen, tx, ty + r * cellH, tx + tw, ty + r * cellH);
-                    }
-                    for (int c = 0; c <= cols; c++)
-                    {
-                        g.DrawLine(gridPen, tx + c * cellW, ty, tx + c * cellW, ty + th);
-                    }
-                    g.DrawRectangle(outerPen, tx, ty, tw, th);
-                }
+                EndPageHeaderFooterScope(hfScope, false);
             }
         }
 
@@ -18610,132 +21065,8 @@ namespace ZenQOffice.UI
             }
         }
 
-        private void DrawVectorArch(D2DGraphics g, Pen archPen, float x, float y, float w, float h)
-        {
-            if (g == null || archPen == null) return;
-            g.DrawArc(archPen, x, y, w, h, 180, 180);
-            g.DrawLine(archPen, x, y + h / 2, x + w, y + h / 2);
-        }
+        // Header/Shape shared vector helpers live in ShapeRenderer
 
-        private void DrawVectorWrapCard(D2DGraphics g, int wrapMode, Rectangle box, bool isSelected)
-        {
-            if (isSelected)
-            {
-                using (SolidBrush selBg = new SolidBrush(Color.FromArgb(215, 220, 225)))
-                {
-                    g.FillRectangle(selBg, box);
-                }
-                using (Pen selBorder = new Pen(Color.FromArgb(120, 125, 130), 1.2f))
-                {
-                    g.DrawRectangle(selBorder, box);
-                }
-            }
-            else
-            {
-                using (Pen borderPen = new Pen(Color.FromArgb(218, 224, 230), 1.0f))
-                {
-                    g.DrawRectangle(borderPen, box);
-                }
-            }
-
-            using (Pen bluePen = new Pen(Color.FromArgb(0, 120, 215), 1.6f))
-            using (Pen darkArchPen = new Pen(Color.FromArgb(40, 40, 40), 3.0f))
-            using (Pen ghostArchPen = new Pen(Color.FromArgb(180, 185, 192), 3.0f))
-            {
-                float archX = box.X + (box.Width - 14) / 2.0f;
-                float archY = box.Y + (box.Height - 12) / 2.0f + 1;
-
-                if (wrapMode == 0) // In Line With Text
-                {
-                    float ax = box.X + 6;
-                    float ay = box.Y + 12;
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 7, box.X + 22, box.Y + 7);
-                    DrawVectorArch(g, darkArchPen, ax, ay, 13, 12);
-                    g.DrawLine(bluePen, box.X + 22, box.Y + 17, box.X + 36, box.Y + 17);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 26, box.X + 36, box.Y + 26);
-                }
-                else if (wrapMode == 1) // Square (Vuông)
-                {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 11, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 31, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 11, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 31, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
-                }
-                else if (wrapMode == 2) // Tight (Chặt)
-                {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 12, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 30, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 11, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 31, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
-                }
-                else if (wrapMode == 3) // Through (Xuyên qua)
-                {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 13, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 29, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 11, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 31, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
-                }
-                else if (wrapMode == 4) // Top and Bottom (Trên và Dưới)
-                {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
-                }
-                else if (wrapMode == 5) // Behind Text (Dưới văn bản)
-                {
-                    DrawVectorArch(g, ghostArchPen, archX, archY, 13, 12);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                }
-                else if (wrapMode == 6) // In Front of Text (Trước văn bản)
-                {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
-                }
-            }
-        }
-
-        private void DrawVectorRadioButton(D2DGraphics g, int x, int y, bool isChecked, string label, Font font)
-        {
-            Rectangle rCircle = new Rectangle(x, y + 2, 12, 12);
-            using (Pen rPen = new Pen(isChecked ? Color.FromArgb(0, 120, 215) : Color.FromArgb(140, 145, 150), 1.2f))
-            {
-                g.DrawEllipse(rPen, rCircle);
-                if (isChecked)
-                {
-                    using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(0, 120, 215)))
-                    {
-                        g.FillEllipse(dotBrush, x + 3, y + 5, 6, 6);
-                    }
-                }
-            }
-            g.DrawString(label, font, isChecked ? new SolidBrush(Color.FromArgb(20, 20, 20)) : new SolidBrush(Color.FromArgb(70, 70, 70)), x + 16, y);
-        }
-
-        private void DrawVectorInfoIcon(D2DGraphics g, int x, int y)
-        {
-            Rectangle infoCircle = new Rectangle(x, y, 11, 11);
-            using (Pen infoPen = new Pen(Color.FromArgb(0, 120, 215), 1.0f))
-            using (Font iFont = new Font("Segoe UI", 6.5f, FontStyle.Bold))
-            {
-                g.DrawEllipse(infoPen, infoCircle);
-                g.DrawString("i", iFont, new SolidBrush(Color.FromArgb(0, 120, 215)), x + 2.5f, y - 0.5f);
-            }
-        }
 
         public void DrawDocumentChart(D2DGraphics g, DocChartObject chart, int chartX, int chartY, int chartW, int chartH, RibbonBar ribbon)
         {
@@ -19051,88 +21382,59 @@ namespace ZenQOffice.UI
                 }
             }
 
-            // Selection Frame & 8 Handles & 4 Floating Action Buttons
+            // Selection Frame & 8 Circular Grey Handles (Slides-style) & 4 Floating Action Buttons
             if (chart.IsSelected)
             {
-                using (Pen selPen = new Pen(Color.FromArgb(0, 120, 215), 1.5f))
-                {
-                    g.DrawRectangle(selPen, chartX - 1, chartY - 1, chartW + 2, chartH + 2);
-                }
-
-                int hs = (int)(7 * ZoomLevel);
-                Point[] handlePts = new Point[]
-                {
-                    new Point(chartX - hs/2, chartY - hs/2),
-                    new Point(chartX + chartW/2 - hs/2, chartY - hs/2),
-                    new Point(chartX + chartW - hs/2, chartY - hs/2),
-                    new Point(chartX + chartW - hs/2, chartY + chartH/2 - hs/2),
-                    new Point(chartX + chartW - hs/2, chartY + chartH - hs/2),
-                    new Point(chartX + chartW/2 - hs/2, chartY + chartH - hs/2),
-                    new Point(chartX - hs/2, chartY + chartH - hs/2),
-                    new Point(chartX - hs/2, chartY + chartH/2 - hs/2)
-                };
-
-                using (SolidBrush hBrush = new SolidBrush(Color.White))
-                using (Pen hPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                {
-                    foreach (var hp in handlePts)
-                    {
-                        g.FillRectangle(hBrush, hp.X, hp.Y, hs, hs);
-                        g.DrawRectangle(hPen, hp.X, hp.Y, hs, hs);
-                    }
-                }
-
-                DrawChartFloatingButtons(g, chart, new Rectangle(chartX, chartY, chartW, chartH));
+                Rectangle chartRect = new Rectangle(chartX, chartY, chartW, chartH);
+                ShapeRenderer.DrawGrayBoxSelectionHandles(g, chartRect, ZoomLevel, dashed: false);
+                DrawChartFloatingButtons(g, chart, chartRect);
             }
         }
 
         private void DrawChartFloatingButtons(D2DGraphics g, DocChartObject chart, Rectangle chartRect)
         {
-            int btnSize = 22;
+            int btnSize = 24;
             int btnX = chartRect.Right + 6;
-            int startBtnY = chartRect.Top + 2;
+            int startBtnY = chartRect.Top;
 
             LayoutBtnChartRect = new Rectangle(btnX, startBtnY, btnSize, btnSize);
-            PlusBtnChartRect = new Rectangle(btnX, startBtnY + 28, btnSize, btnSize);
-            StyleBtnChartRect = new Rectangle(btnX, startBtnY + 56, btnSize, btnSize);
-            FilterBtnChartRect = new Rectangle(btnX, startBtnY + 84, btnSize, btnSize);
+            PlusBtnChartRect = new Rectangle(btnX, startBtnY + 30, btnSize, btnSize);
+            StyleBtnChartRect = new Rectangle(btnX, startBtnY + 60, btnSize, btnSize);
+            FilterBtnChartRect = new Rectangle(btnX, startBtnY + 90, btnSize, btnSize);
 
-            using (Pen borderPen = new Pen(Color.FromArgb(180, 200, 220), 1.2f))
+            // 1. [ ⌒ ] Layout Options
+            ShapeRenderer.DrawLayoutTriggerButton(g, LayoutBtnChartRect, chart.ShowLayoutOptions);
+
+            // 2-4. Floating chart buttons in matching rounded pill style
+            using (Pen borderPen = new Pen(Color.FromArgb(203, 213, 225), 1.0f))
+            using (Pen activeBorderPen = new Pen(Color.FromArgb(37, 99, 235), 1.0f))
             {
-                // 1. [ ⌒ ] Layout Options
-                g.FillRectangle(chart.ShowLayoutOptions ? new SolidBrush(Color.FromArgb(215, 235, 255)) : Brushes.White, LayoutBtnChartRect);
-                g.DrawRectangle(borderPen, LayoutBtnChartRect);
-                using (Pen archP = new Pen(Color.FromArgb(0, 120, 215), 1.5f))
-                {
-                    DrawVectorArch(g, archP, LayoutBtnChartRect.X + 4, LayoutBtnChartRect.Y + 5, 14, 11);
-                }
-
                 // 2. [ + ] Chart Elements
-                g.FillRectangle(chart.ShowElementsMenu ? new SolidBrush(Color.FromArgb(215, 235, 255)) : Brushes.White, PlusBtnChartRect);
-                g.DrawRectangle(borderPen, PlusBtnChartRect);
-                using (Pen plusP = new Pen(Color.FromArgb(16, 124, 65), 2f))
+                g.FillRoundedRectangle(chart.ShowElementsMenu ? new SolidBrush(Color.FromArgb(239, 246, 255)) : Brushes.White, PlusBtnChartRect, 6f);
+                g.DrawRoundedRectangle(chart.ShowElementsMenu ? activeBorderPen : borderPen, PlusBtnChartRect, 6f);
+                using (Pen plusP = new Pen(Color.FromArgb(22, 163, 74), 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                 {
-                    g.DrawLine(plusP, PlusBtnChartRect.X + 6, PlusBtnChartRect.Y + 11, PlusBtnChartRect.X + 16, PlusBtnChartRect.Y + 11);
-                    g.DrawLine(plusP, PlusBtnChartRect.X + 11, PlusBtnChartRect.Y + 6, PlusBtnChartRect.X + 11, PlusBtnChartRect.Y + 16);
+                    g.DrawLine(plusP, PlusBtnChartRect.X + 7, PlusBtnChartRect.Y + 12, PlusBtnChartRect.X + 17, PlusBtnChartRect.Y + 12);
+                    g.DrawLine(plusP, PlusBtnChartRect.X + 12, PlusBtnChartRect.Y + 7, PlusBtnChartRect.X + 12, PlusBtnChartRect.Y + 17);
                 }
 
                 // 3. [ 🖌 ] Chart Styles
-                g.FillRectangle(chart.ShowStylesMenu ? new SolidBrush(Color.FromArgb(215, 235, 255)) : Brushes.White, StyleBtnChartRect);
-                g.DrawRectangle(borderPen, StyleBtnChartRect);
-                using (SolidBrush bB = new SolidBrush(Color.FromArgb(0, 120, 215)))
+                g.FillRoundedRectangle(chart.ShowStylesMenu ? new SolidBrush(Color.FromArgb(239, 246, 255)) : Brushes.White, StyleBtnChartRect, 6f);
+                g.DrawRoundedRectangle(chart.ShowStylesMenu ? activeBorderPen : borderPen, StyleBtnChartRect, 6f);
+                using (SolidBrush bB = new SolidBrush(Color.FromArgb(37, 99, 235)))
                 {
-                    g.FillRectangle(bB, StyleBtnChartRect.X + 6, StyleBtnChartRect.Y + 5, 10, 6);
-                    g.FillPolygon(bB, new Point[] { new Point(StyleBtnChartRect.X + 8, StyleBtnChartRect.Y + 11), new Point(StyleBtnChartRect.X + 14, StyleBtnChartRect.Y + 11), new Point(StyleBtnChartRect.X + 11, StyleBtnChartRect.Y + 16) });
+                    g.FillRectangle(bB, StyleBtnChartRect.X + 7, StyleBtnChartRect.Y + 6, 10, 6);
+                    g.FillPolygon(bB, new Point[] { new Point(StyleBtnChartRect.X + 9, StyleBtnChartRect.Y + 12), new Point(StyleBtnChartRect.X + 15, StyleBtnChartRect.Y + 12), new Point(StyleBtnChartRect.X + 12, StyleBtnChartRect.Y + 17) });
                 }
 
                 // 4. [ ⏚ ] Values Filter
-                g.FillRectangle(chart.ShowFilterMenu ? new SolidBrush(Color.FromArgb(215, 235, 255)) : Brushes.White, FilterBtnChartRect);
-                g.DrawRectangle(borderPen, FilterBtnChartRect);
-                using (Pen fPen = new Pen(Color.FromArgb(80, 80, 80), 1.5f))
+                g.FillRoundedRectangle(chart.ShowFilterMenu ? new SolidBrush(Color.FromArgb(239, 246, 255)) : Brushes.White, FilterBtnChartRect, 6f);
+                g.DrawRoundedRectangle(chart.ShowFilterMenu ? activeBorderPen : borderPen, FilterBtnChartRect, 6f);
+                using (Pen fPen = new Pen(Color.FromArgb(71, 85, 105), 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                 {
-                    g.DrawLine(fPen, FilterBtnChartRect.X + 5, FilterBtnChartRect.Y + 6, FilterBtnChartRect.X + 17, FilterBtnChartRect.Y + 6);
-                    g.DrawLine(fPen, FilterBtnChartRect.X + 7, FilterBtnChartRect.Y + 10, FilterBtnChartRect.X + 15, FilterBtnChartRect.Y + 10);
-                    g.DrawLine(fPen, FilterBtnChartRect.X + 9, FilterBtnChartRect.Y + 14, FilterBtnChartRect.X + 13, FilterBtnChartRect.Y + 14);
+                    g.DrawLine(fPen, FilterBtnChartRect.X + 6, FilterBtnChartRect.Y + 7, FilterBtnChartRect.X + 18, FilterBtnChartRect.Y + 7);
+                    g.DrawLine(fPen, FilterBtnChartRect.X + 8, FilterBtnChartRect.Y + 11, FilterBtnChartRect.X + 16, FilterBtnChartRect.Y + 11);
+                    g.DrawLine(fPen, FilterBtnChartRect.X + 10, FilterBtnChartRect.Y + 15, FilterBtnChartRect.X + 14, FilterBtnChartRect.Y + 15);
                 }
             }
         }
@@ -19140,67 +21442,13 @@ namespace ZenQOffice.UI
         private void DrawChartWrapMenu(D2DGraphics g, DocChartObject chart)
         {
             if (LayoutBtnChartRect.IsEmpty) return;
-            int popW = 185;
-            int popH = 275;
-            int popX = LayoutBtnChartRect.Right + 8;
-            int popY = LayoutBtnChartRect.Top - 5;
-
-            g.FillRectangle(Brushes.White, popX, popY, popW, popH);
-            using (Pen popBorder = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-            {
-                g.DrawRectangle(popBorder, popX, popY, popW, popH);
-                Point[] pointerPts = new Point[] { new Point(popX, popY + 12), new Point(popX - 6, popY + 18), new Point(popX, popY + 24) };
-                g.FillPolygon(Brushes.White, pointerPts);
-                g.DrawLine(popBorder, popX, popY + 12, popX - 6, popY + 18);
-                g.DrawLine(popBorder, popX - 6, popY + 18, popX, popY + 24);
-            }
-
-            using (Font headerFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-            using (Font sectionFont = new Font("Segoe UI", 8.0f, FontStyle.Bold))
-            using (Font itemFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-            using (Font linkFont = new Font("Segoe UI", 8.5f, FontStyle.Underline))
-            {
-                g.DrawString("Tùy chọn bố trí", headerFont, new SolidBrush(Color.FromArgb(0, 95, 184)), popX + 12, popY + 10);
-                using (Pen closePen = new Pen(Color.FromArgb(100, 100, 100), 1.5f))
-                {
-                    g.DrawLine(closePen, popX + popW - 20, popY + 12, popX + popW - 10, popY + 22);
-                    g.DrawLine(closePen, popX + popW - 10, popY + 12, popX + popW - 20, popY + 22);
-                }
-
-                Rectangle sec1Bar = new Rectangle(popX + 10, popY + 36, popW - 20, 18);
-                using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241))) g.FillRectangle(secBarBrush, sec1Bar);
-                g.DrawString("Cùng dòng với văn bản", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec1Bar.X + 6, sec1Bar.Y + 2);
-
-                Rectangle inlineCard = new Rectangle(popX + 14, popY + 58, 42, 34);
-                DrawVectorWrapCard(g, 0, inlineCard, chart.WrapMode == 0);
-
-                Rectangle sec2Bar = new Rectangle(popX + 10, popY + 98, popW - 20, 18);
-                using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241))) g.FillRectangle(secBarBrush, sec2Bar);
-                g.DrawString("Ngắt dòng văn bản", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec2Bar.X + 6, sec2Bar.Y + 2);
-
-                for (int r = 0; r < 2; r++)
-                {
-                    for (int c = 0; c < 3; c++)
-                    {
-                        int wIdx = r == 0 ? (1 + c) : (4 + c);
-                        Rectangle cardBox = new Rectangle(popX + 14 + c * 52, popY + 120 + r * 38, 42, 34);
-                        DrawVectorWrapCard(g, wIdx, cardBox, chart.WrapMode == wIdx);
-                    }
-                }
-
-                int r1Y = popY + 202;
-                DrawVectorRadioButton(g, popX + 14, r1Y, !chart.FixPosition, "Di chuyển cùng văn bản", itemFont);
-                DrawVectorInfoIcon(g, popX + popW - 26, r1Y + 2);
-
-                int r2Y = popY + 226;
-                DrawVectorRadioButton(g, popX + 14, r2Y, chart.FixPosition, "Cố định vị trí trên trang", itemFont);
-                DrawVectorInfoIcon(g, popX + popW - 26, r2Y + 2);
-
-                using (SolidBrush linkBrush = new SolidBrush(Color.FromArgb(0, 95, 184)))
-                {
-                    g.DrawString("Xem thêm...", linkFont, linkBrush, popX + popW - 85, popY + 252);
-                }
-            }
+            var geo = ShapeRenderer.GetLayoutPopupGeometry(LayoutBtnChartRect, showSeeMore: true);
+            ShapeRenderer.DrawFluentLayoutPopupCore(
+                g,
+                geo,
+                chart.WrapMode,
+                chart.FixPosition,
+                AppL10n.T("Tùy chọn bố trí", "Layout Options"));
         }
 
         private void DrawChartElementsMenu(D2DGraphics g, DocChartObject chart)
@@ -19316,99 +21564,237 @@ namespace ZenQOffice.UI
             int tY = (tableIdx < TableBoundsList.Count) ? TableBoundsList[tableIdx].Top : (MoveHandleRects[tableIdx].Top + 18);
             int tW = (tableIdx < TableBoundsList.Count) ? TableBoundsList[tableIdx].Width : 200;
 
-            Rectangle wrapBtn = new Rectangle(tX + tW + 6, tY, 22, 22);
-            int popW = 210;
-            int popH = 280;
-            int popX = wrapBtn.Right + 8;
-            int popY = wrapBtn.Top - 5;
+            Rectangle wrapBtn = new Rectangle(tX + tW + 6, tY, 24, 24);
+            int popW = 224;
+            int popH = 292;
+            int popX = wrapBtn.Right + 10;
+            int popY = wrapBtn.Top - 6;
 
-            if (popX + popW > canvasWidth - 15) popX = wrapBtn.Left - popW - 8;
+            if (popX + popW > canvasWidth - 15) popX = wrapBtn.Left - popW - 10;
 
             Rectangle popRect = new Rectangle(popX, popY, popW, popH);
 
-            g.FillRectangle(Brushes.White, popX, popY, popW, popH);
-            using (Pen popBorder = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
+            int[] shAlphas = new int[] { 7, 11, 16 };
+            int[] shSpread = new int[] { 5, 3, 1 };
+            int[] shOffsetY = new int[] { 6, 4, 2 };
+            for (int si = 0; si < shAlphas.Length; si++)
             {
-                g.DrawRectangle(popBorder, popX, popY, popW, popH);
-                Point[] pointerPts = new Point[] { new Point(popX, popY + 12), new Point(popX - 6, popY + 18), new Point(popX, popY + 24) };
-                g.FillPolygon(Brushes.White, pointerPts);
-                g.DrawLine(popBorder, popX, popY + 12, popX - 6, popY + 18);
-                g.DrawLine(popBorder, popX - 6, popY + 18, popX, popY + 24);
+                Rectangle sr = new Rectangle(popX - shSpread[si], popY - shSpread[si] + shOffsetY[si], popW + shSpread[si] * 2, popH + shSpread[si] * 2);
+                using (SolidBrush sb = new SolidBrush(Color.FromArgb(shAlphas[si], 15, 23, 42)))
+                {
+                    g.FillRoundedRectangle(sb, sr, 12f);
+                }
+            }
+
+            using (SolidBrush cardBg = new SolidBrush(Color.White))
+            using (Pen cardBorder = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
+            {
+                g.FillRoundedRectangle(cardBg, popRect, 10f);
+                g.DrawRoundedRectangle(cardBorder, popRect, 10f);
             }
 
             int curWrap = TableWrapModes.ContainsKey(tableIdx) ? TableWrapModes[tableIdx] : 0;
             bool fixPos = TableFixPositions.ContainsKey(tableIdx) && TableFixPositions[tableIdx];
 
-            using (Font headerFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-            using (Font sectionFont = new Font("Segoe UI", 8.0f, FontStyle.Bold))
+            using (Font headerFont = new Font("Segoe UI Semibold", 9.8f, FontStyle.Bold))
+            using (Font sectionFont = new Font("Segoe UI Semibold", 8.0f, FontStyle.Bold))
             using (Font itemFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-            using (Font subItemFont = new Font("Segoe UI", 8.0f, FontStyle.Regular))
+            using (Font subItemFont = new Font("Segoe UI Semibold", 8.2f, FontStyle.Regular))
             {
-                g.DrawString("Tùy chọn bố trí bảng", headerFont, new SolidBrush(Color.FromArgb(0, 95, 184)), popX + 12, popY + 10);
-                using (Pen closePen = new Pen(Color.FromArgb(100, 100, 100), 1.5f))
+                using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 {
-                    g.DrawLine(closePen, popX + popW - 20, popY + 12, popX + popW - 10, popY + 22);
-                    g.DrawLine(closePen, popX + popW - 10, popY + 12, popX + popW - 20, popY + 22);
+                    g.DrawString(AppL10n.T("Tùy chọn bố trí bảng", "Table Layout Options"), headerFont, hBrush, popX + 16, popY + 10);
+                }
+                Rectangle closeBtnR = new Rectangle(popX + popW - 32, popY + 8, 22, 22);
+                using (SolidBrush cbBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                using (Pen closePen = new Pen(Color.FromArgb(100, 116, 139), 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    g.FillRoundedRectangle(cbBg, closeBtnR, 6f);
+                    float pad = 6.5f;
+                    g.DrawLine(closePen, closeBtnR.X + pad, closeBtnR.Y + pad, closeBtnR.Right - pad, closeBtnR.Bottom - pad);
+                    g.DrawLine(closePen, closeBtnR.Right - pad, closeBtnR.Y + pad, closeBtnR.X + pad, closeBtnR.Bottom - pad);
                 }
 
-                // Section 1: In-Line with Text (None)
-                Rectangle sec1Bar = new Rectangle(popX + 10, popY + 36, popW - 20, 18);
-                using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241))) g.FillRectangle(secBarBrush, sec1Bar);
-                g.DrawString("Cùng dòng với văn bản", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec1Bar.X + 6, sec1Bar.Y + 2);
+                using (Pen divPen = new Pen(Color.FromArgb(241, 245, 249), 1.0f))
+                {
+                    g.DrawLine(divPen, popX + 12, popY + 38, popRect.Right - 12, popY + 38);
+                }
 
-                Rectangle inlineCard = new Rectangle(popX + 14, popY + 58, 44, 34);
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    g.DrawString(AppL10n.T("Cùng dòng với văn bản", "In Line with Text"), sectionFont, secBrush, popX + 16, popY + 46);
+                }
+
+                Rectangle inlineCard = new Rectangle(popX + 16, popY + 64, 52, 38);
                 ShapeRenderer.DrawVectorWrapCard(g, 0, inlineCard, curWrap == 0);
-                g.DrawString("Không ngắt dòng (In-Line)", subItemFont, (curWrap == 0) ? new SolidBrush(Color.FromArgb(0, 102, 204)) : Brushes.DimGray, popX + 64, popY + 68);
+                using (SolidBrush lblB = new SolidBrush((curWrap == 0) ? Color.FromArgb(37, 99, 235) : Color.FromArgb(71, 85, 105)))
+                {
+                    g.DrawString(AppL10n.T("Không ngắt dòng", "None (In-Line)"), subItemFont, lblB, popX + 76, popY + 75);
+                }
 
-                // Section 2: Around (Bao quanh văn bản)
-                Rectangle sec2Bar = new Rectangle(popX + 10, popY + 98, popW - 20, 18);
-                using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241))) g.FillRectangle(secBarBrush, sec2Bar);
-                g.DrawString("Bao quanh văn bản (Around)", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec2Bar.X + 6, sec2Bar.Y + 2);
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    g.DrawString(AppL10n.T("Bao quanh văn bản", "Around Text"), sectionFont, secBrush, popX + 16, popY + 110);
+                }
 
-                Rectangle aroundCard = new Rectangle(popX + 14, popY + 120, 44, 34);
+                Rectangle aroundCard = new Rectangle(popX + 16, popY + 128, 52, 38);
                 ShapeRenderer.DrawVectorWrapCard(g, 1, aroundCard, curWrap == 1);
-                g.DrawString("Bao quanh (Around)", subItemFont, (curWrap == 1) ? new SolidBrush(Color.FromArgb(0, 102, 204)) : Brushes.DimGray, popX + 64, popY + 130);
+                using (SolidBrush lblB = new SolidBrush((curWrap == 1) ? Color.FromArgb(37, 99, 235) : Color.FromArgb(71, 85, 105)))
+                {
+                    g.DrawString(AppL10n.T("Bao quanh (Around)", "Around"), subItemFont, lblB, popX + 76, popY + 139);
+                }
 
-                int r1Y = popY + 162;
-                ShapeRenderer.DrawVectorRadioButton(g, popX + 14, r1Y, !fixPos, "Di chuyển cùng văn bản", itemFont);
-                ShapeRenderer.DrawVectorInfoIcon(g, popX + popW - 26, r1Y + 2);
+                using (Pen divPen = new Pen(Color.FromArgb(241, 245, 249), 1.0f))
+                {
+                    g.DrawLine(divPen, popX + 12, popY + 174, popRect.Right - 12, popY + 174);
+                }
 
-                int r2Y = popY + 186;
-                ShapeRenderer.DrawVectorRadioButton(g, popX + 14, r2Y, fixPos, "Cố định vị trí trên trang", itemFont);
-                ShapeRenderer.DrawVectorInfoIcon(g, popX + popW - 26, r2Y + 2);
+                int r1Y = popY + 180;
+                ShapeRenderer.DrawVectorRadioButton(g, popX + 16, r1Y, !fixPos, AppL10n.T("Di chuyển cùng văn bản", "Move with text"), itemFont);
+                ShapeRenderer.DrawVectorInfoIcon(g, popX + popW - 28, r1Y + 2);
 
-                // Section 3: Table Alignment (Căn chỉnh vị trí bảng)
-                Rectangle sec3Bar = new Rectangle(popX + 10, popY + 214, popW - 20, 18);
-                using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241))) g.FillRectangle(secBarBrush, sec3Bar);
-                g.DrawString("Căn chỉnh vị trí bảng", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec3Bar.X + 6, sec3Bar.Y + 2);
+                int r2Y = popY + 204;
+                ShapeRenderer.DrawVectorRadioButton(g, popX + 16, r2Y, fixPos, AppL10n.T("Cố định vị trí trên trang", "Fix position on page"), itemFont);
+                ShapeRenderer.DrawVectorInfoIcon(g, popX + popW - 28, r2Y + 2);
+
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    g.DrawString(AppL10n.T("Căn chỉnh vị trí bảng", "Table Alignment"), sectionFont, secBrush, popX + 16, popY + 232);
+                }
 
                 DocTableObject tObjPop = (tableIdx < DocumentTables.Count) ? DocumentTables[tableIdx] : null;
                 int curTblAlign = (tObjPop != null) ? tObjPop.Alignment : 0;
 
-                int btnW = (popW - 36) / 3;
-                int btnH = 26;
-                int btnY = popY + 238;
-                string[] alignLabels = new string[] { "⬅ Trái", "↔ Giữa", "➡ Phải" };
+                int btnW = (popW - 44) / 3;
+                int btnH = 28;
+                int btnY = popY + 252;
+                string[] alignLabels = new string[] { AppL10n.T("Trái", "Left"), AppL10n.T("Giữa", "Center"), AppL10n.T("Phải", "Right") };
                 for (int ai = 0; ai < 3; ai++)
                 {
-                    Rectangle btnRect = new Rectangle(popX + 12 + ai * (btnW + 6), btnY, btnW, btnH);
+                    Rectangle btnRect = new Rectangle(popX + 16 + ai * (btnW + 6), btnY, btnW, btnH);
                     bool isSelected = (curTblAlign == ai);
-                    using (SolidBrush btnBg = new SolidBrush(isSelected ? Color.FromArgb(220, 235, 252) : Color.FromArgb(248, 249, 250)))
-                    using (Pen btnPen = new Pen(isSelected ? Color.FromArgb(0, 120, 215) : Color.FromArgb(210, 215, 220), isSelected ? 1.5f : 1.0f))
+                    using (SolidBrush btnBg = new SolidBrush(isSelected ? Color.FromArgb(239, 246, 255) : Color.FromArgb(248, 250, 252)))
+                    using (Pen btnPen = new Pen(isSelected ? Color.FromArgb(37, 99, 235) : Color.FromArgb(226, 232, 240), isSelected ? 1.4f : 1.0f))
+                    using (SolidBrush txtB = new SolidBrush(isSelected ? Color.FromArgb(37, 99, 235) : Color.FromArgb(51, 65, 85)))
                     {
-                        g.FillRectangle(btnBg, btnRect);
-                        g.DrawRectangle(btnPen, btnRect);
+                        g.FillRoundedRectangle(btnBg, btnRect, 6f);
+                        g.DrawRoundedRectangle(btnPen, btnRect, 6f);
                         using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                         {
-                            g.DrawString(alignLabels[ai], itemFont, isSelected ? new SolidBrush(Color.FromArgb(0, 102, 204)) : Brushes.Black, btnRect, sf);
+                            g.DrawString(alignLabels[ai], subItemFont, txtB, btnRect, sf);
                         }
                     }
                 }
             }
         }
 
+        private struct TempPaneContext
+        {
+            public bool Active;
+            public float SavedSmoothScrollY;
+            public float SavedTargetScrollY;
+            public List<RenderedLineInfo> SavedRenderedLines;
+            public List<TableCellHit> SavedTableCellHits;
+            public List<Rectangle> SavedTableBoundsList;
+        }
+
+        private TempPaneContext BeginTempPaneContext(int paneIndex)
+        {
+            if (!IsSplitView || paneIndex == 0)
+            {
+                return new TempPaneContext { Active = false };
+            }
+            var ctx = new TempPaneContext
+            {
+                Active = true,
+                SavedSmoothScrollY = SmoothScrollY,
+                SavedTargetScrollY = TargetScrollY,
+                SavedRenderedLines = RenderedLines,
+                SavedTableCellHits = TableCellHits,
+                SavedTableBoundsList = TableBoundsList
+            };
+            SmoothScrollY = SecondarySmoothScrollY;
+            TargetScrollY = SecondaryTargetScrollY;
+            if (_pane1RenderedLines != null && _pane1RenderedLines.Count > 0)
+            {
+                RenderedLines = _pane1RenderedLines;
+                TableCellHits = _pane1TableCellHits;
+                TableBoundsList = _pane1TableBoundsList;
+            }
+            return ctx;
+        }
+
+        private void EndTempPaneContext(TempPaneContext ctx)
+        {
+            if (!ctx.Active) return;
+            SmoothScrollY = ctx.SavedSmoothScrollY;
+            TargetScrollY = ctx.SavedTargetScrollY;
+            RenderedLines = ctx.SavedRenderedLines;
+            TableCellHits = ctx.SavedTableCellHits;
+            TableBoundsList = ctx.SavedTableBoundsList;
+        }
+
+        private Rectangle GetHitPageBoundsForEvent(int pgIndex, int canvasWidth, RibbonBar ribbon, int baseStartPageY, int pageX, int pageW, int pageH)
+        {
+            if (ViewMode == 0) return new Rectangle(pageX, baseStartPageY, pageW, pageH);
+            if (ViewMode == 1 && IsMultiplePagesView && GetMultiplePagesColsPerRow(canvasWidth, pageW, ribbon) > 1)
+            {
+                return GetPageVisualBounds(pgIndex, canvasWidth, ribbon, baseStartPageY, pageX, pageW, pageH);
+            }
+            return new Rectangle(pageX, baseStartPageY + pgIndex * (pageH + PageGap), pageW, pageH);
+        }
+
         public void HandleMouseDown(int mouseX, int mouseY, int canvasWidth, Graphics g, RibbonBar ribbon)
         {
+            // Outline View toolbar & +/- toggle handling
+            if (ViewMode == 4)
+            {
+                for (int i = 0; i < _outlineToolbarHits.Count; i++)
+                {
+                    if (_outlineToolbarHits[i].Key.Contains(mouseX, mouseY))
+                    {
+                        string cmd = _outlineToolbarHits[i].Value;
+                        if (cmd.StartsWith("Level:"))
+                        {
+                            int lv;
+                            if (int.TryParse(cmd.Substring(6), out lv))
+                            {
+                                OutlineFilterMaxLevel = lv;
+                                _outlineLayoutVersion++;
+                                InvalidateLayoutAndTextCache();
+                                Invalidate();
+                            }
+                        }
+                        else if (cmd == "ExpandAll") ExpandAllOutline();
+                        else if (cmd == "CollapseAll") CollapseAllOutline();
+                        else if (cmd == "CloseOutline") SetViewMode(1);
+                        return;
+                    }
+                }
+                for (int i = 0; i < _outlineToggleHits.Count; i++)
+                {
+                    if (_outlineToggleHits[i].Key.Contains(mouseX, mouseY))
+                    {
+                        ToggleOutlineCollapseAt(_outlineToggleHits[i].Value);
+                        return;
+                    }
+                }
+            }
+
+            // Split View horizontal splitter bar drag
+            if (IsSplitView && !SplitSplitterBounds.IsEmpty && SplitSplitterBounds.Contains(mouseX, mouseY))
+            {
+                IsDraggingSplitter = true;
+                IsDocumentMouseDown = true;
+                Cursor.Current = Cursors.HSplit;
+                return;
+            }
+
+            int targetSplitPane = (IsSplitView && !SplitSplitterBounds.IsEmpty && mouseY >= SplitSplitterBounds.Bottom) ? 1 : 0;
+            if (IsSplitView) ActiveSplitPane = targetSplitPane;
+            var _paneCtx = BeginTempPaneContext(targetSplitPane);
+            try
+            {
             IsDocumentMouseDown = mouseY > 155;
             if ((ribbon == null || ribbon.ActiveDrawTool == 0) && HandleEquationClick(mouseX,mouseY,ribbon)) return;
             int pageX, pageW, pageH, marginX, rightMarginX, marginY;
@@ -19526,8 +21912,8 @@ namespace ZenQOffice.UI
             // =========================================================================
             if (ribbon != null && ribbon.ShowRuler && mouseY >= 155 && mouseY <= 180)
             {
-                int navOffset = ShowNavigationPane ? 280 : 0;
-                int selPaneOffset = ShowSelectionPane ? 260 : 0;
+                int navOffset = EffectiveNavPaneWidth;
+                int selPaneOffset = EffectiveSelectionPaneWidth;
                 if (mouseX >= navOffset && mouseX <= canvasWidth - selPaneOffset)
                 {
                     if (RulerTabSelectorRect.Contains(mouseX, mouseY))
@@ -19628,7 +22014,7 @@ namespace ZenQOffice.UI
             // =========================================================================
             if (ribbon != null && ribbon.ShowRuler && mouseY >= 180 && mouseY <= canvasWidth)
             {
-                int navOffset = ShowNavigationPane ? 280 : 0;
+                int navOffset = EffectiveNavPaneWidth;
                 int vRulerW = 22;
                 int vRulerX = navOffset + 2;
                 if (mouseX >= vRulerX && mouseX <= vRulerX + vRulerW)
@@ -19746,18 +22132,18 @@ namespace ZenQOffice.UI
                 int tY = (tIdx < TableBoundsList.Count) ? TableBoundsList[tIdx].Top : (MoveHandleRects[tIdx].Top + 18);
                 int tW = (tIdx < TableBoundsList.Count) ? TableBoundsList[tIdx].Width : 200;
 
-                Rectangle wrapBtn = new Rectangle(tX + tW + 6, tY, 22, 22);
-                int popW = 210;
-                int popH = 280;
-                int popX = wrapBtn.Right + 8;
-                int popY = wrapBtn.Top - 5;
-                if (popX + popW > canvasWidth - 15) popX = wrapBtn.Left - popW - 8;
+                Rectangle wrapBtn = new Rectangle(tX + tW + 6, tY, 24, 24);
+                int popW = 224;
+                int popH = 292;
+                int popX = wrapBtn.Right + 10;
+                int popY = wrapBtn.Top - 6;
+                if (popX + popW > canvasWidth - 15) popX = wrapBtn.Left - popW - 10;
                 Rectangle popRect = new Rectangle(popX, popY, popW, popH);
 
                 if (popRect.Contains(mouseX, mouseY))
                 {
                     // 1. Close button
-                    Rectangle closeBtn = new Rectangle(popX + popW - 24, popY + 6, 20, 20);
+                    Rectangle closeBtn = new Rectangle(popX + popW - 32, popY + 8, 22, 22);
                     if (closeBtn.Contains(mouseX, mouseY))
                     {
                         ActiveTableLayoutOptionsIndex = -1;
@@ -19765,7 +22151,7 @@ namespace ZenQOffice.UI
                     }
 
                     // 2. In-Line box (Card 0)
-                    Rectangle inlineCard = new Rectangle(popX + 14, popY + 58, popW - 28, 36);
+                    Rectangle inlineCard = new Rectangle(popX + 16, popY + 64, popW - 32, 38);
                     if (inlineCard.Contains(mouseX, mouseY))
                     {
                         TableWrapModes[tIdx] = 0;
@@ -19778,7 +22164,7 @@ namespace ZenQOffice.UI
                     }
 
                     // 3. Around box (Card 1)
-                    Rectangle aroundCard = new Rectangle(popX + 14, popY + 120, popW - 28, 36);
+                    Rectangle aroundCard = new Rectangle(popX + 16, popY + 128, popW - 32, 38);
                     if (aroundCard.Contains(mouseX, mouseY))
                     {
                         TableWrapModes[tIdx] = 1;
@@ -19796,7 +22182,7 @@ namespace ZenQOffice.UI
                     }
 
                     // 4. Radio 1 (Di chuyển cùng văn bản)
-                    Rectangle r1Box = new Rectangle(popX + 14, popY + 160, popW - 28, 22);
+                    Rectangle r1Box = new Rectangle(popX + 12, popY + 178, popW - 24, 22);
                     if (r1Box.Contains(mouseX, mouseY))
                     {
                         TableFixPositions[tIdx] = false;
@@ -19804,7 +22190,7 @@ namespace ZenQOffice.UI
                     }
 
                     // 5. Radio 2 (Cố định vị trí trên trang)
-                    Rectangle r2Box = new Rectangle(popX + 14, popY + 184, popW - 28, 22);
+                    Rectangle r2Box = new Rectangle(popX + 12, popY + 202, popW - 24, 22);
                     if (r2Box.Contains(mouseX, mouseY))
                     {
                         TableFixPositions[tIdx] = true;
@@ -19812,12 +22198,12 @@ namespace ZenQOffice.UI
                     }
 
                     // 6. Alignment buttons (Trái / Giữa / Phải)
-                    int btnW = (popW - 36) / 3;
-                    int btnH = 26;
-                    int btnY = popY + 238;
+                    int btnW = (popW - 44) / 3;
+                    int btnH = 28;
+                    int btnY = popY + 252;
                     for (int ai = 0; ai < 3; ai++)
                     {
-                        Rectangle btnRect = new Rectangle(popX + 12 + ai * (btnW + 6), btnY, btnW, btnH);
+                        Rectangle btnRect = new Rectangle(popX + 16 + ai * (btnW + 6), btnY, btnW, btnH);
                         if (btnRect.Contains(mouseX, mouseY))
                         {
                             SaveUndoState();
@@ -20089,60 +22475,37 @@ namespace ZenQOffice.UI
 
                 if (ShowHeaderLayoutOptions)
                 {
-                    int popW = 185;
-                    int popH = 250;
-                    int popX = wrapBtnRect.Right + 8;
-                    int popY = wrapBtnRect.Top - 5;
-                    Rectangle popRect = new Rectangle(popX, popY, popW, popH);
-                    if (popRect.Contains(mouseX, mouseY))
+                    var geo = ShapeRenderer.GetLayoutPopupGeometry(wrapBtnRect, showSeeMore: false);
+                    if (geo.PopupRect.Contains(mouseX, mouseY))
                     {
-                        // 1. Close button
-                        Rectangle closeBtn = new Rectangle(popX + popW - 24, popY + 6, 20, 20);
-                        if (closeBtn.Contains(mouseX, mouseY))
+                        if (geo.CloseButtonRect.Contains(mouseX, mouseY))
                         {
                             ShowHeaderLayoutOptions = false;
                             return;
                         }
-
-                        // 2. In-Line box
-                        Rectangle inlineCard = new Rectangle(popX + 14, popY + 58, 42, 34);
-                        if (inlineCard.Contains(mouseX, mouseY))
+                        if (geo.InlineCardRect.Contains(mouseX, mouseY))
                         {
                             HeaderWrapMode = 0;
                             return;
                         }
-
-                        // 3. 6 Wrap boxes
-                        for (int r = 0; r < 2; r++)
+                        for (int ci = 0; ci < 6; ci++)
                         {
-                            for (int c = 0; c < 3; c++)
+                            if (geo.WrapCardRects[ci].Contains(mouseX, mouseY))
                             {
-                                int wIdx = r == 0 ? (1 + c) : (4 + c);
-                                Rectangle cardBox = new Rectangle(popX + 14 + c * 52, popY + 120 + r * 38, 42, 34);
-                                if (cardBox.Contains(mouseX, mouseY))
-                                {
-                                    HeaderWrapMode = wIdx;
-                                    return;
-                                }
+                                HeaderWrapMode = ci + 1;
+                                return;
                             }
                         }
-
-                        // 4. Radio 1 (Di chuyển cùng văn bản)
-                        Rectangle r1Box = new Rectangle(popX + 14, popY + 200, popW - 28, 22);
-                        if (r1Box.Contains(mouseX, mouseY))
+                        if (geo.MoveWithTextRect.Contains(mouseX, mouseY))
                         {
                             HeaderFixPosition = false;
                             return;
                         }
-
-                        // 5. Radio 2 (Cố định vị trí trên trang)
-                        Rectangle r2Box = new Rectangle(popX + 14, popY + 224, popW - 28, 22);
-                        if (r2Box.Contains(mouseX, mouseY))
+                        if (geo.FixPositionRect.Contains(mouseX, mouseY))
                         {
                             HeaderFixPosition = true;
                             return;
                         }
-
                         return;
                     }
                     else
@@ -20193,21 +22556,24 @@ namespace ZenQOffice.UI
                 bool hitZone = false;
                 for (int pg = 0; pg < Math.Max(1, CalculatedPageCount); pg++)
                 {
-                    int curPageY = (ViewMode == 0) ? pageY : (pageY + pg * (pageH + PageGap));
-                    Rectangle pRect = new Rectangle(pageX, curPageY, pageW, pageH);
+                    int paneBaseY = (IsSplitView && ActiveSplitPane == 1 && !SplitSplitterBounds.IsEmpty) ? (SplitSplitterBounds.Bottom + 9 - (int)Math.Round(SmoothScrollY)) : (pageY + (ViewMode == 4 ? 30 : 0));
+                    Rectangle pRect = GetHitPageBoundsForEvent(pg, canvasWidth, ribbon, paneBaseY, pageX, pageW, pageH);
                     if (!pRect.Contains(mouseX, mouseY)) continue;
 
                     int headerH = Math.Max((int)(45 * ZoomLevel), marginY);
                     int effBottomMarginY = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f) * 96.0f * ZoomLevel);
                     int footerH = Math.Max((int)(45 * ZoomLevel), effBottomMarginY);
-                    Rectangle headerZone = new Rectangle(pageX, curPageY, pageW, headerH);
-                    Rectangle footerZone = new Rectangle(pageX, curPageY + pageH - footerH, pageW, footerH);
+                    Rectangle headerZone = new Rectangle(pRect.X, pRect.Y, pRect.Width, headerH);
+                    Rectangle footerZone = new Rectangle(pRect.X, pRect.Y + pRect.Height - footerH, pRect.Width, footerH);
 
                     if (headerZone.Contains(mouseX, mouseY))
                     {
                         ActiveHeaderFooterPageIndex = pg;
                         IsEditingHeaderMode = true;
                         IsHeaderTextSelected = false;
+                        var _hfMdScope = BeginPageHeaderFooterScope(pg);
+                        try
+                        {
                         if (CurrentHeaderPreset == HeaderFooterPreset.None) CurrentHeaderPreset = HeaderFooterPreset.Blank;
                         if (CurrentHeaderPreset == HeaderFooterPreset.ThreeColumns)
                         {
@@ -20219,16 +22585,21 @@ namespace ZenQOffice.UI
                         {
                             EnsureActiveHeaderRunsInitialized();
                         }
-                        HeaderCursorCharIndex = GetHeaderCharIndexAt(mouseX, pageX, pageW, pg, ribbon);
+                        HeaderCursorCharIndex = GetHeaderCharIndexAt(mouseX, pRect.X, pRect.Width, pg, ribbon);
                         hitZone = true;
                         Invalidate();
                         return;
+                        }
+                        finally { EndPageHeaderFooterScope(_hfMdScope, true); }
                     }
                     if (footerZone.Contains(mouseX, mouseY))
                     {
                         ActiveHeaderFooterPageIndex = pg;
                         IsEditingHeaderMode = false;
                         IsHeaderTextSelected = false;
+                        var _hfFdScope = BeginPageHeaderFooterScope(pg);
+                        try
+                        {
                         if (CurrentFooterPreset == HeaderFooterPreset.None) CurrentFooterPreset = HeaderFooterPreset.Blank;
                         if (CurrentFooterPreset == HeaderFooterPreset.ThreeColumns)
                         {
@@ -20240,10 +22611,12 @@ namespace ZenQOffice.UI
                         {
                             EnsureActiveFooterRunsInitialized();
                         }
-                        FooterCursorCharIndex = GetFooterCharIndexAt(mouseX, pageX, pageW, pg, ribbon);
+                        FooterCursorCharIndex = GetFooterCharIndexAt(mouseX, pRect.X, pRect.Width, pg, ribbon);
                         hitZone = true;
                         Invalidate();
                         return;
+                        }
+                        finally { EndPageHeaderFooterScope(_hfFdScope, true); }
                     }
                 }
 
@@ -20318,43 +22691,34 @@ namespace ZenQOffice.UI
                 // Check Chart Popups clicks
                 if (ActiveChart.ShowLayoutOptions && !LayoutBtnChartRect.IsEmpty)
                 {
-                    int popW = 185; int popH = 275;
-                    int popX = LayoutBtnChartRect.Right + 8; int popY = LayoutBtnChartRect.Top - 5;
-                    Rectangle popRect = new Rectangle(popX, popY, popW, popH);
-                    if (popRect.Contains(mouseX, mouseY))
+                    var geo = ShapeRenderer.GetLayoutPopupGeometry(LayoutBtnChartRect, showSeeMore: true);
+                    if (geo.PopupRect.Contains(mouseX, mouseY))
                     {
-                        Rectangle closeBtn = new Rectangle(popX + popW - 24, popY + 6, 20, 20);
-                        if (closeBtn.Contains(mouseX, mouseY)) { ActiveChart.ShowLayoutOptions = false; return; }
+                        if (geo.CloseButtonRect.Contains(mouseX, mouseY)) { ActiveChart.ShowLayoutOptions = false; return; }
+                        if (geo.InlineCardRect.Contains(mouseX, mouseY)) { ActiveChart.WrapMode = 0; return; }
 
-                        Rectangle inlineCard = new Rectangle(popX + 14, popY + 58, 42, 34);
-                        if (inlineCard.Contains(mouseX, mouseY)) { ActiveChart.WrapMode = 0; return; }
-
-                        for (int r = 0; r < 2; r++)
+                        for (int ci = 0; ci < 6; ci++)
                         {
-                            for (int c = 0; c < 3; c++)
+                            if (geo.WrapCardRects[ci].Contains(mouseX, mouseY))
                             {
-                                int wIdx = r == 0 ? (1 + c) : (4 + c);
-                                Rectangle cardBox = new Rectangle(popX + 14 + c * 52, popY + 120 + r * 38, 42, 34);
-                                if (cardBox.Contains(mouseX, mouseY))
+                                int wIdx = ci + 1;
+                                if (ActiveChart.WrapMode == 0 && wIdx != 0)
                                 {
-                                    if (ActiveChart.WrapMode == 0 && wIdx != 0)
-                                    {
-                                        int pX_cur = Math.Max(0, (int)((ActiveChart.LastBounds.X - pageX) / ZoomLevel));
-                                        int pY_cur = Math.Max(0, (int)((ActiveChart.LastBounds.Y - (pageY + (int)(45 * ZoomLevel))) / ZoomLevel));
-                                        ActiveChart.PageX = pX_cur > 0 ? pX_cur : 65;
-                                        ActiveChart.PageY = pY_cur > 0 ? pY_cur : 150;
-                                    }
-                                    ActiveChart.WrapMode = wIdx;
-                                    return;
+                                    int pX_cur = Math.Max(0, (int)((ActiveChart.LastBounds.X - pageX) / ZoomLevel));
+                                    int pY_cur = Math.Max(0, (int)((ActiveChart.LastBounds.Y - (pageY + (int)(45 * ZoomLevel))) / ZoomLevel));
+                                    ActiveChart.PageX = pX_cur > 0 ? pX_cur : 65;
+                                    ActiveChart.PageY = pY_cur > 0 ? pY_cur : 150;
                                 }
+                                ActiveChart.WrapMode = wIdx;
+                                return;
                             }
                         }
 
-                        if (new Rectangle(popX + 14, popY + 202, popW - 28, 20).Contains(mouseX, mouseY)) { ActiveChart.FixPosition = false; return; }
-                        if (new Rectangle(popX + 14, popY + 226, popW - 28, 20).Contains(mouseX, mouseY)) { ActiveChart.FixPosition = true; return; }
-                        if (new Rectangle(popX + popW - 90, popY + 248, 80, 24).Contains(mouseX, mouseY))
+                        if (geo.MoveWithTextRect.Contains(mouseX, mouseY)) { ActiveChart.FixPosition = false; return; }
+                        if (geo.FixPositionRect.Contains(mouseX, mouseY)) { ActiveChart.FixPosition = true; return; }
+                        if (geo.SeeMoreRect.Contains(mouseX, mouseY))
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Chế độ ngắt dòng biểu đồ hiện tại: " + (ActiveChart.WrapMode == 0 ? "Cùng dòng với văn bản" : (ActiveChart.WrapMode == 1 ? "Vuông (Square)" : (ActiveChart.WrapMode == 2 ? "Chặt (Tight)" : (ActiveChart.WrapMode == 3 ? "Xuyên qua (Through)" : (ActiveChart.WrapMode == 4 ? "Trên và Dưới (Top/Bottom)" : (ActiveChart.WrapMode == 5 ? "Dưới văn bản (Behind)" : "Trước văn bản (In Front)")))))) + "\n\nBạn có thể nhấp và kéo trực tiếp biểu đồ đến bất kỳ vị trí nào trên trang tài liệu.", "Tùy chọn bố trí Biểu đồ ZENQ OFFICE", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Chế độ ngắt dòng biểu đồ hiện tại: ", "Current chart wrapping mode: ") + (ActiveChart.WrapMode == 0 ? AppL10n.T("Cùng dòng với văn bản", "In Line with Text") : (ActiveChart.WrapMode == 1 ? AppL10n.T("Vuông (Square)", "Square") : (ActiveChart.WrapMode == 2 ? AppL10n.T("Chặt (Tight)", "Tight") : (ActiveChart.WrapMode == 3 ? AppL10n.T("Xuyên qua (Through)", "Through") : (ActiveChart.WrapMode == 4 ? AppL10n.T("Trên và Dưới (Top/Bottom)", "Top and Bottom") : (ActiveChart.WrapMode == 5 ? AppL10n.T("Dưới văn bản (Behind)", "Behind Text") : AppL10n.T("Trước văn bản (In Front)", "In Front of Text"))))))) + AppL10n.T("\n\nBạn có thể nhấp và kéo trực tiếp biểu đồ đến bất kỳ vị trí nào trên trang tài liệu.", "\n\nYou can click and drag the chart anywhere on the page."), AppL10n.T("Tùy chọn bố trí Biểu đồ ZENQ OFFICE", "Chart Layout Options"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                             return;
                         }
                         return;
@@ -20454,7 +22818,7 @@ namespace ZenQOffice.UI
                 int hs = (int)(7 * ZoomLevel);
 
                 // Check Layout Options button
-                Rectangle wrapBtn = new Rectangle(sBounds.Right + 5, sBounds.Top, 22, 22);
+                Rectangle wrapBtn = ShapeRenderer.GetLayoutOptionsButtonRect(sBounds);
                 if (wrapBtn.Contains(mouseX, mouseY))
                 {
                     ActiveShape.ShowLayoutOptions = !ActiveShape.ShowLayoutOptions;
@@ -20464,36 +22828,26 @@ namespace ZenQOffice.UI
                 // Check Layout Options popup clicks
                 if (ActiveShape.ShowLayoutOptions)
                 {
-                    int popW = 185; int popH = 275;
-                    int popX = wrapBtn.Right + 8; int popY = wrapBtn.Top - 5;
-                    Rectangle popRect = new Rectangle(popX, popY, popW, popH);
-                    if (popRect.Contains(mouseX, mouseY))
+                    var geo = ShapeRenderer.GetLayoutPopupGeometry(wrapBtn, showSeeMore: true);
+                    if (geo.PopupRect.Contains(mouseX, mouseY))
                     {
-                        Rectangle closeBtn = new Rectangle(popX + popW - 24, popY + 6, 20, 20);
-                        if (closeBtn.Contains(mouseX, mouseY)) { ActiveShape.ShowLayoutOptions = false; return; }
+                        if (geo.CloseButtonRect.Contains(mouseX, mouseY)) { ActiveShape.ShowLayoutOptions = false; return; }
+                        if (geo.InlineCardRect.Contains(mouseX, mouseY)) { SetShapeWrapMode(ActiveShape, 0); return; }
 
-                        Rectangle inlineCard = new Rectangle(popX + 14, popY + 58, 42, 34);
-                        if (inlineCard.Contains(mouseX, mouseY)) { SetShapeWrapMode(ActiveShape, 0); return; }
-
-                        for (int r = 0; r < 2; r++)
+                        for (int ci = 0; ci < 6; ci++)
                         {
-                            for (int c = 0; c < 3; c++)
+                            if (geo.WrapCardRects[ci].Contains(mouseX, mouseY))
                             {
-                                int wIdx = r == 0 ? (1 + c) : (4 + c);
-                                Rectangle cardBox = new Rectangle(popX + 14 + c * 52, popY + 120 + r * 38, 42, 34);
-                                if (cardBox.Contains(mouseX, mouseY))
-                                {
-                                    SetShapeWrapMode(ActiveShape, wIdx);
-                                    return;
-                                }
+                                SetShapeWrapMode(ActiveShape, ci + 1);
+                                return;
                             }
                         }
 
-                        if (new Rectangle(popX + 14, popY + 202, popW - 28, 20).Contains(mouseX, mouseY)) { SaveUndoState(); ActiveShape.FixPosition = false; SyncShapeTagInDocument(ActiveShape); return; }
-                        if (new Rectangle(popX + 14, popY + 226, popW - 28, 20).Contains(mouseX, mouseY)) { SaveUndoState(); ActiveShape.FixPosition = true; SyncShapeTagInDocument(ActiveShape); return; }
-                        if (new Rectangle(popX + popW - 90, popY + 248, 80, 24).Contains(mouseX, mouseY))
+                        if (geo.MoveWithTextRect.Contains(mouseX, mouseY)) { SaveUndoState(); ActiveShape.FixPosition = false; SyncShapeTagInDocument(ActiveShape); return; }
+                        if (geo.FixPositionRect.Contains(mouseX, mouseY)) { SaveUndoState(); ActiveShape.FixPosition = true; SyncShapeTagInDocument(ActiveShape); return; }
+                        if (geo.SeeMoreRect.Contains(mouseX, mouseY))
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Chế độ ngắt dòng hiện tại: " + (ActiveShape.WrapMode == 0 ? "Cùng dòng với văn bản" : (ActiveShape.WrapMode == 1 ? "Vuông (Square)" : (ActiveShape.WrapMode == 2 ? "Chặt (Tight)" : (ActiveShape.WrapMode == 3 ? "Xuyên qua (Through)" : (ActiveShape.WrapMode == 4 ? "Trên và Dưới (Top/Bottom)" : (ActiveShape.WrapMode == 5 ? "Dưới văn bản (Behind)" : "Trước văn bản (In Front)")))))) + "\n\nBạn có thể nhấp và kéo trực tiếp đối tượng đến bất kỳ vị trí nào trên trang tài liệu.", "Tùy chọn bố trí ZENQ OFFICE", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Chế độ ngắt dòng hiện tại: ", "Current wrapping mode: ") + (ActiveShape.WrapMode == 0 ? AppL10n.T("Cùng dòng với văn bản", "In Line with Text") : (ActiveShape.WrapMode == 1 ? AppL10n.T("Vuông (Square)", "Square") : (ActiveShape.WrapMode == 2 ? AppL10n.T("Chặt (Tight)", "Tight") : (ActiveShape.WrapMode == 3 ? AppL10n.T("Xuyên qua (Through)", "Through") : (ActiveShape.WrapMode == 4 ? AppL10n.T("Trên và Dưới (Top/Bottom)", "Top and Bottom") : (ActiveShape.WrapMode == 5 ? AppL10n.T("Dưới văn bản (Behind)", "Behind Text") : AppL10n.T("Trước văn bản (In Front)", "In Front of Text"))))))) + AppL10n.T("\n\nBạn có thể nhấp và kéo trực tiếp đối tượng đến bất kỳ vị trí nào trên trang tài liệu.", "\n\nYou can click and drag the object anywhere on the page."), AppL10n.T("Tùy chọn bố trí ZENQ OFFICE", "Layout Options"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                             return;
                         }
                         return;
@@ -20585,16 +22939,8 @@ namespace ZenQOffice.UI
                 }
             }
 
-            // Check Hit on any shape in DocumentShapes
-            DocShapeObject hitShape = null;
-            foreach (var sh in DocumentShapes)
-            {
-                if (!sh.LastBounds.IsEmpty && sh.LastBounds.Contains(mouseX, mouseY))
-                {
-                    hitShape = sh;
-                    break;
-                }
-            }
+            // Check Hit on any shape in DocumentShapes (topmost visual layer first: InFront -> Floating -> Inline -> Behind)
+            DocShapeObject hitShape = HitTestDocumentShape(mouseX, mouseY);
 
             if (hitShape != null)
             {
@@ -20643,7 +22989,7 @@ namespace ZenQOffice.UI
                             GroupChildDragStartMouse = new Point(mouseX, mouseY);
                             GroupChildDragStartOffset = new Point(hitChild.PageX, hitChild.PageY);
 
-                            using (Font txtFont = new Font(hitChild.FontFamily, hitChild.FontSize * ZoomLevel, hitChild.Bold ? FontStyle.Bold : FontStyle.Regular))
+                            using (Font txtFont = new Font(hitChild.FontFamily, Math.Max(0.5f, hitChild.FontSize * ZoomLevel), hitChild.Bold ? FontStyle.Bold : FontStyle.Regular))
                             {
                                 hitChild.TextCursorIndex = ShapeRenderer.GetCharIndexFromPoint(g, hitChild, hitChild.LastBounds, txtFont, ZoomLevel, mouseX, mouseY);
                             }
@@ -20700,22 +23046,33 @@ namespace ZenQOffice.UI
                     return;
                 }
 
+                SelectionStart = CursorPosition;
+                SelectionEnd = CursorPosition;
+                SelectedColumnTableIndex = -1;
+                SelectedColumnIndex = -1;
+                ActiveTableLayoutOptionsIndex = -1;
+                if (IsEditingHeaderFooter) IsEditingHeaderFooter = false;
+
                 int borderThickness = Math.Max(6, (int)(8 * ZoomLevel));
                 Rectangle innerTextBounds = new Rectangle(hitShape.LastBounds.X + borderThickness, hitShape.LastBounds.Y + borderThickness, Math.Max(10, hitShape.LastBounds.Width - borderThickness * 2), Math.Max(10, hitShape.LastBounds.Height - borderThickness * 2));
+                Rectangle shapeTextBounds = new Rectangle(hitShape.LastBounds.X + 8, hitShape.LastBounds.Y + 6, Math.Max(10, hitShape.LastBounds.Width - 16), Math.Max(10, hitShape.LastBounds.Height - 12));
 
                 if (hitShape.ShapeType != "Image" && innerTextBounds.Contains(mouseX, mouseY))
                 {
-                    // Clicked in Text area -> Position text cursor inside shape, DO NOT drag
+                    // Clicked in Text area -> Enter text-edit mode inside shape & keep shape context active
                     IsDraggingShape = false;
                     DragShapeHandleIndex = -1;
-                    using (Font txtFont = new Font(hitShape.FontFamily, hitShape.FontSize * ZoomLevel, hitShape.Bold ? FontStyle.Bold : FontStyle.Regular))
+                    hitShape.IsEditingText = true;
+                    FontStyle shStyle = (hitShape.Bold ? FontStyle.Bold : FontStyle.Regular) | (hitShape.Italic ? FontStyle.Italic : FontStyle.Regular);
+                    using (Font txtFont = new Font(hitShape.FontFamily, Math.Max(0.5f, hitShape.FontSize * ZoomLevel), shStyle))
                     {
-                        hitShape.TextCursorIndex = ShapeRenderer.GetCharIndexFromPoint(g, hitShape, innerTextBounds, txtFont, ZoomLevel, mouseX, mouseY);
+                        hitShape.TextCursorIndex = ShapeRenderer.GetCharIndexFromPoint(g, hitShape, shapeTextBounds, txtFont, ZoomLevel, mouseX, mouseY);
                     }
                 }
                 else
                 {
-                    // Clicked on Shape -> Select and prepare drag
+                    // Clicked on Shape border / image -> Select and prepare drag
+                    hitShape.IsEditingText = false;
                     IsDraggingShape = true;
                     DragShapeHandleIndex = -1;
                     ShapeDragStartMouse = new Point(mouseX, mouseY);
@@ -20724,6 +23081,8 @@ namespace ZenQOffice.UI
                     ShapeDragStartPageNumber = hitShape.PageNumber;
                 }
 
+                if (ribbon != null) UpdateRibbonState(ribbon);
+                this.Invalidate();
                 return;
             }
             else
@@ -20871,6 +23230,8 @@ namespace ZenQOffice.UI
             SelectionEnd = index;
             IsSelecting = true;
             UpdateRibbonState(ribbon);
+            }
+            finally { EndTempPaneContext(_paneCtx); }
         }
 
         private bool IsInTableOfContentsLine(int charIdx)
@@ -20930,6 +23291,38 @@ namespace ZenQOffice.UI
 
         public void HandleMouseMove(int mouseX, int mouseY, int canvasWidth, Graphics g, RibbonBar ribbon)
         {
+            if (IsDraggingSplitter)
+            {
+                int ch = LastViewHeight > 0 ? LastViewHeight : 800;
+                int baseTop = (ribbon != null && ribbon.ShowRuler) ? 181 : 155;
+                if (ViewMode == 4) baseTop += 30;
+                int maxScrollX = GetMaxScrollX(canvasWidth);
+                int wsBottom = Math.Max(baseTop + 80, ch - 26 - (maxScrollX > 0 ? 12 : 0));
+                int availH = Math.Max(80, wsBottom - baseTop - 6);
+                SplitRatio = Math.Max(0.18f, Math.Min(0.82f, (mouseY - baseTop) / (float)availH));
+                Cursor.Current = Cursors.HSplit;
+                Invalidate();
+                return;
+            }
+            if (IsSplitView && !SplitSplitterBounds.IsEmpty && SplitSplitterBounds.Contains(mouseX, mouseY))
+            {
+                Cursor.Current = Cursors.HSplit;
+                return;
+            }
+            if (ViewMode == 4)
+            {
+                for (int i = 0; i < _outlineToolbarHits.Count; i++)
+                {
+                    if (_outlineToolbarHits[i].Key.Contains(mouseX, mouseY)) { Cursor.Current = Cursors.Hand; return; }
+                }
+                for (int i = 0; i < _outlineToggleHits.Count; i++)
+                {
+                    if (_outlineToggleHits[i].Key.Contains(mouseX, mouseY)) { Cursor.Current = Cursors.Hand; return; }
+                }
+            }
+            var _paneMoveCtx = BeginTempPaneContext(IsSplitView ? ActiveSplitPane : 0);
+            try
+            {
             if (LastViewHeight > 100 && mouseY >= LastViewHeight - 25)
             {
                 return;
@@ -21122,7 +23515,7 @@ namespace ZenQOffice.UI
             // 0. Nếu chuột đang ở thanh Ribbon / Title bar hoặc thước kẻ phía trên -> kiểm tra hover thước kẻ
             if (ribbon != null && ribbon.ShowRuler && mouseY >= 155 && mouseY <= 195)
             {
-                int navOffset = ShowNavigationPane ? 280 : 0;
+                int navOffset = EffectiveNavPaneWidth;
                 if (mouseX >= navOffset)
                 {
                     if (FirstLineIndentHitRect.Contains(mouseX, mouseY) || HangingIndentHitRect.Contains(mouseX, mouseY) ||
@@ -21141,7 +23534,7 @@ namespace ZenQOffice.UI
 
             if (mouseY < 155 || (ribbon != null && !ribbon.ShowRuler && mouseY < 155) || (ribbon != null && ribbon.ShowRuler && mouseY < 180))
             {
-                int navOffset = ShowNavigationPane ? 280 : 0;
+                int navOffset = EffectiveNavPaneWidth;
                 if (mouseX >= navOffset)
                 {
                     Cursor.Current = Cursors.Default;
@@ -21152,7 +23545,7 @@ namespace ZenQOffice.UI
             // Check hover over Vertical Ruler (X: navOffset+2..navOffset+24, Y: 180..bottom)
             if (ribbon != null && ribbon.ShowRuler && mouseY >= 180)
             {
-                int navOffset_v = ShowNavigationPane ? 280 : 0;
+                int navOffset_v = EffectiveNavPaneWidth;
                 int vRulerW_v = 22;
                 int vRulerX_v = navOffset_v + 2;
                 if (mouseX >= vRulerX_v && mouseX <= vRulerX_v + vRulerW_v)
@@ -21595,7 +23988,7 @@ namespace ZenQOffice.UI
                 int hs = (int)(7 * ZoomLevel);
 
                 // Check Layout Options button
-                Rectangle wrapBtn = new Rectangle(sBounds.Right + 5, sBounds.Top, 22, 22);
+                Rectangle wrapBtn = ShapeRenderer.GetLayoutOptionsButtonRect(sBounds);
                 if (wrapBtn.Contains(mouseX, mouseY))
                 {
                     Cursor.Current = Cursors.Hand;
@@ -21605,31 +23998,22 @@ namespace ZenQOffice.UI
                 // Check Layout Options Popup (if open)
                 if (ActiveShape.ShowLayoutOptions)
                 {
-                    int popW = 185; int popH = 250;
-                    int popX = wrapBtn.Right + 8; int popY = wrapBtn.Top - 5;
-                    Rectangle popRect = new Rectangle(popX, popY, popW, popH);
-                    if (popRect.Contains(mouseX, mouseY))
+                    var geo = ShapeRenderer.GetLayoutPopupGeometry(wrapBtn, showSeeMore: true);
+                    if (geo.PopupRect.Contains(mouseX, mouseY))
                     {
-                        Rectangle closeBtn = new Rectangle(popX + popW - 24, popY + 6, 20, 20);
-                        Rectangle inCard = new Rectangle(popX + 14, popY + 58, 42, 34);
-                        if (closeBtn.Contains(mouseX, mouseY) || inCard.Contains(mouseX, mouseY))
+                        bool interactive = geo.CloseButtonRect.Contains(mouseX, mouseY) ||
+                                           geo.InlineCardRect.Contains(mouseX, mouseY) ||
+                                           geo.MoveWithTextRect.Contains(mouseX, mouseY) ||
+                                           geo.FixPositionRect.Contains(mouseX, mouseY) ||
+                                           geo.SeeMoreRect.Contains(mouseX, mouseY);
+                        if (!interactive)
                         {
-                            Cursor.Current = Cursors.Hand;
-                            return;
-                        }
-                        for (int r = 0; r < 2; r++)
-                        {
-                            for (int c = 0; c < 3; c++)
+                            for (int ci = 0; ci < 6; ci++)
                             {
-                                Rectangle cardBox = new Rectangle(popX + 14 + c * 52, popY + 120 + r * 38, 42, 34);
-                                if (cardBox.Contains(mouseX, mouseY))
-                                {
-                                    Cursor.Current = Cursors.Hand;
-                                    return;
-                                }
+                                if (geo.WrapCardRects[ci].Contains(mouseX, mouseY)) { interactive = true; break; }
                             }
                         }
-                        Cursor.Current = Cursors.Default;
+                        Cursor.Current = interactive ? Cursors.Hand : Cursors.Default;
                         return;
                     }
                 }
@@ -21796,10 +24180,8 @@ namespace ZenQOffice.UI
 
                 if (ActiveChart.ShowLayoutOptions && !LayoutBtnChartRect.IsEmpty)
                 {
-                    int popW = 185; int popH = 250;
-                    int popX = LayoutBtnChartRect.Right + 8; int popY = LayoutBtnChartRect.Top - 5;
-                    Rectangle popRect = new Rectangle(popX, popY, popW, popH);
-                    if (popRect.Contains(mouseX, mouseY))
+                    var geo = ShapeRenderer.GetLayoutPopupGeometry(LayoutBtnChartRect, showSeeMore: true);
+                    if (geo.PopupRect.Contains(mouseX, mouseY))
                     {
                         Cursor.Current = Cursors.Hand;
                         return;
@@ -22396,7 +24778,21 @@ namespace ZenQOffice.UI
                     int effPageH = pageH_m > 0 ? pageH_m : (int)(11.69f * 96f * ZoomLevel);
                     int effMouseY = (ViewMode == 0) ? (mouseY + ReadModePageIndex * (effPageH + 30)) : mouseY;
                     int index = GetCharIndexFromPoint(mouseX, effMouseY, canvasWidth, g, ribbon);
-                    SelectionEnd = index;
+                    int selA = _mouseDownCharIndex;
+                    int selB = index;
+                    string fullSelTxt = PieceTable != null ? PieceTable.GetText() : "";
+                    if (!string.IsNullOrEmpty(fullSelTxt) && selA != selB)
+                    {
+                        int lo = Math.Min(selA, selB);
+                        int hi = Math.Max(selA, selB);
+                        ExpandRangeToWholeObjectTags(fullSelTxt, ref lo, ref hi);
+                        if (selB < selA) { SelectionStart = hi; SelectionEnd = lo; index = lo; }
+                        else { SelectionStart = lo; SelectionEnd = hi; index = hi; }
+                    }
+                    else
+                    {
+                        SelectionEnd = index;
+                    }
                     CursorPosition = index;
                     UpdateRibbonState(ribbon);
                     WriterFloatingMiniToolbarForm.HideToolbar();
@@ -22426,49 +24822,96 @@ namespace ZenQOffice.UI
             {
                 WriterFloatingMiniToolbarPopup.CloseCurrent();
             }
+            }
+            finally { EndTempPaneContext(_paneMoveCtx); }
+        }
+
+        public DocShapeObject HitTestDocumentShape(int mouseX, int mouseY)
+        {
+            if (DocumentShapes == null || DocumentShapes.Count == 0) return null;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                for (int si = DocumentShapes.Count - 1; si >= 0; si--)
+                {
+                    var sh = DocumentShapes[si];
+                    if (sh == null || !sh.Visible || sh.LastBounds.IsEmpty) continue;
+                    bool matchesPass = (pass == 0 && sh.WrapMode == 6)
+                        || (pass == 1 && sh.WrapMode != 5 && sh.WrapMode != 6)
+                        || (pass == 2 && sh.WrapMode == 5);
+                    if (matchesPass && sh.LastBounds.Contains(mouseX, mouseY))
+                        return sh;
+                }
+            }
+            return null;
         }
 
         public void HandleDoubleClick(int mouseX, int mouseY, int canvasWidth, Graphics g, RibbonBar ribbon)
         {
-            if (SelectEquationAt(mouseX,mouseY,ribbon)) return;
-            foreach (var sh in DocumentShapes)
+            if (IsSplitView && !SplitSplitterBounds.IsEmpty && SplitSplitterBounds.Contains(mouseX, mouseY)) return;
+            int dblPane = (IsSplitView && !SplitSplitterBounds.IsEmpty && mouseY >= SplitSplitterBounds.Bottom) ? 1 : 0;
+            if (IsSplitView) ActiveSplitPane = dblPane;
+            var _paneDblCtx = BeginTempPaneContext(dblPane);
+            try
             {
-                if (!sh.LastBounds.IsEmpty && sh.LastBounds.Contains(mouseX, mouseY))
+            if (SelectEquationAt(mouseX,mouseY,ribbon)) return;
+            DocShapeObject sh = HitTestDocumentShape(mouseX, mouseY);
+            if (sh != null)
+            {
+                foreach (var other in DocumentShapes)
                 {
-                    ActiveShape = sh;
-                    sh.IsSelected = true;
-                    if (sh.ShapeType == "Group" && sh.GroupChildren != null)
+                    if (other != sh)
                     {
-                        for (int ci = sh.GroupChildren.Count - 1; ci >= 0; ci--)
-                        {
-                            var child = sh.GroupChildren[ci];
-                            if (!child.LastBounds.IsEmpty && child.LastBounds.Contains(mouseX, mouseY))
-                            {
-                                foreach (var oc in sh.GroupChildren) { oc.IsSelected = false; oc.IsEditingText = false; }
-                                child.IsSelected = true;
-                                child.IsEditingText = true;
-                                child.TextCursorIndex = (child.TextContent ?? "").Length;
-                                ActiveGroupChild = child;
-                                this.Invalidate();
-                                return;
-                            }
-                        }
+                        other.IsSelected = false;
+                        other.IsEditingText = false;
+                        other.SelectedNodeIndex = -1;
                     }
-                    if (sh.ShapeType == "SmartArt" || !string.IsNullOrEmpty(sh.SmartArtType))
+                }
+                if (ActiveChart != null) { ActiveChart.IsSelected = false; ActiveChart = null; }
+                ActiveShape = sh;
+                sh.IsSelected = true;
+                if (sh.ShapeType == "Group" && sh.GroupChildren != null)
+                {
+                    for (int ci = sh.GroupChildren.Count - 1; ci >= 0; ci--)
                     {
-                        int hitNode = sh.HitTestNode(mouseX, mouseY);
-                        if (hitNode >= 0)
+                        var child = sh.GroupChildren[ci];
+                        if (!child.LastBounds.IsEmpty && child.LastBounds.Contains(mouseX, mouseY))
                         {
-                            sh.SelectedNodeIndex = hitNode;
-                            StartSmartArtInlineTextEdit(sh, hitNode, canvasWidth, g, ribbon);
-                            return;
-                        }
-                        else
-                        {
+                            foreach (var oc in sh.GroupChildren) { oc.IsSelected = false; oc.IsEditingText = false; }
+                            child.IsSelected = true;
+                            child.IsEditingText = true;
+                            child.TextCursorIndex = (child.TextContent ?? "").Length;
+                            ActiveGroupChild = child;
+                            if (ribbon != null) UpdateRibbonState(ribbon);
+                            this.Invalidate();
                             return;
                         }
                     }
                 }
+                if (sh.ShapeType == "SmartArt" || !string.IsNullOrEmpty(sh.SmartArtType))
+                {
+                    int hitNode = sh.HitTestNode(mouseX, mouseY);
+                    if (hitNode >= 0)
+                    {
+                        sh.SelectedNodeIndex = hitNode;
+                        StartSmartArtInlineTextEdit(sh, hitNode, canvasWidth, g, ribbon);
+                    }
+                    if (ribbon != null) UpdateRibbonState(ribbon);
+                    return;
+                }
+
+                if (sh.ShapeType != "Image")
+                {
+                    sh.IsEditingText = true;
+                    Rectangle shapeTextBounds = new Rectangle(sh.LastBounds.X + 8, sh.LastBounds.Y + 6, Math.Max(10, sh.LastBounds.Width - 16), Math.Max(10, sh.LastBounds.Height - 12));
+                    FontStyle shStyle = (sh.Bold ? FontStyle.Bold : FontStyle.Regular) | (sh.Italic ? FontStyle.Italic : FontStyle.Regular);
+                    using (Font txtFont = new Font(sh.FontFamily, Math.Max(0.5f, sh.FontSize * ZoomLevel), shStyle))
+                    {
+                        sh.TextCursorIndex = ShapeRenderer.GetCharIndexFromPoint(g, sh, shapeTextBounds, txtFont, ZoomLevel, mouseX, mouseY);
+                    }
+                }
+                if (ribbon != null) UpdateRibbonState(ribbon);
+                this.Invalidate();
+                return;
             }
 
             foreach (var ch in DocumentCharts)
@@ -22511,15 +24954,15 @@ namespace ZenQOffice.UI
             bool doubleClickInHeaderFooter = false;
             for (int pg = 0; pg < Math.Max(1, CalculatedPageCount); pg++)
             {
-                int curPageY = (ViewMode == 0) ? pageY : (pageY + pg * (pageH + PageGap));
-                Rectangle pRect = new Rectangle(pageX, curPageY, pageW, pageH);
+                int paneBaseY = (IsSplitView && ActiveSplitPane == 1 && !SplitSplitterBounds.IsEmpty) ? (SplitSplitterBounds.Bottom + 9 - (int)Math.Round(SmoothScrollY)) : (pageY + (ViewMode == 4 ? 30 : 0));
+                Rectangle pRect = GetHitPageBoundsForEvent(pg, canvasWidth, ribbon, paneBaseY, pageX, pageW, pageH);
                 if (!pRect.Contains(mouseX, mouseY)) continue;
 
                 int headerH = Math.Max((int)(45 * ZoomLevel), marginY);
                 int effBottomMarginY2 = (int)Math.Round((ribbon != null ? ribbon.GetEffectiveBottomMarginInches() : 1.0f) * 96.0f * ZoomLevel);
                 int footerH = Math.Max((int)(45 * ZoomLevel), effBottomMarginY2);
-                Rectangle hZone = new Rectangle(pageX, curPageY, pageW, headerH);
-                Rectangle fZone = new Rectangle(pageX, curPageY + pageH - footerH, pageW, footerH);
+                Rectangle hZone = new Rectangle(pRect.X, pRect.Y, pRect.Width, headerH);
+                Rectangle fZone = new Rectangle(pRect.X, pRect.Y + pRect.Height - footerH, pRect.Width, footerH);
 
                 if (hZone.Contains(mouseX, mouseY))
                 {
@@ -22529,6 +24972,9 @@ namespace ZenQOffice.UI
                     ActiveHeaderFooterPageIndex = pg;
                     IsEditingHeaderFooter = true;
                     IsEditingHeaderMode = true;
+                    var _hfDblH = BeginPageHeaderFooterScope(pg);
+                    try
+                    {
                     if (CurrentHeaderPreset == HeaderFooterPreset.None) CurrentHeaderPreset = HeaderFooterPreset.Blank;
                     if (CurrentHeaderPreset == HeaderFooterPreset.ThreeColumns)
                     {
@@ -22541,11 +24987,13 @@ namespace ZenQOffice.UI
                         EnsureActiveHeaderRunsInitialized();
                     }
                     if (ribbon != null) ribbon.ActiveRibbonTab = 9;
-                    HeaderCursorCharIndex = GetHeaderCharIndexAt(mouseX, pageX, pageW, pg, ribbon);
+                    HeaderCursorCharIndex = GetHeaderCharIndexAt(mouseX, pRect.X, pRect.Width, pg, ribbon);
                     IsHeaderTextSelected = wasEditingHeaderHere && !string.IsNullOrEmpty(GetCurrentHeaderText());
                     doubleClickInHeaderFooter = true;
                     Invalidate();
                     return;
+                    }
+                    finally { EndPageHeaderFooterScope(_hfDblH, true); }
                 }
                 if (fZone.Contains(mouseX, mouseY))
                 {
@@ -22555,6 +25003,9 @@ namespace ZenQOffice.UI
                     ActiveHeaderFooterPageIndex = pg;
                     IsEditingHeaderFooter = true;
                     IsEditingHeaderMode = false;
+                    var _hfDblF = BeginPageHeaderFooterScope(pg);
+                    try
+                    {
                     if (CurrentFooterPreset == HeaderFooterPreset.None) CurrentFooterPreset = HeaderFooterPreset.Blank;
                     if (CurrentFooterPreset == HeaderFooterPreset.ThreeColumns)
                     {
@@ -22567,11 +25018,13 @@ namespace ZenQOffice.UI
                         EnsureActiveFooterRunsInitialized();
                     }
                     if (ribbon != null) ribbon.ActiveRibbonTab = 9;
-                    FooterCursorCharIndex = GetFooterCharIndexAt(mouseX, pageX, pageW, pg, ribbon);
+                    FooterCursorCharIndex = GetFooterCharIndexAt(mouseX, pRect.X, pRect.Width, pg, ribbon);
                     IsHeaderTextSelected = wasEditingFooterHere && !string.IsNullOrEmpty(GetCurrentFooterText());
                     doubleClickInHeaderFooter = true;
                     Invalidate();
                     return;
+                    }
+                    finally { EndPageHeaderFooterScope(_hfDblF, true); }
                 }
             }
 
@@ -22635,10 +25088,20 @@ namespace ZenQOffice.UI
                 string txt = PieceTable.GetText();
                 if (txt != null && txt.Length > 0 && charIdx >= 0 && charIdx <= txt.Length)
                 {
+                    if (TryGetObjectTagSpanAt(txt, charIdx, includeEndBoundary: true, out int objStart, out int objEnd))
+                    {
+                        SelectionStart = objStart;
+                        SelectionEnd = Math.Min(txt.Length, objEnd + 1);
+                        CursorPosition = SelectionEnd;
+                        _hasDraggedSelection = true;
+                        return;
+                    }
+
                     int wStart = Math.Min(charIdx, txt.Length > 0 ? txt.Length - 1 : 0);
                     while (wStart > 0 && !char.IsWhiteSpace(txt[wStart - 1])) wStart--;
                     int wEnd = Math.Min(charIdx, txt.Length);
                     while (wEnd < txt.Length && !char.IsWhiteSpace(txt[wEnd])) wEnd++;
+                    ExpandRangeToWholeObjectTags(txt, ref wStart, ref wEnd);
 
                     if (wEnd > wStart)
                     {
@@ -22658,6 +25121,8 @@ namespace ZenQOffice.UI
                 _hasDraggedSelection = false;
                 WriterFloatingMiniToolbarForm.CloseCurrent();
             }
+            }
+            finally { EndTempPaneContext(_paneDblCtx); }
         }
 
         public void HandleTripleClick(int mouseX, int mouseY, int canvasWidth, Graphics g, RibbonBar ribbon)
@@ -22696,6 +25161,13 @@ namespace ZenQOffice.UI
 
         public void HandleMouseUp(int mouseX = 0, int mouseY = 0, int canvasWidth = 0, Graphics g = null, RibbonBar ribbon = null)
         {
+            if (IsDraggingSplitter)
+            {
+                IsDraggingSplitter = false;
+                IsDocumentMouseDown = false;
+                Invalidate();
+                return;
+            }
             bool wasDocMouseDown = IsDocumentMouseDown;
             IsDocumentMouseDown = false;
             if (CompleteEquationClick()) return;
@@ -22779,8 +25251,8 @@ namespace ZenQOffice.UI
                         {
                             string fullTag = text.Substring(oldIdx, endIdx - oldIdx + 1);
                             int newPos = InlineDragDropCursorPos;
-                            // Ensure valid index
-                            newPos = Math.Max(0, Math.Min(text.Length, newPos));
+                            // Ensure valid index outside any existing object tag
+                            newPos = SnapCursorOutOfObjectTag(Math.Max(0, Math.Min(text.Length, newPos)), 0, text);
 
                             // If dropped on itself, do nothing
                             if (newPos >= oldIdx && newPos <= oldIdx + fullTag.Length)
@@ -23112,22 +25584,263 @@ namespace ZenQOffice.UI
             this.Invalidate();
         }
 
+        private static bool IsMarkdownTableDividerLine(string line)
+        {
+            return !string.IsNullOrWhiteSpace(line) && (line.Contains("---") || line.Contains("==="));
+        }
+
+        private static bool IsMarkdownTableDataLine(string line)
+        {
+            return !string.IsNullOrWhiteSpace(line) && line.Trim().StartsWith("|") && !IsMarkdownTableDividerLine(line);
+        }
+
+        private void EnsureTableCharRangesFromText(string fullText)
+        {
+            if (string.IsNullOrEmpty(fullText)) return;
+            TableCharRanges.Clear();
+            string[] paragraphs = fullText.Split('\n');
+            int offset = 0;
+            int tblIdx = 0;
+            for (int p = 0; p < paragraphs.Length; p++)
+            {
+                string para = paragraphs[p];
+                if (!string.IsNullOrWhiteSpace(para) && para.Trim().StartsWith("|"))
+                {
+                    int start = offset;
+                    int len = 0;
+                    bool hasDataRow = false;
+                    while (p < paragraphs.Length && !string.IsNullOrWhiteSpace(paragraphs[p]) && paragraphs[p].Trim().StartsWith("|"))
+                    {
+                        if (!IsMarkdownTableDividerLine(paragraphs[p])) hasDataRow = true;
+                        int step = paragraphs[p].Length + (p < paragraphs.Length - 1 ? 1 : 0);
+                        len += step;
+                        offset += step;
+                        p++;
+                    }
+                    p--;
+                    if (hasDataRow)
+                    {
+                        TableCharRanges[tblIdx++] = new int[] { start, len };
+                    }
+                }
+                else
+                {
+                    offset += para.Length + (p < paragraphs.Length - 1 ? 1 : 0);
+                }
+            }
+        }
+
+        private bool TryGetTableMarkdownBlock(int tableIdx, out string fullText, out int tblStart, out int tblLen)
+        {
+            fullText = PieceTable != null ? (PieceTable.GetText() ?? "") : "";
+            tblStart = 0;
+            tblLen = 0;
+            if (tableIdx < 0 || string.IsNullOrEmpty(fullText)) return false;
+
+            if (!TableCharRanges.ContainsKey(tableIdx))
+            {
+                EnsureTableCharRangesFromText(fullText);
+            }
+            if (!TableCharRanges.TryGetValue(tableIdx, out int[] tRange) || tRange == null || tRange.Length < 2)
+            {
+                return false;
+            }
+            tblStart = Math.Max(0, Math.Min(tRange[0], fullText.Length));
+            tblLen = Math.Max(0, Math.Min(tRange[1], fullText.Length - tblStart));
+            return tblLen > 0;
+        }
+
+        private void CommitTableMarkdownEdit(int tableIdx, string fullText, int tblStart, int tblLen, string newTableText)
+        {
+            string newDocText = fullText.Substring(0, tblStart) + newTableText + fullText.Substring(tblStart + tblLen);
+            int delta = newTableText.Length - tblLen;
+            TableCharRanges[tableIdx] = new int[] { tblStart, newTableText.Length };
+            foreach (int key in new List<int>(TableCharRanges.Keys))
+            {
+                if (key != tableIdx && TableCharRanges[key] != null && TableCharRanges[key].Length >= 2 && TableCharRanges[key][0] > tblStart)
+                {
+                    TableCharRanges[key][0] = Math.Max(0, TableCharRanges[key][0] + delta);
+                }
+            }
+
+            SaveUndoState();
+            PieceTable.SetInitialText(newDocText);
+            CursorPosition = Math.Max(0, Math.Min(CursorPosition, newDocText.Length));
+            SelectionStart = CursorPosition;
+            SelectionEnd = CursorPosition;
+            if (_paraLayoutCache != null) _paraLayoutCache.Clear();
+            this.Invalidate();
+        }
+
+        private static void RemoveAndShiftTableDict<T>(Dictionary<int, T> dict, int removedIdx)
+        {
+            if (dict == null) return;
+            dict.Remove(removedIdx);
+            List<int> higherKeys = new List<int>();
+            foreach (int k in dict.Keys)
+            {
+                if (k > removedIdx) higherKeys.Add(k);
+            }
+            higherKeys.Sort();
+            foreach (int k in higherKeys)
+            {
+                dict[k - 1] = dict[k];
+                dict.Remove(k);
+            }
+        }
+
+        public bool FindTableCellAtPoint(int mouseX, int mouseY, out int tblIdx, out int rowIdx, out int colIdx)
+        {
+            tblIdx = -1;
+            rowIdx = 0;
+            colIdx = 0;
+
+            for (int i = 0; i < TableCellHits.Count; i++)
+            {
+                var hit = TableCellHits[i];
+                if (hit.CellRect.Contains(mouseX, mouseY))
+                {
+                    tblIdx = hit.TableIndex;
+                    rowIdx = hit.RowIndex;
+                    colIdx = hit.ColIndex;
+                    return true;
+                }
+            }
+
+            int matchedTbl = -1;
+            for (int t = 0; t < MoveHandleRects.Count; t++)
+            {
+                Rectangle handleRect = MoveHandleRects[t];
+                handleRect.Inflate(6, 6);
+                if (handleRect.Contains(mouseX, mouseY))
+                {
+                    matchedTbl = t;
+                    break;
+                }
+            }
+
+            if (matchedTbl < 0)
+            {
+                for (int t = 0; t < TableBoundsList.Count; t++)
+                {
+                    Rectangle bounds = TableBoundsList[t];
+                    bounds.Inflate(6, 6);
+                    if (bounds.Contains(mouseX, mouseY))
+                    {
+                        matchedTbl = t;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedTbl < 0 && TableFloatingBounds != null)
+            {
+                foreach (var kvp in TableFloatingBounds)
+                {
+                    Rectangle bounds = kvp.Value;
+                    bounds.Inflate(6, 6);
+                    if (bounds.Contains(mouseX, mouseY))
+                    {
+                        matchedTbl = kvp.Key;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedTbl >= 0)
+            {
+                tblIdx = matchedTbl;
+                double bestDist = double.MaxValue;
+                bool foundCell = false;
+                for (int i = 0; i < TableCellHits.Count; i++)
+                {
+                    var hit = TableCellHits[i];
+                    if (hit.TableIndex != matchedTbl) continue;
+                    int dx = Math.Max(0, Math.Max(hit.CellRect.Left - mouseX, mouseX - hit.CellRect.Right));
+                    int dy = Math.Max(0, Math.Max(hit.CellRect.Top - mouseY, mouseY - hit.CellRect.Bottom));
+                    double dist = dx * dx + dy * dy;
+                    if (!foundCell || dist < bestDist)
+                    {
+                        bestDist = dist;
+                        rowIdx = hit.RowIndex;
+                        colIdx = hit.ColIndex;
+                        foundCell = true;
+                    }
+                }
+                if (!foundCell && GetCursorTableCell(out int curTbl, out int curRow, out int curCol) && curTbl == matchedTbl)
+                {
+                    rowIdx = curRow;
+                    colIdx = curCol;
+                }
+                return true;
+            }
+
+            if (TableBoundsList.Count == 0 && TableCellHits.Count == 0 && ActiveTableIndex >= 0)
+            {
+                return GetCursorTableCell(out tblIdx, out rowIdx, out colIdx);
+            }
+
+            return false;
+        }
+
+        public void FocusCellForContextMenuIfNeeded(int tblIdx, int rowIdx, int colIdx)
+        {
+            if (tblIdx < 0) return;
+            if (SelectedColumnTableIndex == tblIdx && SelectedColumnIndex >= 0)
+            {
+                int endCol = SelectedColumnEndIndex >= 0 ? SelectedColumnEndIndex : SelectedColumnIndex;
+                int minC = Math.Min(SelectedColumnIndex, endCol);
+                int maxC = Math.Max(SelectedColumnIndex, endCol);
+                if (colIdx >= minC && colIdx <= maxC) return;
+            }
+
+            for (int i = 0; i < TableCellHits.Count; i++)
+            {
+                var hit = TableCellHits[i];
+                if (hit.TableIndex == tblIdx && hit.RowIndex == rowIdx && hit.ColIndex == colIdx)
+                {
+                    if (SelectionStart != SelectionEnd)
+                    {
+                        int selMin = Math.Min(SelectionStart, SelectionEnd);
+                        int selMax = Math.Max(SelectionStart, SelectionEnd);
+                        if (hit.CharStartIndex + hit.CharLength >= selMin && hit.CharStartIndex <= selMax)
+                            return;
+                    }
+                    SelectedColumnTableIndex = -1;
+                    SelectedColumnIndex = -1;
+                    SelectedColumnEndIndex = -1;
+                    CursorPosition = Math.Max(0, hit.CharStartIndex);
+                    SelectionStart = CursorPosition;
+                    SelectionEnd = CursorPosition;
+                    return;
+                }
+            }
+        }
+
         public void InsertTableRow(int tableIdx, int insertAtRow)
         {
-            if (!TableCharRanges.ContainsKey(tableIdx)) return;
-            int[] tRange = TableCharRanges[tableIdx];
-            int tblStart = tRange[0];
-            int tblLen   = tRange[1];
-
-            string fullText = PieceTable.GetText();
-            if (tblStart < 0 || tblStart + tblLen > fullText.Length) return;
+            if (!TryGetTableMarkdownBlock(tableIdx, out string fullText, out int tblStart, out int tblLen)) return;
 
             string tableText = fullText.Substring(tblStart, tblLen);
             string[] lines = tableText.Split('\n');
             List<string> newLines = new List<string>();
 
             int numCols = 1;
-            if (TableColWidths.ContainsKey(tableIdx)) numCols = TableColWidths[tableIdx].Count;
+            if (TableColWidths.ContainsKey(tableIdx) && TableColWidths[tableIdx].Count > 0)
+            {
+                numCols = TableColWidths[tableIdx].Count;
+            }
+            else
+            {
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (IsMarkdownTableDataLine(lines[i]))
+                    {
+                        numCols = Math.Max(1, lines[i].Split('|').Length - 2);
+                        break;
+                    }
+                }
+            }
 
             StringBuilder sbRow = new StringBuilder("|");
             for (int c = 0; c < numCols; c++) sbRow.Append("   |");
@@ -23135,12 +25848,13 @@ namespace ZenQOffice.UI
 
             int dataRowCounter = 0;
             bool inserted = false;
+            int clampedInsertRow = Math.Max(0, insertAtRow);
             for (int i = 0; i < lines.Length; i++)
             {
                 string l = lines[i];
-                if (!string.IsNullOrWhiteSpace(l) && l.Trim().StartsWith("|") && !l.Contains("---") && !l.Contains("==="))
+                if (IsMarkdownTableDataLine(l))
                 {
-                    if (dataRowCounter == insertAtRow && !inserted)
+                    if (dataRowCounter == clampedInsertRow && !inserted)
                     {
                         newLines.Add(newRowStr);
                         inserted = true;
@@ -23151,41 +25865,42 @@ namespace ZenQOffice.UI
             }
             if (!inserted)
             {
-                newLines.Add(newRowStr);
+                int insertPos = (newLines.Count > 0 && string.IsNullOrEmpty(newLines[newLines.Count - 1])) ? newLines.Count - 1 : newLines.Count;
+                newLines.Insert(insertPos, newRowStr);
             }
 
-            string newTableText = string.Join("\n", newLines.ToArray());
-            string newDocText = fullText.Substring(0, tblStart) + newTableText + fullText.Substring(tblStart + tblLen);
+            if (tableIdx >= 0 && tableIdx < DocumentTables.Count)
+            {
+                var docTbl = DocumentTables[tableIdx];
+                var newDocRow = new DocTableRow();
+                for (int c = 0; c < numCols; c++) newDocRow.Cells.Add(new DocTableCell());
+                int docInsertIdx = Math.Min(clampedInsertRow, docTbl.Rows.Count);
+                docTbl.Rows.Insert(docInsertIdx, newDocRow);
+            }
 
             TableRowHeights.Remove(tableIdx);
-            SaveUndoState();
-            PieceTable.SetInitialText(newDocText);
+            CommitTableMarkdownEdit(tableIdx, fullText, tblStart, tblLen, string.Join("\n", newLines.ToArray()));
         }
 
         public void InsertTableColumn(int tableIdx, int insertAtCol)
         {
-            if (!TableCharRanges.ContainsKey(tableIdx)) return;
-            int[] tRange = TableCharRanges[tableIdx];
-            int tblStart = tRange[0];
-            int tblLen   = tRange[1];
-
-            string fullText = PieceTable.GetText();
-            if (tblStart < 0 || tblStart + tblLen > fullText.Length) return;
+            if (!TryGetTableMarkdownBlock(tableIdx, out string fullText, out int tblStart, out int tblLen)) return;
 
             string tableText = fullText.Substring(tblStart, tblLen);
             string[] lines = tableText.Split('\n');
             List<string> newLines = new List<string>();
+            int clampedCol = Math.Max(0, insertAtCol);
 
             for (int i = 0; i < lines.Length; i++)
             {
                 string l = lines[i];
                 if (!string.IsNullOrWhiteSpace(l) && l.Trim().StartsWith("|"))
                 {
-                    if (l.Contains("---") || l.Contains("==="))
+                    if (IsMarkdownTableDividerLine(l))
                     {
                         string[] parts = l.Split('|');
                         List<string> newParts = new List<string>(parts);
-                        int insIdx = Math.Min(newParts.Count - 1, Math.Max(1, insertAtCol + 1));
+                        int insIdx = Math.Min(newParts.Count - 1, Math.Max(1, clampedCol + 1));
                         newParts.Insert(insIdx, "---");
                         newLines.Add(string.Join("|", newParts.ToArray()));
                     }
@@ -23193,7 +25908,7 @@ namespace ZenQOffice.UI
                     {
                         string[] cells = l.Split('|');
                         List<string> newCells = new List<string>(cells);
-                        int insIdx = Math.Min(newCells.Count - 1, Math.Max(1, insertAtCol + 1));
+                        int insIdx = Math.Min(newCells.Count - 1, Math.Max(1, clampedCol + 1));
                         newCells.Insert(insIdx, "   ");
                         newLines.Add(string.Join("|", newCells.ToArray()));
                     }
@@ -23204,66 +25919,109 @@ namespace ZenQOffice.UI
                 }
             }
 
-            string newTableText = string.Join("\n", newLines.ToArray());
-            string newDocText = fullText.Substring(0, tblStart) + newTableText + fullText.Substring(tblStart + tblLen);
+            if (tableIdx >= 0 && tableIdx < DocumentTables.Count)
+            {
+                var docTbl = DocumentTables[tableIdx];
+                for (int r = 0; r < docTbl.Rows.Count; r++)
+                {
+                    int colInsert = Math.Min(clampedCol, docTbl.Rows[r].Cells.Count);
+                    docTbl.Rows[r].Cells.Insert(colInsert, new DocTableCell());
+                }
+            }
 
             TableColWidths.Remove(tableIdx);
-            SaveUndoState();
-            PieceTable.SetInitialText(newDocText);
+            SelectedColumnTableIndex = -1;
+            SelectedColumnIndex = -1;
+            SelectedColumnEndIndex = -1;
+            CommitTableMarkdownEdit(tableIdx, fullText, tblStart, tblLen, string.Join("\n", newLines.ToArray()));
         }
 
         public void DeleteTableRow(int tableIdx, int rowIdx)
         {
-            if (!TableCharRanges.ContainsKey(tableIdx)) return;
-            int[] tRange = TableCharRanges[tableIdx];
-            int tblStart = tRange[0];
-            int tblLen   = tRange[1];
-
-            string fullText = PieceTable.GetText();
-            if (tblStart < 0 || tblStart + tblLen > fullText.Length) return;
+            if (!TryGetTableMarkdownBlock(tableIdx, out string fullText, out int tblStart, out int tblLen)) return;
 
             string tableText = fullText.Substring(tblStart, tblLen);
             string[] lines = tableText.Split('\n');
-            List<string> newLines = new List<string>();
 
+            int totalDataRows = 0;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (IsMarkdownTableDataLine(lines[i])) totalDataRows++;
+            }
+            if (totalDataRows <= 1)
+            {
+                DeleteTable(tableIdx);
+                return;
+            }
+            if (rowIdx < 0 || rowIdx >= totalDataRows) return;
+
+            List<string> newLines = new List<string>();
             int dataRowCounter = 0;
             for (int i = 0; i < lines.Length; i++)
             {
                 string l = lines[i];
-                if (!string.IsNullOrWhiteSpace(l) && l.Trim().StartsWith("|") && !l.Contains("---") && !l.Contains("==="))
+                if (IsMarkdownTableDataLine(l))
                 {
                     if (dataRowCounter == rowIdx)
                     {
                         dataRowCounter++;
-                        continue; // Bỏ qua để xóa hàng này
+                        continue;
                     }
                     dataRowCounter++;
                 }
                 newLines.Add(l);
             }
 
-            string newTableText = string.Join("\n", newLines.ToArray());
-            string newDocText = fullText.Substring(0, tblStart) + newTableText + fullText.Substring(tblStart + tblLen);
+            if (rowIdx == 0)
+            {
+                int divIdx = newLines.FindIndex(IsMarkdownTableDividerLine);
+                int firstDataIdx = newLines.FindIndex(IsMarkdownTableDataLine);
+                if (divIdx >= 0 && firstDataIdx >= 0 && divIdx < firstDataIdx)
+                {
+                    string divLine = newLines[divIdx];
+                    newLines.RemoveAt(divIdx);
+                    int insertAfterFirst = newLines.FindIndex(IsMarkdownTableDataLine) + 1;
+                    newLines.Insert(insertAfterFirst, divLine);
+                }
+            }
+
+            if (tableIdx >= 0 && tableIdx < DocumentTables.Count)
+            {
+                var docTbl = DocumentTables[tableIdx];
+                if (rowIdx >= 0 && rowIdx < docTbl.Rows.Count)
+                {
+                    docTbl.Rows.RemoveAt(rowIdx);
+                }
+            }
 
             TableRowHeights.Remove(tableIdx);
-            SaveUndoState();
-            PieceTable.SetInitialText(newDocText);
+            CommitTableMarkdownEdit(tableIdx, fullText, tblStart, tblLen, string.Join("\n", newLines.ToArray()));
         }
 
         public void DeleteTableColumn(int tableIdx, int colIdx)
         {
-            if (!TableCharRanges.ContainsKey(tableIdx)) return;
-            int[] tRange = TableCharRanges[tableIdx];
-            int tblStart = tRange[0];
-            int tblLen   = tRange[1];
-
-            string fullText = PieceTable.GetText();
-            if (tblStart < 0 || tblStart + tblLen > fullText.Length) return;
+            if (!TryGetTableMarkdownBlock(tableIdx, out string fullText, out int tblStart, out int tblLen)) return;
 
             string tableText = fullText.Substring(tblStart, tblLen);
             string[] lines = tableText.Split('\n');
-            List<string> newLines = new List<string>();
 
+            int totalCols = 0;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (IsMarkdownTableDataLine(lines[i]))
+                {
+                    totalCols = Math.Max(0, lines[i].Split('|').Length - 2);
+                    break;
+                }
+            }
+            if (totalCols <= 1)
+            {
+                DeleteTable(tableIdx);
+                return;
+            }
+            if (colIdx < 0 || colIdx >= totalCols) return;
+
+            List<string> newLines = new List<string>();
             for (int i = 0; i < lines.Length; i++)
             {
                 string l = lines[i];
@@ -23277,7 +26035,7 @@ namespace ZenQOffice.UI
                     }
                     if (keepCells.Count > 0)
                     {
-                        newLines.Add("| " + string.Join(" | ", keepCells.ToArray()) + " |");
+                        newLines.Add("|" + string.Join("|", keepCells.ToArray()) + "|");
                     }
                 }
                 else
@@ -23286,35 +26044,182 @@ namespace ZenQOffice.UI
                 }
             }
 
-            string newTableText = string.Join("\n", newLines.ToArray());
-            string newDocText = fullText.Substring(0, tblStart) + newTableText + fullText.Substring(tblStart + tblLen);
+            if (tableIdx >= 0 && tableIdx < DocumentTables.Count)
+            {
+                var docTbl = DocumentTables[tableIdx];
+                for (int r = 0; r < docTbl.Rows.Count; r++)
+                {
+                    if (colIdx >= 0 && colIdx < docTbl.Rows[r].Cells.Count)
+                    {
+                        docTbl.Rows[r].Cells.RemoveAt(colIdx);
+                    }
+                }
+            }
 
             if (TableColWidths.ContainsKey(tableIdx) && colIdx >= 0 && colIdx < TableColWidths[tableIdx].Count)
             {
                 TableColWidths[tableIdx].RemoveAt(colIdx);
             }
-            SaveUndoState();
-            PieceTable.SetInitialText(newDocText);
+            SelectedColumnTableIndex = -1;
+            SelectedColumnIndex = -1;
+            SelectedColumnEndIndex = -1;
+            CommitTableMarkdownEdit(tableIdx, fullText, tblStart, tblLen, string.Join("\n", newLines.ToArray()));
         }
 
         public void DeleteTable(int tableIdx)
         {
-            if (!TableCharRanges.ContainsKey(tableIdx)) return;
-            int[] tRange = TableCharRanges[tableIdx];
-            int tblStart = tRange[0];
-            int tblLen = tRange[1];
+            if (!TryGetTableMarkdownBlock(tableIdx, out string fullText, out int tblStart, out int tblLen)) return;
 
-            string fullText = PieceTable.GetText();
-            if (tblStart < 0 || tblStart + tblLen > fullText.Length) return;
+            int removeEnd = tblStart + tblLen;
+            if (tblStart > 0 && fullText[tblStart - 1] == '\n' && removeEnd < fullText.Length && fullText[removeEnd] == '\n')
+            {
+                removeEnd++;
+            }
+            string newDocText = fullText.Substring(0, tblStart) + fullText.Substring(removeEnd);
 
-            string newDocText = fullText.Substring(0, tblStart) + fullText.Substring(tblStart + tblLen);
+            if (DocumentTables != null && tableIdx >= 0 && tableIdx < DocumentTables.Count)
+            {
+                DocumentTables.RemoveAt(tableIdx);
+            }
 
-            TableCharRanges.Remove(tableIdx);
-            if (TableColWidths.ContainsKey(tableIdx)) TableColWidths.Remove(tableIdx);
-            if (TableRowHeights.ContainsKey(tableIdx)) TableRowHeights.Remove(tableIdx);
+            RemoveAndShiftTableDict(TableCharRanges, tableIdx);
+            RemoveAndShiftTableDict(TableColWidths, tableIdx);
+            RemoveAndShiftTableDict(TableRowHeights, tableIdx);
+            RemoveAndShiftTableDict(TableWrapModes, tableIdx);
+            RemoveAndShiftTableDict(TablePageX, tableIdx);
+            RemoveAndShiftTableDict(TablePageY, tableIdx);
+            RemoveAndShiftTableDict(TableFloatingBounds, tableIdx);
+            RemoveAndShiftTableDict(TableCustomSizes, tableIdx);
+            RemoveAndShiftTableDict(TableFixPositions, tableIdx);
+            RemoveAndShiftTableDict(TableLogicalRowPages, tableIdx);
+            RemoveAndShiftTableDict(TableUnzoomedRowHeights, tableIdx);
+
+            EnsureTableCharRangesFromText(newDocText);
+
+            SelectedColumnTableIndex = -1;
+            SelectedColumnIndex = -1;
+            SelectedColumnEndIndex = -1;
+            if (ActiveTableLayoutOptionsIndex == tableIdx) ActiveTableLayoutOptionsIndex = -1;
+            else if (ActiveTableLayoutOptionsIndex > tableIdx) ActiveTableLayoutOptionsIndex--;
+
             SaveUndoState();
             PieceTable.SetInitialText(newDocText);
+            CursorPosition = Math.Max(0, Math.Min(tblStart, newDocText.Length));
+            SelectionStart = CursorPosition;
+            SelectionEnd = CursorPosition;
+            if (_paraLayoutCache != null) _paraLayoutCache.Clear();
             this.Invalidate();
+        }
+
+        public void ClearTableCell(int tableIdx, int rowIdx, int colIdx)
+        {
+            if (!TryGetTableMarkdownBlock(tableIdx, out string fullText, out int tblStart, out int tblLen)) return;
+
+            string tableText = fullText.Substring(tblStart, tblLen);
+            string[] lines = tableText.Split('\n');
+            int dataRowCounter = 0;
+            bool modified = false;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (IsMarkdownTableDataLine(lines[i]))
+                {
+                    if (dataRowCounter == rowIdx)
+                    {
+                        string[] cells = lines[i].Split('|');
+                        int targetCellIdx = colIdx + 1;
+                        if (targetCellIdx >= 1 && targetCellIdx < cells.Length - 1)
+                        {
+                            cells[targetCellIdx] = "   ";
+                            lines[i] = string.Join("|", cells);
+                            modified = true;
+                        }
+                        break;
+                    }
+                    dataRowCounter++;
+                }
+            }
+
+            if (!modified) return;
+
+            if (tableIdx >= 0 && tableIdx < DocumentTables.Count &&
+                rowIdx >= 0 && rowIdx < DocumentTables[tableIdx].Rows.Count &&
+                colIdx >= 0 && colIdx < DocumentTables[tableIdx].Rows[rowIdx].Cells.Count)
+            {
+                SyncCellLiveTextWithParagraphs(DocumentTables[tableIdx].Rows[rowIdx].Cells[colIdx], "");
+            }
+
+            CommitTableMarkdownEdit(tableIdx, fullText, tblStart, tblLen, string.Join("\n", lines));
+        }
+
+        public void DeleteSelectedTableRowsOrTarget(int tableIdx, int fallbackRowIdx)
+        {
+            if (tableIdx < 0) return;
+            List<int> selectedRows = new List<int>();
+            if (SelectionStart != SelectionEnd)
+            {
+                int selMin = Math.Min(SelectionStart, SelectionEnd);
+                int selMax = Math.Max(SelectionStart, SelectionEnd);
+                for (int i = 0; i < TableCellHits.Count; i++)
+                {
+                    var hit = TableCellHits[i];
+                    if (hit.TableIndex != tableIdx) continue;
+                    if (hit.CharStartIndex + hit.CharLength >= selMin && hit.CharStartIndex <= selMax)
+                    {
+                        if (!selectedRows.Contains(hit.RowIndex)) selectedRows.Add(hit.RowIndex);
+                    }
+                }
+            }
+
+            if (selectedRows.Count == 0)
+            {
+                DeleteTableRow(tableIdx, fallbackRowIdx);
+                return;
+            }
+
+            selectedRows.Sort((a, b) => b.CompareTo(a));
+            foreach (int r in selectedRows)
+            {
+                DeleteTableRow(tableIdx, r);
+            }
+        }
+
+        public void DeleteSelectedTableColumnsOrTarget(int tableIdx, int fallbackColIdx)
+        {
+            if (tableIdx < 0) return;
+            if (HasColumnSelection(out int selTblIdx, out _, out _) && selTblIdx == tableIdx)
+            {
+                DeleteSelectedColumns();
+                return;
+            }
+
+            List<int> selectedCols = new List<int>();
+            if (SelectionStart != SelectionEnd)
+            {
+                int selMin = Math.Min(SelectionStart, SelectionEnd);
+                int selMax = Math.Max(SelectionStart, SelectionEnd);
+                for (int i = 0; i < TableCellHits.Count; i++)
+                {
+                    var hit = TableCellHits[i];
+                    if (hit.TableIndex != tableIdx) continue;
+                    if (hit.CharStartIndex + hit.CharLength >= selMin && hit.CharStartIndex <= selMax)
+                    {
+                        if (!selectedCols.Contains(hit.ColIndex)) selectedCols.Add(hit.ColIndex);
+                    }
+                }
+            }
+
+            if (selectedCols.Count == 0)
+            {
+                DeleteTableColumn(tableIdx, fallbackColIdx);
+                return;
+            }
+
+            selectedCols.Sort((a, b) => b.CompareTo(a));
+            foreach (int c in selectedCols)
+            {
+                DeleteTableColumn(tableIdx, c);
+            }
         }
 
         public void ApplyTableStylePreset(int tblIdx, int stylePreset)
@@ -23858,16 +26763,21 @@ namespace ZenQOffice.UI
             int tblIdx, rowIdx, colIdx;
             if (GetCursorTableCell(out tblIdx, out rowIdx, out colIdx))
             {
-                DeleteTableRow(tblIdx, rowIdx);
+                DeleteSelectedTableRowsOrTarget(tblIdx, rowIdx);
             }
         }
 
         public void DeleteCurrentTableColumn()
         {
+            if (HasColumnSelection(out _, out _, out _))
+            {
+                DeleteSelectedColumns();
+                return;
+            }
             int tblIdx, rowIdx, colIdx;
             if (GetCursorTableCell(out tblIdx, out rowIdx, out colIdx))
             {
-                DeleteTableColumn(tblIdx, colIdx);
+                DeleteSelectedTableColumnsOrTarget(tblIdx, colIdx);
             }
         }
 
@@ -23882,21 +26792,14 @@ namespace ZenQOffice.UI
 
         public void DeleteCurrentTableCell()
         {
+            if (HasColumnSelection(out _, out _, out _))
+            {
+                ClearSelectedColumnsText();
+                return;
+            }
             int tblIdx, rowIdx, colIdx;
             if (!GetCursorTableCell(out tblIdx, out rowIdx, out colIdx)) return;
-            if (tblIdx < 0) return;
-            for (int i = 0; i < TableCellHits.Count; i++)
-            {
-                var hit = TableCellHits[i];
-                if (hit.TableIndex == tblIdx && hit.RowIndex == rowIdx && hit.ColIndex == colIdx)
-                {
-                    SelectionStart = hit.CharStartIndex;
-                    SelectionEnd = hit.CharStartIndex + hit.CharLength;
-                    InsertText("   ");
-                    this.Invalidate();
-                    return;
-                }
-            }
+            ClearTableCell(tblIdx, rowIdx, colIdx);
         }
 
         public void MergeCellsAtCursor()
@@ -24355,19 +27258,107 @@ namespace ZenQOffice.UI
             this.Invalidate();
         }
 
+        public void ShowShapeContextMenu(int x, int y, DocShapeObject shape, Control parentControl, RibbonBar ribbon)
+        {
+            if (shape == null) return;
+            ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
+            if (shape.ShapeType != "Image")
+            {
+                cms.Items.Add(AppL10n.T("Chỉnh sửa văn bản (Edit Text)", "Edit Text"), null, (s, e) =>
+                {
+                    ActiveShape = shape;
+                    shape.IsSelected = true;
+                    shape.IsEditingText = true;
+                    shape.TextCursorIndex = (shape.TextContent ?? "").Length;
+                    if (ribbon != null) UpdateRibbonState(ribbon);
+                    this.Invalidate();
+                });
+                cms.Items.Add(new ToolStripSeparator());
+            }
+
+            cms.Items.Add(AppL10n.T("Cắt (Cut)", "Cut"), null, (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(shape.TextContent)) Clipboard.SetText(shape.TextContent);
+                DeleteActiveShape();
+                if (ribbon != null) UpdateRibbonState(ribbon);
+                this.Invalidate();
+            });
+            cms.Items.Add(AppL10n.T("Sao chép (Copy)", "Copy"), null, (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(shape.TextContent)) Clipboard.SetText(shape.TextContent);
+            });
+            cms.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem wrapMenu = new ToolStripMenuItem(AppL10n.T("Ngắt dòng (Wrap Text)", "Wrap Text"));
+            string[] wNames = { "Cùng dòng (In Line with Text)", AppL10n.T("Vuông (Square)", "Square"), AppL10n.T("Chặt (Tight)", "Tight"), AppL10n.T("Xuyên qua (Through)", "Through"), "Trên và Dưới (Top and Bottom)", "Dưới văn bản (Behind Text)", "Trước văn bản (In Front of Text)" };
+            for (int wi = 0; wi < wNames.Length; wi++)
+            {
+                int capW = wi;
+                ToolStripMenuItem wItm = new ToolStripMenuItem(wNames[wi], null, (s, e) =>
+                {
+                    SetShapeWrapMode(shape, capW);
+                    this.Invalidate();
+                });
+                wItm.Checked = (shape.WrapMode == capW);
+                wrapMenu.DropDownItems.Add(wItm);
+            }
+            cms.Items.Add(wrapMenu);
+
+            cms.Items.Add(AppL10n.T("Đưa lên trước (Bring to Front)", "Bring to Front"), null, (s, e) =>
+            {
+                SaveUndoState();
+                DocumentShapes.Remove(shape);
+                DocumentShapes.Add(shape);
+                SyncShapeTagInDocument(shape);
+                this.Invalidate();
+            });
+            cms.Items.Add(AppL10n.T("Đưa ra sau (Send to Back)", "Send to Back"), null, (s, e) =>
+            {
+                SaveUndoState();
+                DocumentShapes.Remove(shape);
+                DocumentShapes.Insert(0, shape);
+                SyncShapeTagInDocument(shape);
+                this.Invalidate();
+            });
+            cms.Items.Add(AppL10n.T("Tùy chọn Bố trí (Layout Options...)", "Layout Options..."), null, (s, e) =>
+            {
+                Form pf = parentControl as Form;
+                using (LayoutOptionsDialogForm layoutDlg = new LayoutOptionsDialogForm(shape, 0))
+                {
+                    if (layoutDlg.ShowDialog(pf) == DialogResult.OK)
+                    {
+                        SetShapeWrapMode(shape, layoutDlg.WrapMode);
+                        shape.RotationAngle = layoutDlg.RotationAngle;
+                        SyncShapeTagInDocument(shape);
+                        this.Invalidate();
+                    }
+                }
+            });
+            cms.Items.Add(new ToolStripSeparator());
+            cms.Items.Add(AppL10n.T("Xóa Hình dạng (Delete)", "Delete Shape"), null, (s, e) =>
+            {
+                ActiveShape = shape;
+                DeleteActiveShape();
+                if (ribbon != null) UpdateRibbonState(ribbon);
+                this.Invalidate();
+            });
+
+            if (parentControl != null) cms.Show(parentControl, new Point(x, y));
+        }
+
         public void ShowSmartArtContextMenu(int x, int y, DocShapeObject shape, Control parentControl)
         {
             if (shape == null) return;
             ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
             cms.Font = new Font("Segoe UI", 9f);
 
-            cms.Items.Add("➕ Thêm ô (Add Shape)", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("➕ Thêm ô (Add Shape)", "➕ Add Shape"), null, (s, e) =>
             {
                 AddSmartArtNode(shape);
                 if (parentControl != null) parentControl.Invalidate();
             });
 
-            cms.Items.Add("❌ Xóa ô đã chọn (Delete Shape)", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("❌ Xóa ô đã chọn (Delete Shape)", "❌ Delete Shape"), null, (s, e) =>
             {
                 DeleteSelectedSmartArtNode(shape);
                 if (parentControl != null) parentControl.Invalidate();
@@ -24375,24 +27366,24 @@ namespace ZenQOffice.UI
 
             cms.Items.Add(new ToolStripSeparator());
 
-            cms.Items.Add("✏️ Chỉnh sửa nội dung chữ SmartArt...", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("✏️ Chỉnh sửa nội dung chữ SmartArt...", "✏️ Edit SmartArt Text..."), null, (s, e) =>
             {
                 OpenSmartArtEditor(shape);
                 if (parentControl != null) parentControl.Invalidate();
             });
 
-            ToolStripMenuItem colorMenu = new ToolStripMenuItem("🎨 Đổi màu sắc SmartArt (Color Palette)");
-            colorMenu.DropDownItems.Add("🌈 Đa sắc màu (Colorful Accent)", null, (s, e) => { shape.StylePresetIndex = 0; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🟠 Cam & Vàng (Office Warm)", null, (s, e) => { shape.StylePresetIndex = 1; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🔵 Xanh Lam & Lục (Colorful Cool)", null, (s, e) => { shape.StylePresetIndex = 2; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🔷 Xanh Lam Chuẩn (Office Blue)", null, (s, e) => { shape.StylePresetIndex = 3; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🟢 Xanh Lục (Emerald Green)", null, (s, e) => { shape.StylePresetIndex = 4; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("🟣 Tím & Hồng (Purple & Magenta)", null, (s, e) => { shape.StylePresetIndex = 5; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
-            colorMenu.DropDownItems.Add("⚫ Đơn sắc (Monochrome Gray)", null, (s, e) => { shape.StylePresetIndex = 6; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
+            ToolStripMenuItem colorMenu = new ToolStripMenuItem(AppL10n.T("🎨 Đổi màu sắc SmartArt (Color Palette)", "🎨 Change SmartArt Colors"));
+            colorMenu.DropDownItems.Add(AppL10n.T("🌈 Đa sắc màu (Colorful Accent)", "🌈 Colorful Accent"), null, (s, e) => { shape.StylePresetIndex = 0; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🟠 Cam & Vàng (Office Warm)", "🟠 Office Warm (Orange & Gold)"), null, (s, e) => { shape.StylePresetIndex = 1; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🔵 Xanh Lam & Lục (Colorful Cool)", "🔵 Colorful Cool (Blue & Teal)"), null, (s, e) => { shape.StylePresetIndex = 2; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🔷 Xanh Lam Chuẩn (Office Blue)", "🔷 Office Blue"), null, (s, e) => { shape.StylePresetIndex = 3; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🟢 Xanh Lục (Emerald Green)", "🟢 Emerald Green"), null, (s, e) => { shape.StylePresetIndex = 4; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("🟣 Tím & Hồng (Purple & Magenta)", "🟣 Purple & Magenta"), null, (s, e) => { shape.StylePresetIndex = 5; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
+            colorMenu.DropDownItems.Add(AppL10n.T("⚫ Đơn sắc (Monochrome Gray)", "⚫ Monochrome Gray"), null, (s, e) => { shape.StylePresetIndex = 6; SyncShapeTagInDocument(shape); this.Invalidate(); if (parentControl != null) parentControl.Invalidate(); });
             cms.Items.Add(colorMenu);
 
             cms.Items.Add(new ToolStripSeparator());
-            cms.Items.Add("🗑️ Xóa sơ đồ SmartArt", null, (s, e) =>
+            cms.Items.Add(AppL10n.T("🗑️ Xóa sơ đồ SmartArt", "🗑️ Delete SmartArt"), null, (s, e) =>
             {
                 DocumentShapes.Remove(shape);
                 if (ActiveShape == shape) ActiveShape = null;
@@ -24411,39 +27402,60 @@ namespace ZenQOffice.UI
                 ShowEquationMenu(parentControl,new Point(mouseX,mouseY),ribbon);
                 return;
             }
-            // Kiểm tra nhấp chuột phải vào SmartArt / Shape
-            foreach (var sh in DocumentShapes)
+            // Kiểm tra nhấp chuột phải vào SmartArt / Shape (topmost visual order)
+            DocShapeObject rcShape = HitTestDocumentShape(mouseX, mouseY);
+            if (rcShape != null)
             {
-                if (!sh.LastBounds.IsEmpty && sh.LastBounds.Contains(mouseX, mouseY))
+                foreach (var other in DocumentShapes)
                 {
-                    ActiveShape = sh;
-                    sh.IsSelected = true;
-                    if (sh.ShapeType == "Group" && sh.GroupChildren != null)
+                    if (other != rcShape)
                     {
-                        for (int ci = sh.GroupChildren.Count - 1; ci >= 0; ci--)
-                        {
-                            var child = sh.GroupChildren[ci];
-                            if (!child.LastBounds.IsEmpty && child.LastBounds.Contains(mouseX, mouseY))
-                            {
-                                foreach (var oc in sh.GroupChildren) { oc.IsSelected = false; oc.IsEditingText = false; }
-                                child.IsSelected = true;
-                                child.IsEditingText = true;
-                                child.TextCursorIndex = (child.TextContent ?? "").Length;
-                                ActiveGroupChild = child;
-                                this.Invalidate();
-                                return;
-                            }
-                        }
-                    }
-                    if (sh.ShapeType == "SmartArt" || !string.IsNullOrEmpty(sh.SmartArtType))
-                    {
-                        ShowSmartArtContextMenu(mouseX, mouseY, sh, parentControl);
-                        return;
+                        other.IsSelected = false;
+                        other.IsEditingText = false;
+                        other.SelectedNodeIndex = -1;
                     }
                 }
+                ActiveShape = rcShape;
+                rcShape.IsSelected = true;
+                if (ribbon != null) UpdateRibbonState(ribbon);
+
+                if (rcShape.ShapeType == "Group" && rcShape.GroupChildren != null)
+                {
+                    for (int ci = rcShape.GroupChildren.Count - 1; ci >= 0; ci--)
+                    {
+                        var child = rcShape.GroupChildren[ci];
+                        if (!child.LastBounds.IsEmpty && child.LastBounds.Contains(mouseX, mouseY))
+                        {
+                            foreach (var oc in rcShape.GroupChildren) { oc.IsSelected = false; oc.IsEditingText = false; }
+                            child.IsSelected = true;
+                            child.IsEditingText = true;
+                            child.TextCursorIndex = (child.TextContent ?? "").Length;
+                            ActiveGroupChild = child;
+                            this.Invalidate();
+                            return;
+                        }
+                    }
+                }
+                if (rcShape.ShapeType == "SmartArt" || !string.IsNullOrEmpty(rcShape.SmartArtType))
+                {
+                    ShowSmartArtContextMenu(mouseX, mouseY, rcShape, parentControl);
+                    return;
+                }
+
+                ShowShapeContextMenu(mouseX, mouseY, rcShape, parentControl, ribbon);
+                this.Invalidate();
+                return;
             }
 
-            // Kiểm tra nhấp chuột phải vào bảng
+            // Kiểm tra nhấp chuột phải vào bảng (Word 365 Context Menu + Mini Toolbar)
+            Form parentFormUnified = parentControl as Form;
+            if (FindTableCellAtPoint(mouseX, mouseY, out int hitTblIdx, out int hitRowIdx, out int hitColIdx))
+            {
+                FocusCellForContextMenuIfNeeded(hitTblIdx, hitRowIdx, hitColIdx);
+                WriterContextMenuHelper.Show(mouseX, mouseY, this, ribbon, parentFormUnified);
+                return;
+            }
+
             for (int t = 0; t < MoveHandleRects.Count; t++)
             {
                 int tX = (t < TableBoundsList.Count) ? TableBoundsList[t].Left : (MoveHandleRects[t].Left + 18);
@@ -24458,31 +27470,31 @@ namespace ZenQOffice.UI
                     int curWrap = TableWrapModes.ContainsKey(tblIdx) ? TableWrapModes[tblIdx] : 0;
 
                     ContextMenuStrip cms = new ZenQOffice.UI.FluentContextMenuStrip();
-                    cms.Items.Add("➕ Chèn hàng phía dưới", null, (s, e) => { InsertTableRow(tblIdx, 999); parentControl.Invalidate(); });
-                    cms.Items.Add("➕ Chèn hàng phía trên", null, (s, e) => { InsertTableRow(tblIdx, 0); parentControl.Invalidate(); });
+                    cms.Items.Add(AppL10n.T("➕ Chèn hàng phía dưới", "➕ Insert Row Below"), null, (s, e) => { InsertTableRow(tblIdx, 999); parentControl.Invalidate(); });
+                    cms.Items.Add(AppL10n.T("➕ Chèn hàng phía trên", "➕ Insert Row Above"), null, (s, e) => { InsertTableRow(tblIdx, 0); parentControl.Invalidate(); });
                     cms.Items.Add(new ToolStripSeparator());
-                    cms.Items.Add("➕ Chèn cột bên phải", null, (s, e) => { InsertTableColumn(tblIdx, 999); parentControl.Invalidate(); });
-                    cms.Items.Add("➕ Chèn cột bên trái", null, (s, e) => { InsertTableColumn(tblIdx, 0); parentControl.Invalidate(); });
-                    cms.Items.Add("🗑️ Xóa hàng này", null, (s, e) => { DeleteTableRow(tblIdx, 0); parentControl.Invalidate(); });
-                    cms.Items.Add("🗑️ Xóa cột này", null, (s, e) => { DeleteTableColumn(tblIdx, 0); parentControl.Invalidate(); });
+                    cms.Items.Add(AppL10n.T("➕ Chèn cột bên phải", "➕ Insert Column Right"), null, (s, e) => { InsertTableColumn(tblIdx, 999); parentControl.Invalidate(); });
+                    cms.Items.Add(AppL10n.T("➕ Chèn cột bên trái", "➕ Insert Column Left"), null, (s, e) => { InsertTableColumn(tblIdx, 0); parentControl.Invalidate(); });
+                    cms.Items.Add(AppL10n.T("🗑️ Xóa hàng này", "🗑️ Delete Row"), null, (s, e) => { DeleteTableRow(tblIdx, 0); parentControl.Invalidate(); });
+                    cms.Items.Add(AppL10n.T("🗑️ Xóa cột này", "🗑️ Delete Column"), null, (s, e) => { DeleteTableColumn(tblIdx, 0); parentControl.Invalidate(); });
                     cms.Items.Add(new ToolStripSeparator());
-                    ToolStripMenuItem alignMenu = new ToolStripMenuItem("📐 Căn chỉnh bảng (Table Alignment)");
+                    ToolStripMenuItem alignMenu = new ToolStripMenuItem(AppL10n.T("📐 Căn chỉnh bảng (Table Alignment)", "📐 Table Alignment"));
                     DocTableObject curTableObj = (tblIdx < DocumentTables.Count) ? DocumentTables[tblIdx] : null;
                     int curAlign = (curTableObj != null) ? curTableObj.Alignment : 0;
 
-                    var itmAlignLeft = alignMenu.DropDownItems.Add("⬅️ Căn trái (Align Left)", null, (s, e) => {
+                    var itmAlignLeft = alignMenu.DropDownItems.Add(AppL10n.T("⬅️ Căn trái (Align Left)", "⬅️ Align Left"), null, (s, e) => {
                         SaveUndoState();
                         if (tblIdx < DocumentTables.Count) DocumentTables[tblIdx].Alignment = 0;
                         InvalidateLayoutAndTextCache();
                         parentControl.Invalidate();
                     });
-                    var itmAlignCenter = alignMenu.DropDownItems.Add("↔️ Căn giữa (Align Center - Mở rộng đều 2 bên)", null, (s, e) => {
+                    var itmAlignCenter = alignMenu.DropDownItems.Add(AppL10n.T("↔️ Căn giữa (Align Center - Mở rộng đều 2 bên)", "↔️ Align Center"), null, (s, e) => {
                         SaveUndoState();
                         if (tblIdx < DocumentTables.Count) DocumentTables[tblIdx].Alignment = 1;
                         InvalidateLayoutAndTextCache();
                         parentControl.Invalidate();
                     });
-                    var itmAlignRight = alignMenu.DropDownItems.Add("➡️ Căn phải (Align Right)", null, (s, e) => {
+                    var itmAlignRight = alignMenu.DropDownItems.Add(AppL10n.T("➡️ Căn phải (Align Right)", "➡️ Align Right"), null, (s, e) => {
                         SaveUndoState();
                         if (tblIdx < DocumentTables.Count) DocumentTables[tblIdx].Alignment = 2;
                         InvalidateLayoutAndTextCache();
@@ -24496,8 +27508,8 @@ namespace ZenQOffice.UI
                     cms.Items.Add(alignMenu);
                     cms.Items.Add(new ToolStripSeparator());
 
-                    ToolStripMenuItem wrapMenu = new ToolStripMenuItem("🗖 Ngắt dòng văn bản (Wrap Text)");
-                    var itm0 = wrapMenu.DropDownItems.Add("📄 Cùng dòng với văn bản (In-Line)", null, (s, e) => {
+                    ToolStripMenuItem wrapMenu = new ToolStripMenuItem(AppL10n.T("🗖 Ngắt dòng văn bản (Wrap Text)", "🗖 Wrap Text"));
+                    var itm0 = wrapMenu.DropDownItems.Add(AppL10n.T("📄 Cùng dòng với văn bản (In-Line)", "📄 In Line with Text"), null, (s, e) => {
                         TableWrapModes[tblIdx] = 0;
                         TableFloatingBounds.Remove(tblIdx);
                         TablePageX.Remove(tblIdx);
@@ -24506,7 +27518,7 @@ namespace ZenQOffice.UI
                         _lastLayoutTextVersion = -1;
                         parentControl.Invalidate();
                     });
-                    var itm1 = wrapMenu.DropDownItems.Add("🔲 Bao quanh văn bản (Around)", null, (s, e) => {
+                    var itm1 = wrapMenu.DropDownItems.Add(AppL10n.T("🔲 Bao quanh văn bản (Around)", "🔲 Around"), null, (s, e) => {
                         TableWrapModes[tblIdx] = 1;
                         _paraLayoutCache.Clear();
                         _lastLayoutTextVersion = -1;
@@ -24546,7 +27558,7 @@ namespace ZenQOffice.UI
         {
             if (Clipboard.ContainsText())
             {
-                string txt = Clipboard.GetText();
+                string txt = (Clipboard.GetText() ?? "").Replace("\r\n", "\n").Replace("\r", "\n");
                 if (SelectionStart != SelectionEnd)
                 {
                     DeleteSelection();
@@ -25275,71 +28287,84 @@ namespace ZenQOffice.UI
 
             if (RenderedLines.Count == 0) return 0;
 
-            // Determine target rendered line (including clamped above-first-line and below-last-line so horizontal X position is always respected!)
+            // Determine target rendered line (column-aware so clicking in Column 2/3 resolves to that column!)
             RenderedLineInfo? targetLine = null;
-            if (mouseY < RenderedLines[0].ScreenY)
+            int minRenderedY = int.MaxValue;
+            int maxRenderedBottomY = int.MinValue;
+            int lastBottomIdx = RenderedLines.Count - 1;
+            for (int l = 0; l < RenderedLines.Count; l++)
             {
-                targetLine = RenderedLines[0];
+                var rl = RenderedLines[l];
+                if (rl.ScreenY < minRenderedY) minRenderedY = rl.ScreenY;
+                if (rl.ScreenY + rl.ScreenH > maxRenderedBottomY) { maxRenderedBottomY = rl.ScreenY + rl.ScreenH; lastBottomIdx = l; }
             }
-            else if (mouseY >= RenderedLines[RenderedLines.Count - 1].ScreenY + RenderedLines[RenderedLines.Count - 1].ScreenH)
+
+            if (mouseY >= maxRenderedBottomY && !IsSelecting)
             {
-                var last = RenderedLines[RenderedLines.Count - 1];
-                // If dragging selection or clicking near the last line vertically, project X onto the last line; if clicking far below in blank page area, place at end of last line
-                if (IsSelecting || mouseY <= last.ScreenY + last.ScreenH * 2)
+                var lastGlobal = RenderedLines[RenderedLines.Count - 1];
+                if (mouseY > maxRenderedBottomY + lastGlobal.ScreenH * 2)
                 {
-                    targetLine = last;
-                }
-                else
-                {
-                    return Math.Min(fullText.Length, last.StartCharIndex + last.Length);
+                    return Math.Min(fullText.Length, lastGlobal.StartCharIndex + lastGlobal.Length);
                 }
             }
-            else
+
+            // First check direct vertical hit within matching horizontal column band (or nearest column band at that Y)
+            int colTol = (int)Math.Round(18f * ZoomLevel);
+            int bestMatchDistX = int.MaxValue;
+            for (int l = 0; l < RenderedLines.Count; l++)
             {
-                // 1. Check direct hit on rendered lines or between-line vertical gaps
+                var rLine = RenderedLines[l];
+                int cL = rLine.ColLeftX > 0 ? rLine.ColLeftX : rLine.ScreenX;
+                int cR = rLine.ColRightX > cL ? rLine.ColRightX : (cL + 1000);
+                int lineTop = rLine.ScreenY;
+                int lineBottom = rLine.ScreenY + rLine.ScreenH;
+                if (l > 0)
+                {
+                    var prevLine = RenderedLines[l - 1];
+                    if (prevLine.ColumnIndex == rLine.ColumnIndex && prevLine.PageIndex == rLine.PageIndex
+                        && rLine.ScreenY > prevLine.ScreenY && rLine.ScreenY - prevLine.ScreenY <= prevLine.ScreenH * 2.5f)
+                    {
+                        lineTop = (prevLine.ScreenY + prevLine.ScreenH + rLine.ScreenY) / 2;
+                    }
+                }
+                if (l < RenderedLines.Count - 1)
+                {
+                    var nextLine = RenderedLines[l + 1];
+                    if (nextLine.ColumnIndex == rLine.ColumnIndex && nextLine.PageIndex == rLine.PageIndex
+                        && nextLine.ScreenY > rLine.ScreenY && nextLine.ScreenY - rLine.ScreenY <= rLine.ScreenH * 2.5f)
+                    {
+                        lineBottom = (rLine.ScreenY + rLine.ScreenH + nextLine.ScreenY) / 2;
+                    }
+                }
+
+                if (mouseY >= lineTop && mouseY < lineBottom)
+                {
+                    int dx = (mouseX < cL) ? (cL - mouseX) : ((mouseX > cR) ? (mouseX - cR) : 0);
+                    if (dx <= colTol && dx < bestMatchDistX)
+                    {
+                        bestMatchDistX = dx;
+                        targetLine = rLine;
+                    }
+                }
+            }
+
+            if (targetLine == null)
+            {
+                // Pick line in closest column horizontally & closest vertically (e.g., clicking below short Column 2 or in margin)
+                long bestScore = long.MaxValue;
                 for (int l = 0; l < RenderedLines.Count; l++)
                 {
                     var rLine = RenderedLines[l];
-                    bool isLast = (l == RenderedLines.Count - 1);
-                    int lineTop = rLine.ScreenY;
-                    int lineBottom = rLine.ScreenY + rLine.ScreenH;
-                    if (l > 0)
+                    int cL = rLine.ColLeftX > 0 ? rLine.ColLeftX : rLine.ScreenX;
+                    int cR = rLine.ColRightX > cL ? rLine.ColRightX : (cL + 1000);
+                    int dx = (mouseX < cL) ? (cL - mouseX) : ((mouseX > cR) ? (mouseX - cR) : 0);
+                    int midY = rLine.ScreenY + rLine.ScreenH / 2;
+                    int dy = Math.Abs(mouseY - midY);
+                    long score = (long)dy * 4L + (long)dx * 8L;
+                    if (score < bestScore)
                     {
-                        var prevLine = RenderedLines[l - 1];
-                        if (rLine.ScreenY > prevLine.ScreenY && rLine.ScreenY - prevLine.ScreenY <= prevLine.ScreenH * 2.5f)
-                        {
-                            lineTop = (prevLine.ScreenY + prevLine.ScreenH + rLine.ScreenY) / 2;
-                        }
-                    }
-                    if (!isLast)
-                    {
-                        var nextLine = RenderedLines[l + 1];
-                        if (nextLine.ScreenY > rLine.ScreenY && nextLine.ScreenY - rLine.ScreenY <= rLine.ScreenH * 2.5f)
-                        {
-                            lineBottom = (rLine.ScreenY + rLine.ScreenH + nextLine.ScreenY) / 2;
-                        }
-                    }
-
-                    if (mouseY >= lineTop && mouseY < lineBottom)
-                    {
+                        bestScore = score;
                         targetLine = rLine;
-                        break;
-                    }
-                }
-                if (targetLine == null)
-                {
-                    // Fallback: pick closest line vertically
-                    int bestDist = int.MaxValue;
-                    for (int l = 0; l < RenderedLines.Count; l++)
-                    {
-                        var rLine = RenderedLines[l];
-                        int midY = rLine.ScreenY + rLine.ScreenH / 2;
-                        int dist = Math.Abs(mouseY - midY);
-                        if (dist < bestDist)
-                        {
-                            bestDist = dist;
-                            targetLine = rLine;
-                        }
                     }
                 }
             }
@@ -25367,26 +28392,8 @@ namespace ZenQOffice.UI
                 float wCurr = MeasureSubstringWidth(g, lineText, rLine.StartCharIndex, 0, Math.Min(low, lineText.Length), rLine.ExtraSpaceW);
                 int resultCharIdx = (low > 0 && Math.Abs(relX - wPrev) < Math.Abs(relX - wCurr)) ? (rLine.StartCharIndex + low - 1) : (rLine.StartCharIndex + low);
 
-                // Tag boundary guard: nếu rơi vào giữa tag hình ảnh inline, tự động snap ra trước hoặc sau hình ảnh
-                if (resultCharIdx >= 0 && resultCharIdx < fullText.Length)
-                {
-                    int tagStart = fullText.LastIndexOf("![", Math.Min(fullText.Length - 1, resultCharIdx));
-                    if (tagStart >= 0 && tagStart >= rLine.StartCharIndex)
-                    {
-                        string rem = fullText.Substring(tagStart);
-                        if (rem.StartsWith("![SHAPE:") || rem.StartsWith("![IMAGE:"))
-                        {
-                            int tagEnd = DocShapeObject.FindTagEnd(fullText, tagStart);
-                            if (tagEnd > tagStart && resultCharIdx > tagStart && resultCharIdx <= tagEnd)
-                            {
-                                if (resultCharIdx - tagStart < (tagEnd + 1 - resultCharIdx))
-                                    resultCharIdx = tagStart;
-                                else
-                                    resultCharIdx = tagEnd + 1;
-                            }
-                        }
-                    }
-                }
+                // Tag boundary guard: nếu rơi vào giữa tag đối tượng (shape/image/chart/notebox), tự động snap ra trước hoặc sau tag
+                resultCharIdx = SnapCursorOutOfObjectTag(resultCharIdx, 0, fullText);
                 return Math.Max(0, Math.Min(fullText.Length, resultCharIdx));
             }
 
@@ -26107,6 +29114,9 @@ namespace ZenQOffice.UI
             DeleteSelection();
 
             string fullText = PieceTable.GetText();
+            CursorPosition = SnapCursorOutOfObjectTag(CursorPosition, 0, fullText);
+            SelectionStart = CursorPosition;
+            SelectionEnd = CursorPosition;
             int curPos = CursorPosition;
 
             // Check Smart Math & Symbol AutoCorrect first
@@ -26308,6 +29318,9 @@ namespace ZenQOffice.UI
 
             if (IsEditingHeaderFooter)
             {
+                var _hfCharScope = BeginActiveHeaderFooterScope();
+                try
+                {
                 if (ch == 27)
                 {
                     IsEditingHeaderFooter = false;
@@ -26439,6 +29452,8 @@ namespace ZenQOffice.UI
                 InvalidateLayoutAndTextCache();
                 Invalidate();
                 return;
+                            }
+                finally { EndPageHeaderFooterScope(_hfCharScope, true); }
             }
 
             if (EditingReplyCommentId != -1)
@@ -26560,38 +29575,28 @@ namespace ZenQOffice.UI
                     }
                     else
                     {
+                        string fullDocTxt = PieceTable.GetText();
+                        int snappedPos = SnapCursorOutOfObjectTag(CursorPosition, 1, fullDocTxt);
+                        if (snappedPos <= 0) return;
+
                         SaveUndoState();
+                        int delStart = snappedPos - 1;
+                        int delLen = 1;
+                        if (TryGetObjectTagSpanAt(fullDocTxt, delStart, includeEndBoundary: true, out int objTagStart, out int objTagEnd))
+                        {
+                            delStart = objTagStart;
+                            delLen = objTagEnd - objTagStart + 1;
+                        }
+
                         if (TrackChanges)
                         {
-                            int delPos = CursorPosition - 1;
-                            string delChar = PieceTable.GetSubstring(delPos, 1);
-                            var rev = RecordChange(RevisionType.Deletion, delPos, 1, delChar);
-                            ApplyFormatToRange(delPos, 1, null, 0, null, null, null, true, rev.Color, null);
-                            CursorPosition--;
+                            string delChar = PieceTable.GetSubstring(delStart, delLen);
+                            var rev = RecordChange(RevisionType.Deletion, delStart, delLen, delChar);
+                            ApplyFormatToRange(delStart, delLen, null, 0, null, null, null, true, rev.Color, null);
+                            CursorPosition = delStart;
                         }
                         else
                         {
-                            int delLen = 1;
-                            int delStart = CursorPosition - 1;
-                            string fullDocTxt = PieceTable.GetText();
-                            if (delStart >= 0 && delStart < fullDocTxt.Length && fullDocTxt[delStart] == ']')
-                            {
-                                int searchBack = Math.Max(0, delStart - 400);
-                                string sub = fullDocTxt.Substring(searchBack, delStart - searchBack + 1);
-                                int tagOpen = sub.LastIndexOf("![SHAPE:");
-                                if (tagOpen < 0) tagOpen = sub.LastIndexOf("![IMAGE:");
-                                if (tagOpen < 0) tagOpen = sub.LastIndexOf("![CHART:");
-                                if (tagOpen >= 0)
-                                {
-                                    int absOpen = searchBack + tagOpen;
-                                    int absEnd = DocShapeObject.FindTagEnd(fullDocTxt, absOpen);
-                                    if (absEnd == delStart)
-                                    {
-                                        delStart = absOpen;
-                                        delLen = absEnd - absOpen + 1;
-                                    }
-                                }
-                            }
                             PieceTable.Remove(delStart, delLen);
                             AdjustFormattedRunsOnDelete(delStart, delLen);
                             ShiftRevisionsOnDelete(delStart, delLen);
@@ -26705,6 +29710,9 @@ namespace ZenQOffice.UI
         {
             if (IsEditingHeaderFooter)
             {
+                var _hfKeyScope = BeginActiveHeaderFooterScope();
+                try
+                {
                 Keys kCode = key & Keys.KeyCode;
                 bool ctrlPressed = (key & Keys.Modifiers) == Keys.Control;
 
@@ -26959,6 +29967,8 @@ namespace ZenQOffice.UI
                     return true;
                 }
                 return false; // Let KeyPress handle character typing!
+                            }
+                finally { EndPageHeaderFooterScope(_hfKeyScope, true); }
             }
 
             if (ActiveShape != null || ActiveChart != null) return false;
@@ -27084,10 +30094,12 @@ namespace ZenQOffice.UI
                         else
                         {
                             CursorPosition--;
+                            CursorPosition = SnapCursorOutOfObjectTag(CursorPosition, -1, text);
                         }
                     }
                 }
 
+                CursorPosition = SnapCursorOutOfObjectTag(CursorPosition, -1, text);
                 if (isShift)
                 {
                     SelectionEnd = CursorPosition;
@@ -27169,10 +30181,12 @@ namespace ZenQOffice.UI
                         else
                         {
                             CursorPosition++;
+                            CursorPosition = SnapCursorOutOfObjectTag(CursorPosition, 1, text);
                         }
                     }
                 }
 
+                CursorPosition = SnapCursorOutOfObjectTag(CursorPosition, 1, text);
                 if (isShift)
                 {
                     SelectionEnd = CursorPosition;
@@ -27704,39 +30718,54 @@ namespace ZenQOffice.UI
                     }
                     else
                     {
+                        string fullDocTxt = PieceTable.GetText();
+                        int delPos = SnapCursorOutOfObjectTag(CursorPosition, 0, fullDocTxt);
+                        if (delPos >= fullDocTxt.Length) return true;
+                        int delLen = 1;
+                        if (TryGetObjectTagSpanAt(fullDocTxt, delPos, includeEndBoundary: true, out int objTagStart, out int objTagEnd))
+                        {
+                            delPos = objTagStart;
+                            delLen = objTagEnd - objTagStart + 1;
+                        }
+
                         SaveUndoState();
                         if (TrackChanges)
                         {
-                            int delPos = CursorPosition;
-                            string delChar = PieceTable.GetSubstring(delPos, 1);
-                            var rev = RecordChange(RevisionType.Deletion, delPos, 1, delChar);
-                            ApplyFormatToRange(delPos, 1, null, 0, null, null, null, true, rev.Color, null);
+                            string delChar = PieceTable.GetSubstring(delPos, delLen);
+                            var rev = RecordChange(RevisionType.Deletion, delPos, delLen, delChar);
+                            ApplyFormatToRange(delPos, delLen, null, 0, null, null, null, true, rev.Color, null);
+                            CursorPosition = delPos;
                         }
                         else
                         {
-                            int delLen = 1;
-                            string fullDocTxt = PieceTable.GetText();
-                            if (CursorPosition >= 0 && CursorPosition + 8 <= fullDocTxt.Length && fullDocTxt[CursorPosition] == '!' && fullDocTxt[CursorPosition + 1] == '[')
-                            {
-                                string pfx = fullDocTxt.Substring(CursorPosition, 8);
-                                if (pfx == "![SHAPE:" || pfx == "![IMAGE:" || pfx == "![CHART:")
-                                {
-                                    int absEnd = DocShapeObject.FindTagEnd(fullDocTxt, CursorPosition);
-                                    if (absEnd > CursorPosition)
-                                    {
-                                        delLen = absEnd - CursorPosition + 1;
-                                    }
-                                }
-                            }
-                            PieceTable.Remove(CursorPosition, delLen);
-                            AdjustFormattedRunsOnDelete(CursorPosition, delLen);
-                            ShiftRevisionsOnDelete(CursorPosition, delLen);
+                            PieceTable.Remove(delPos, delLen);
+                            AdjustFormattedRunsOnDelete(delPos, delLen);
+                            ShiftRevisionsOnDelete(delPos, delLen);
+                            CursorPosition = delPos;
                             if (TableRowHeights != null) TableRowHeights.Clear();
                             if (TableUnzoomedRowHeights != null) TableUnzoomedRowHeights.Clear();
                         }
                     }
                 }
                 LastCursorScreenX = -1;
+            }
+            if (handled)
+            {
+                string postNavTxt = PieceTable != null ? PieceTable.GetText() : "";
+                CursorPosition = SnapCursorOutOfObjectTag(CursorPosition, 0, postNavTxt);
+                if (SelectionStart == SelectionEnd)
+                {
+                    SelectionStart = CursorPosition;
+                    SelectionEnd = CursorPosition;
+                }
+                else
+                {
+                    int sLo = Math.Min(SelectionStart, SelectionEnd);
+                    int sHi = Math.Max(SelectionStart, SelectionEnd);
+                    ExpandRangeToWholeObjectTags(postNavTxt, ref sLo, ref sHi);
+                    if (SelectionEnd < SelectionStart) { SelectionStart = sHi; SelectionEnd = sLo; }
+                    else { SelectionStart = sLo; SelectionEnd = sHi; }
+                }
             }
             if (handled && key != Keys.PageUp && key != Keys.PageDown && !(isCtrl && (key == Keys.Home || key == Keys.End)))
             {
@@ -27762,176 +30791,162 @@ namespace ZenQOffice.UI
         public void DrawWordScrollBar(D2DGraphics g, int width, int height, RibbonBar ribbon)
         {
             if (ViewMode == 0) return;
-
-            int rightOffset = ShowSelectionPane ? 260 : 0;
-            int barW = 12;
-            int barX = width - rightOffset - barW - 2;
-            int topY = (ribbon != null && ribbon.ShowRuler ? 190 : 165);
+            int topY = (ribbon != null && ribbon.ShowRuler) ? 181 : 155;
+            if (ViewMode == 4) topY += 30;
             int maxScrollX = GetMaxScrollX(width);
-            int bottomY = height - 26 - (maxScrollX > 0 ? 12 : 0); // Status bar is 26px, leave 12px for HScrollBar if active
-            int barH = bottomY - topY;
-            if (barH < 40) return;
+            int botY = height - 26 - (maxScrollX > 0 ? 12 : 0);
+            DrawWordScrollBarForPane(g, width, topY, botY, height, ScrollY, 0, ribbon, IsHoveringScrollBar, IsDraggingScrollBar, out ScrollBarBounds, out ScrollBarThumbBounds);
+        }
 
-            ScrollBarBounds = new Rectangle(barX, topY, barW, barH);
+        private void DrawWordScrollBarForPane(D2DGraphics g, int width, int topY, int botY, int totalHeight, int paneScrollY, int paneIndex, RibbonBar ribbon,
+            bool isHovering, bool isDragging, out Rectangle boundsOut, out Rectangle thumbOut)
+        {
+            boundsOut = Rectangle.Empty;
+            thumbOut = Rectangle.Empty;
+            if (ViewMode == 0) return;
 
-            int maxScroll = GetMaxScrollY(height, ribbon);
-            if (maxScroll <= 0) return;
+            int trackW = 12;
+            int trackH = Math.Max(40, botY - topY);
+            int trackX = width - trackW;
 
-            int pageX, pageW, pageH, marginX, rightMarginX, marginY;
-            GetPageLayoutMetrics(width, ribbon, out pageX, out pageW, out pageH, out marginX, out rightMarginX, out marginY);
-            int pageCount = Math.Max(1, TotalPageCount);
-            int totalDocH = topY + (pageCount - 1) * (pageH + PageGap) + pageH + 25;
-            float viewRatio = (float)barH / Math.Max(barH + 1, totalDocH);
-            int thumbH = Math.Max(32, Math.Min(barH - 10, (int)(barH * viewRatio)));
-
-            float scrollFrac = (float)ScrollY / maxScroll;
-            scrollFrac = Math.Max(0f, Math.Min(1f, scrollFrac));
-
-            int thumbY = topY + (int)((barH - thumbH) * scrollFrac);
-            int thumbW = 8;
-            int thumbX = barX + (barW - thumbW) / 2;
-            ScrollBarThumbBounds = new Rectangle(thumbX, thumbY, thumbW, thumbH);
-
-            // 1. Sleek Word-style track background on hover/drag
-            if (IsHoveringScrollBar || IsDraggingScrollBar)
+            boundsOut = new Rectangle(trackX, topY, trackW, trackH);
+            int maxScroll = GetMaxScrollY(totalHeight, ribbon, paneIndex);
+            if (maxScroll <= 0)
             {
-                using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
-                {
-                    FillRoundedRectangle(g, trackBg, new RectangleF(barX, topY, barW, barH), 4f);
-                }
+                return;
             }
 
-            // 2. Modern pill thumb
-            Color thumbColor;
-            if (IsDraggingScrollBar)
-                thumbColor = Color.FromArgb(118, 118, 118); // Active dragging (#767676)
-            else if (IsHoveringScrollBar)
-                thumbColor = Color.FromArgb(166, 166, 166); // Hover state (#A6A6A6)
-            else
-                thumbColor = Color.FromArgb(205, 205, 205); // Modern Word inactive (#CDCDCD)
-
-            using (SolidBrush thumbBrush = new SolidBrush(thumbColor))
+            using (SolidBrush trackBg = new SolidBrush(Color.FromArgb(245, 246, 248)))
             {
-                FillRoundedRectangle(g, thumbBrush, new RectangleF(thumbX, thumbY, thumbW, thumbH), 4f);
+                g.FillRectangle(trackBg, boundsOut);
+            }
+            using (Pen sepPen = new Pen(Color.FromArgb(228, 231, 235), 1))
+            {
+                g.DrawLine(sepPen, trackX, topY, trackX, topY + trackH);
             }
 
-            // 3. Floating Tooltip while dragging: "Trang X / Y" (like Microsoft Word)
-            if (IsDraggingScrollBar)
+            int totalDocH = trackH + maxScroll;
+            float thumbRatio = Math.Min(1.0f, (float)trackH / Math.Max(1, totalDocH));
+            int thumbH = Math.Max(32, (int)(trackH * thumbRatio));
+            int availableSlide = Math.Max(1, trackH - thumbH);
+            float scrollRatio = Math.Min(1.0f, Math.Max(0f, (float)paneScrollY / maxScroll));
+            int thumbY = topY + (int)(availableSlide * scrollRatio);
+
+            thumbOut = new Rectangle(trackX + 2, thumbY + 2, trackW - 4, thumbH - 4);
+
+            Color thumbCol = Color.FromArgb(182, 188, 196);
+            if (isHovering || isDragging) thumbCol = Color.FromArgb(130, 138, 148);
+
+            using (SolidBrush thumbBrush = new SolidBrush(thumbCol))
             {
-                int totalPages = Math.Max(1, TotalPageCount);
-                int curPage = Math.Max(1, Math.Min(totalPages, CurrentActivePage));
-                string tipText = string.Format("Trang {0} / {1}", curPage, totalPages);
+                g.FillRectangle(thumbBrush, thumbOut);
+            }
 
-                using (Font tipFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            if (isDragging)
+            {
+                int pageNum = Math.Max(1, CurrentActivePage);
+                string tipText = (ViewMode == 3 || ViewMode == 4) ? ("Dòng đầu cuộn: " + paneScrollY + "px") : ("Trang: " + pageNum + " / " + Math.Max(1, TotalPageCount));
+                using (Font tipFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
                 {
-                    SizeF sz = g.MeasureString(tipText, tipFont);
-                    int tipW = (int)sz.Width + 18;
-                    int tipH = 26;
-                    int tipX = barX - tipW - 8;
-                    int tipY = Math.Max(topY, Math.Min(bottomY - tipH, thumbY + (thumbH - tipH) / 2));
+                    SizeF tSz = g.MeasureString(tipText, tipFont);
+                    int bw = (int)tSz.Width + 16;
+                    int bh = 24;
+                    int bx = trackX - bw - 10;
+                    int by = Math.Max(topY + 4, Math.Min(botY - bh - 4, thumbY + (thumbH - bh) / 2));
 
-                    Rectangle tipRect = new Rectangle(tipX, tipY, tipW, tipH);
-
-                    using (SolidBrush shadowBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+                    Rectangle tipRect = new Rectangle(bx, by, bw, bh);
+                    using (SolidBrush tipBg = new SolidBrush(Color.FromArgb(240, 32, 32, 32)))
+                    using (Pen tipBorder = new Pen(Color.FromArgb(64, 64, 64), 1))
                     {
-                        FillRoundedRectangle(g, shadowBrush, new RectangleF(tipX + 1, tipY + 1, tipW, tipH), 4f);
+                        g.FillRectangle(tipBg, tipRect);
+                        g.DrawRectangle(tipBorder, tipRect);
                     }
-                    using (SolidBrush tipBg = new SolidBrush(Color.FromArgb(38, 38, 38))) // #262626
-                    using (SolidBrush textBrush = new SolidBrush(Color.White))
-                    using (Pen borderPen = new Pen(Color.FromArgb(60, 60, 60), 1.0f))
-                    {
-                        FillRoundedRectangle(g, tipBg, tipRect, 4f);
-                        DrawRoundedRectangle(g, borderPen, tipRect, 4f);
-                        g.DrawString(tipText, tipFont, textBrush, tipRect.X + 9, tipRect.Y + 4);
-                    }
+                    g.DrawString(tipText, tipFont, Brushes.White, bx + 8, by + 4);
                 }
             }
         }
 
+        private bool HandlePaneScrollBarDown(int mouseX, int mouseY, int height, RibbonBar ribbon, int paneIndex, Rectangle sbBounds, Rectangle thumbBounds, ref bool isDraggingFlag)
+        {
+            if (sbBounds.IsEmpty || !sbBounds.Contains(mouseX, mouseY)) return false;
+            int maxScroll = GetMaxScrollY(height, ribbon, paneIndex);
+            if (maxScroll <= 0) return false;
+            int curScroll = (paneIndex == 1) ? SecondaryScrollY : ScrollY;
+            _activeScrollBarDragPane = paneIndex;
+            if (paneIndex == 1) IsDraggingSecondaryScrollBar = true;
+            if (thumbBounds.Contains(mouseX, mouseY))
+            {
+                isDraggingFlag = true;
+                _scrollBarDragStartMouseY = mouseY;
+                _scrollBarDragStartScrollY = curScroll;
+            }
+            else
+            {
+                float ratio = (float)(mouseY - sbBounds.Top) / Math.Max(1, sbBounds.Height);
+                float nextVal = Math.Max(0, Math.Min(maxScroll, ratio * maxScroll));
+                if (paneIndex == 1) { SecondarySmoothScrollY = nextVal; SecondaryTargetScrollY = nextVal; }
+                else { SmoothScrollY = nextVal; TargetScrollY = nextVal; }
+                isDraggingFlag = true;
+                _scrollBarDragStartMouseY = mouseY;
+                _scrollBarDragStartScrollY = nextVal;
+            }
+            return true;
+        }
+
         public bool HandleScrollBarMouseDown(int mouseX, int mouseY, int width, int height, RibbonBar ribbon)
         {
-            if (ViewMode == 0 || ScrollBarBounds.IsEmpty) return false;
-            if (ScrollBarBounds.Contains(mouseX, mouseY))
-            {
-                int maxScroll = GetMaxScrollY(height, ribbon);
-                if (maxScroll <= 0) return true;
-
-                if (ScrollBarThumbBounds.Contains(mouseX, mouseY))
-                {
-                    IsDraggingScrollBar = true;
-                    _scrollBarDragStartMouseY = mouseY;
-                    _scrollBarDragStartScrollY = TargetScrollY;
-                    return true;
-                }
-                else
-                {
-                    int barH = ScrollBarBounds.Height;
-                    int thumbH = Math.Max(20, ScrollBarThumbBounds.Height);
-                    int trackScrollH = Math.Max(1, barH - thumbH);
-                    float frac = (float)(mouseY - ScrollBarBounds.Y - thumbH / 2) / trackScrollH;
-                    frac = Math.Max(0f, Math.Min(1f, frac));
-                    TargetScrollY = (int)(frac * maxScroll);
-                    SmoothScrollY = TargetScrollY;
-
-                    int stdH = ribbon != null && ribbon.IsLandscape ? 794 : 1123;
-                    int pageH = (int)(stdH * ZoomLevel);
-                    int totalPages = Math.Max(1, TotalPageCount);
-                    CurrentActivePage = Math.Max(1, Math.Min(totalPages, (int)((SmoothScrollY + (height / 2)) / (pageH + PageGap)) + 1));
-
-                    IsDraggingScrollBar = true;
-                    _scrollBarDragStartMouseY = mouseY;
-                    _scrollBarDragStartScrollY = TargetScrollY;
-                    return true;
-                }
-            }
+            if (ViewMode == 0) return false;
+            if (IsSplitView && HandlePaneScrollBarDown(mouseX, mouseY, height, ribbon, 1, SecondaryScrollBarBounds, SecondaryScrollBarThumbBounds, ref IsDraggingScrollBar))
+                return true;
+            if (HandlePaneScrollBarDown(mouseX, mouseY, height, ribbon, 0, ScrollBarBounds, ScrollBarThumbBounds, ref IsDraggingScrollBar))
+                return true;
             return false;
         }
 
         public bool HandleScrollBarMouseMove(int mouseX, int mouseY, int width, int height, RibbonBar ribbon)
         {
-            if (ViewMode == 0 || ScrollBarBounds.IsEmpty) return false;
+            if (ViewMode == 0) return false;
             if (IsDraggingScrollBar)
             {
-                int barH = ScrollBarBounds.Height;
-                int thumbH = Math.Max(20, ScrollBarThumbBounds.Height);
-                int trackScrollH = Math.Max(1, barH - thumbH);
-                int deltaMouseY = mouseY - _scrollBarDragStartMouseY;
-                int maxScroll = GetMaxScrollY(height, ribbon);
-                float deltaScroll = ((float)deltaMouseY / trackScrollH) * maxScroll;
-                TargetScrollY = Math.Max(0, Math.Min(maxScroll, _scrollBarDragStartScrollY + deltaScroll));
-                SmoothScrollY = TargetScrollY;
-
-                int stdH = ribbon != null && ribbon.IsLandscape ? 794 : 1123;
-                int pageH = (int)(stdH * ZoomLevel);
-                int totalPages = Math.Max(1, TotalPageCount);
-                CurrentActivePage = Math.Max(1, Math.Min(totalPages, (int)((SmoothScrollY + (height / 2)) / (pageH + PageGap)) + 1));
-
-                Cursor.Current = Cursors.Default;
-                return true;
-            }
-
-            bool isInside = ScrollBarBounds.Contains(mouseX, mouseY);
-            if (isInside)
-            {
-                if (!IsHoveringScrollBar)
+                int pane = _activeScrollBarDragPane;
+                Rectangle sb = (pane == 1 && !SecondaryScrollBarBounds.IsEmpty) ? SecondaryScrollBarBounds : ScrollBarBounds;
+                Rectangle th = (pane == 1 && !SecondaryScrollBarThumbBounds.IsEmpty) ? SecondaryScrollBarThumbBounds : ScrollBarThumbBounds;
+                int maxScroll = GetMaxScrollY(height, ribbon, pane);
+                if (maxScroll > 0 && !sb.IsEmpty)
                 {
-                    IsHoveringScrollBar = true;
+                    int availableSlide = Math.Max(1, sb.Height - th.Height);
+                    int dy = mouseY - _scrollBarDragStartMouseY;
+                    float scrollDelta = (dy / (float)availableSlide) * maxScroll;
+                    float val = Math.Max(0, Math.Min(maxScroll, _scrollBarDragStartScrollY + scrollDelta));
+                    if (pane == 1) { SecondarySmoothScrollY = val; SecondaryTargetScrollY = val; }
+                    else { SmoothScrollY = val; TargetScrollY = val; }
                 }
                 Cursor.Current = Cursors.Default;
                 return true;
             }
-            else if (IsHoveringScrollBar)
+            bool wasHover0 = IsHoveringScrollBar;
+            bool wasHover1 = IsHoveringSecondaryScrollBar;
+            IsHoveringScrollBar = !ScrollBarBounds.IsEmpty && ScrollBarBounds.Contains(mouseX, mouseY);
+            IsHoveringSecondaryScrollBar = IsSplitView && !SecondaryScrollBarBounds.IsEmpty && SecondaryScrollBarBounds.Contains(mouseX, mouseY);
+            if (IsHoveringScrollBar || IsHoveringSecondaryScrollBar)
             {
-                IsHoveringScrollBar = false;
+                Cursor.Current = Cursors.Default;
+                return true;
+            }
+            if (wasHover0 != IsHoveringScrollBar || wasHover1 != IsHoveringSecondaryScrollBar)
+            {
+                if (InvalidateCallback != null) InvalidateCallback();
             }
             return false;
         }
 
         public bool HandleScrollBarMouseUp()
         {
-            if (IsDraggingScrollBar)
+            if (IsDraggingScrollBar || IsDraggingSecondaryScrollBar)
             {
                 IsDraggingScrollBar = false;
+                IsDraggingSecondaryScrollBar = false;
+                _activeScrollBarDragPane = 0;
                 return true;
             }
             return false;
@@ -27949,8 +30964,8 @@ namespace ZenQOffice.UI
                 return;
             }
 
-            int navOffset = ShowNavigationPane ? 280 : 0;
-            int rightOffset = ShowSelectionPane ? 260 : 0;
+            int navOffset = EffectiveNavPaneWidth;
+            int rightOffset = EffectiveSelectionPaneWidth;
             int maxScrollY = GetMaxScrollY(height, ribbon);
             int vBarReservation = (maxScrollY > 0) ? 14 : 2;
 

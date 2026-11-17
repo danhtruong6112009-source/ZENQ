@@ -84,7 +84,7 @@ namespace ZenQOffice.Core
             if (config.Provider != AiProviderType.Ollama && string.IsNullOrWhiteSpace(config.ApiKey))
             {
                 resp.Success = false;
-                resp.ErrorMessage = "Vui lòng nhập API Key trước khi kiểm tra.";
+                resp.ErrorMessage = AppL10n.T("Vui lòng nhập API Key trước khi kiểm tra.", "Please enter an API Key before testing.");
                 sw.Stop();
                 resp.DurationMs = sw.ElapsedMilliseconds;
                 return resp;
@@ -93,7 +93,7 @@ namespace ZenQOffice.Core
             if (string.IsNullOrWhiteSpace(config.ModelName))
             {
                 resp.Success = false;
-                resp.ErrorMessage = "Vui lòng nhập tên Model cần kiểm tra.";
+                resp.ErrorMessage = AppL10n.T("Vui lòng nhập tên Model cần kiểm tra.", "Please enter a Model name to test.");
                 sw.Stop();
                 resp.DurationMs = sw.ElapsedMilliseconds;
                 return resp;
@@ -114,7 +114,7 @@ namespace ZenQOffice.Core
                 {
                     sw.Stop();
                     resp.Success = false;
-                    resp.ErrorMessage = "Không thể kết nối tới Ollama daemon. Hãy kiểm tra 'ollama serve' tại http://localhost:11434.";
+                    resp.ErrorMessage = AppL10n.T("Không thể kết nối tới Ollama daemon. Hãy kiểm tra 'ollama serve' tại http://localhost:11434.", "Cannot connect to Ollama daemon at http://localhost:11434.");
                     resp.DurationMs = sw.ElapsedMilliseconds;
                     return resp;
                 }
@@ -132,7 +132,7 @@ namespace ZenQOffice.Core
             {
                 sw.Stop();
                 resp.Success = false;
-                resp.ErrorMessage = "Lỗi kết nối: " + ex.Message;
+                resp.ErrorMessage = AppL10n.T("Lỗi kết nối: ", "Connection error: ") + ex.Message;
                 resp.DurationMs = sw.ElapsedMilliseconds;
                 return resp;
             }
@@ -326,7 +326,7 @@ namespace ZenQOffice.Core
                 {
                     try
                     {
-                        onCompleted(resp.Success, resp.DurationMs, resp.Success ? "Thành công" : resp.ErrorMessage);
+                        onCompleted(resp.Success, resp.DurationMs, resp.Success ? AppL10n.T("Thành công", "Success") : resp.ErrorMessage);
                     }
                     catch { }
                 }
@@ -405,7 +405,7 @@ namespace ZenQOffice.Core
                             }
                             if (string.IsNullOrEmpty(chatDisplay))
                             {
-                                chatDisplay = "🎨 AI đã định vị và kiến tạo slide hoàn chỉnh lên Canvas.";
+                                chatDisplay = AppL10n.T("🎨 AI đã định vị và kiến tạo slide hoàn chỉnh lên Canvas.", "🎨 AI designed and created the slide on Canvas.");
                             }
 
                             int step = Math.Max(5, chatDisplay.Length / 10);
@@ -422,14 +422,14 @@ namespace ZenQOffice.Core
                     else
                     {
                         resp.Success = false;
-                        resp.ErrorMessage = "Lỗi chạy Vector Model: " + err;
+                        resp.ErrorMessage = AppL10n.T("Lỗi chạy Vector Model: ", "Vector search error: ") + err;
                     }
                 }
             }
             catch (Exception ex)
             {
                 resp.Success = false;
-                resp.ErrorMessage = "Lỗi khởi chạy Python Vector Search: " + ex.Message;
+                resp.ErrorMessage = AppL10n.T("Lỗi khởi chạy Python Vector Search: ", "Failed to launch Vector Search: ") + ex.Message;
             }
             return resp;
         }
@@ -549,7 +549,7 @@ namespace ZenQOffice.Core
                 }
 
                 result.Success = false;
-                result.ErrorMessage = "Phản hồi từ Google AI Studio không có dữ liệu văn bản hợp lệ.";
+                result.ErrorMessage = AppL10n.T("Phản hồi từ Google AI Studio không có dữ liệu văn bản hợp lệ.", "Google AI Studio returned no valid text content.");
             }
 
             return result;
@@ -676,7 +676,7 @@ namespace ZenQOffice.Core
                 }
 
                 result.Success = false;
-                result.ErrorMessage = "Phản hồi từ API (" + config.Provider + ") không chứa dữ liệu choices hợp lệ.";
+                result.ErrorMessage = AppL10n.T("Phản hồi từ API (", "API response (") + config.Provider + AppL10n.T(") không chứa dữ liệu choices hợp lệ.", ") returned no valid choices.");
             }
 
             return result;
@@ -1092,7 +1092,7 @@ namespace ZenQOffice.Core
                     }
                     else
                     {
-                        callback(new List<string>(), "Không tìm thấy model Ollama nào đang chạy trên máy (Hãy chạy 'ollama serve' hoặc cài model).");
+                        callback(new List<string>(), AppL10n.T("Không tìm thấy model Ollama nào đang chạy trên máy (Hãy chạy 'ollama serve' hoặc cài model).", "No running Ollama models found (run 'ollama serve' or pull a model)."));
                     }
                 }
                 catch (Exception ex)
@@ -1133,7 +1133,7 @@ namespace ZenQOffice.Core
                 exLower.Contains("404") ||
                 exLower.Contains("not found"))
             {
-                return string.Format("⚠️ Model '{0}' hiện không tồn tại hoặc đã ngừng hỗ trợ (404 Not Found).\n👉 Vui lòng chọn Model khác (ví dụ: gemini-3.7-flash, gemini-3.1-flash-lite, v.v.) trong Cài đặt hoặc danh sách phía trên.", modelDisplay);
+                return string.Format(AppL10n.T("⚠️ Model '{0}' hiện không tồn tại hoặc đã ngừng hỗ trợ (404 Not Found).\n👉 Vui lòng chọn Model khác (ví dụ: gemini-3.7-flash, gemini-3.1-flash-lite, v.v.) trong Cài đặt hoặc danh sách phía trên.", "⚠️ Model '{0}' does not exist or is no longer supported (404 Not Found).\n👉 Please choose another model in Settings or from the list above."), modelDisplay);
             }
 
             // 2. Hết Token / Hết hạn ngạch sử dụng / Hết lượt / Hết tiền (RESOURCE_EXHAUSTED, insufficient_quota, credits, billing)
@@ -1148,7 +1148,7 @@ namespace ZenQOffice.Core
                 errLower.Contains("payment required") ||
                 statusCode == 402)
             {
-                return string.Format("🚫 Model '{0}' hoặc tài khoản đã hết lượt / hết Token (Hạn ngạch Quota đã cạn).\n👉 Vui lòng đổi sang Model khác, đổi API Key hoặc kiểm tra lại hạn mức tài khoản.", modelDisplay);
+                return string.Format(AppL10n.T("🚫 Model '{0}' hoặc tài khoản đã hết lượt / hết Token (Hạn ngạch Quota đã cạn).\n👉 Vui lòng đổi sang Model khác, đổi API Key hoặc kiểm tra lại hạn mức tài khoản.", "🚫 Quota or tokens exhausted for model '{0}'.\n👉 Please switch models, change your API key, or check billing."), modelDisplay);
             }
 
             // 3. Gửi yêu cầu quá nhanh / Đạt giới hạn RPM - Requests Per Minute (Rate Limit / Too Many Requests)
@@ -1165,7 +1165,7 @@ namespace ZenQOffice.Core
                 errLower.Contains("retry after") ||
                 exLower.Contains("429"))
             {
-                return "⏳ Bạn đang gửi yêu cầu quá nhanh (Đạt giới hạn RPM - Requests Per Minute).\n👉 Vui lòng chat chậm lại và chờ sau ít phút trước khi gửi tiếp nhé!";
+                return AppL10n.T("⏳ Bạn đang gửi yêu cầu quá nhanh (Đạt giới hạn RPM - Requests Per Minute).\n👉 Vui lòng chat chậm lại và chờ sau ít phút trước khi gửi tiếp nhé!", "⏳ Sending requests too fast (Rate Limit RPM reached).\n👉 Please wait a moment and try again.");
             }
 
             // 4. Lỗi API Key không hợp lệ / Chưa được cấp quyền (401 / 403 / API_KEY_INVALID)
@@ -1178,7 +1178,7 @@ namespace ZenQOffice.Core
                 errLower.Contains("permission denied") ||
                 exLower.Contains("401") || exLower.Contains("403"))
             {
-                return "🔑 API Key không chính xác hoặc không có quyền truy cập (401/403).\n👉 Vui lòng kiểm tra và dán lại mã API Key chính xác trong phần Cài đặt AI.";
+                return AppL10n.T("🔑 API Key không chính xác hoặc không có quyền truy cập (401/403).\n👉 Vui lòng kiểm tra và dán lại mã API Key chính xác trong phần Cài đặt AI.", "🔑 Invalid API Key or unauthorized (401/403).\n👉 Please check your API key in AI Settings.");
             }
 
             // 5. Lỗi Timeout / Quá thời gian chờ
@@ -1187,7 +1187,7 @@ namespace ZenQOffice.Core
                 exLower.Contains("timeout") ||
                 (ex is WebException && ((WebException)ex).Status == WebExceptionStatus.Timeout))
             {
-                return "⏱️ Yêu cầu quá thời gian chờ (Server phản hồi chậm hoặc timeout).\n👉 Vui lòng thử lại sau vài giây hoặc chọn Model có tốc độ phản hồi nhanh hơn (Flash).";
+                return AppL10n.T("⏱️ Yêu cầu quá thời gian chờ (Server phản hồi chậm hoặc timeout).\n👉 Vui lòng thử lại sau vài giây hoặc chọn Model có tốc độ phản hồi nhanh hơn (Flash).", "⏱️ Request timed out.\n👉 Please try again in a few seconds or choose a faster model.");
             }
 
             // 6. Lỗi kết nối / Mất mạng / Máy chủ gián đoạn / 500 / 502 / 503 / Ollama offline
@@ -1199,19 +1199,19 @@ namespace ZenQOffice.Core
                 exLower.Contains("connectfailure") ||
                 exLower.Contains("connection refused"))
             {
-                return "🌐 Lỗi kết nối tới máy chủ AI hoặc mạng bị gián đoạn.\n👉 Vui lòng kiểm tra đường truyền Internet (hoặc đảm bảo 'ollama serve' đang chạy nếu dùng Local).";
+                return AppL10n.T("🌐 Lỗi kết nối tới máy chủ AI hoặc mạng bị gián đoạn.\n👉 Vui lòng kiểm tra đường truyền Internet (hoặc đảm bảo 'ollama serve' đang chạy nếu dùng Local).", "🌐 Network error connecting to AI server.\n👉 Check your internet connection or ensure 'ollama serve' is running for local models.");
             }
 
             // 7. Lỗi mặc định sạch đẹp
             if (!string.IsNullOrWhiteSpace(rawError))
             {
-                return string.Format("❌ Lỗi phản hồi ({0}): {1}", statusCode > 0 ? ("HTTP " + statusCode) : "Máy chủ", rawError.Trim());
+                return string.Format(AppL10n.T("❌ Lỗi phản hồi ({0}): {1}", "❌ Error ({0}): {1}"), statusCode > 0 ? ("HTTP " + statusCode) : AppL10n.T("Máy chủ", "Server"), rawError.Trim());
             }
             if (ex != null && !string.IsNullOrWhiteSpace(ex.Message))
             {
-                return "❌ Lỗi: " + ex.Message;
+                return AppL10n.T("❌ Lỗi: ", "❌ Error: ") + ex.Message;
             }
-            return "❌ Đã xảy ra lỗi không xác định khi giao tiếp với máy chủ AI.";
+            return AppL10n.T("❌ Đã xảy ra lỗi không xác định khi giao tiếp với máy chủ AI.", "❌ Unknown error communicating with AI server.");
         }
         #endregion
     }

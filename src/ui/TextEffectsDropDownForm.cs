@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -245,7 +246,7 @@ namespace ZenQOffice.UI
             using (Font titleFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
             using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("Kiểu chữ nghệ thuật & Hiệu ứng", titleFont, titleBrush, 12, 9);
+                g.DrawString(AppL10n.Tr("Kiểu chữ nghệ thuật & Hiệu ứng"), titleFont, titleBrush, 12, 9);
             }
 
             // Presets Grid
@@ -401,7 +402,7 @@ namespace ZenQOffice.UI
 
                     // Text
                     SolidBrush itemBrush = (i == 4) ? redBrush : textBrush;
-                    g.DrawString(MenuItems[i], menuFont, itemBrush, rItem.X + 30, rItem.Y + 4);
+                    g.DrawString(AppL10n.Tr(MenuItems[i]), menuFont, itemBrush, rItem.X + 30, rItem.Y + 4);
 
                     // Right arrow chevron for submenus
                     if (i < 4)

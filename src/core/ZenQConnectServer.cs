@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
@@ -158,7 +158,7 @@ namespace ZenQOffice.Core
 
             if (_listener == null)
             {
-                OnStatusMessage?.Invoke("Không thể khởi động cổng mạng nội bộ!");
+                OnStatusMessage?.Invoke(AppL10n.T("Không thể khởi động cổng mạng nội bộ!", "Unable to start local network port!"));
                 return false;
             }
 
@@ -170,7 +170,7 @@ namespace ZenQOffice.Core
             _statusBroadcastTimer = new System.Threading.Timer(OnBroadcastTimerTick, null, 1000, 1000);
 
             OnServerStarted?.Invoke();
-            OnStatusMessage?.Invoke($"ZenQ Connect đang chạy tại: {ActiveUrl}");
+            OnStatusMessage?.Invoke(AppL10n.T("ZenQ Connect đang chạy tại: ", "ZenQ Connect running at: ") + ActiveUrl);
             return true;
         }
 
@@ -758,8 +758,8 @@ namespace ZenQOffice.Core
                     case "device_info":
                         if (dict.ContainsKey("name"))
                         {
-                            ConnectedDeviceName = dict["name"]?.ToString() ?? "Điện thoại";
-                            OnStatusMessage?.Invoke($"Đã kết nối: {ConnectedDeviceName}");
+                            ConnectedDeviceName = dict["name"]?.ToString() ?? AppL10n.T("Điện thoại", "Phone");
+                            OnStatusMessage?.Invoke(AppL10n.T("Đã kết nối: ", "Connected: ") + ConnectedDeviceName);
                         }
                         break;
 

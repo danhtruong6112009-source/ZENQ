@@ -10,6 +10,7 @@ namespace ZenQOffice.UI
         public string SmartArtType;
         public string SmartArtTitle;
         public string TextContent;
+        public bool HasTextContent = false;
         public int StylePresetIndex = 0;
         public float AdjustValue1 = 0.2f;
         public float AdjustValue2 = 0.4f;
@@ -27,6 +28,8 @@ namespace ZenQOffice.UI
         public bool AspectRatioLock;
         public Color[] ResolvedThemePalette;
         public List<DocShapeObject> GroupChildren;
+        public bool HasFixPosition = false;
+        public bool FixPosition = false;
     }
 
     public class DocShapeObject
@@ -641,7 +644,7 @@ namespace ZenQOffice.UI
                 DocShapeTagProperties p = TagCache[Id];
                 if (!string.IsNullOrEmpty(p.SmartArtType)) SmartArtType = p.SmartArtType;
                 if (!string.IsNullOrEmpty(p.SmartArtTitle)) SmartArtTitle = p.SmartArtTitle;
-                if (!string.IsNullOrEmpty(p.TextContent)) TextContent = p.TextContent;
+                if (p.HasTextContent || !string.IsNullOrEmpty(p.TextContent)) TextContent = p.TextContent ?? "";
                 if (p.StylePresetIndex >= 0) StylePresetIndex = p.StylePresetIndex;
                 if (p.AdjustValue1 > 0f) AdjustValue1 = p.AdjustValue1;
                 if (p.AdjustValue2 > 0f) AdjustValue2 = p.AdjustValue2;
@@ -657,6 +660,7 @@ namespace ZenQOffice.UI
                 if (p.NodeOffsetDeltas != null) NodeOffsetDeltas = new Dictionary<int, PointF>(p.NodeOffsetDeltas);
                 if (p.OriginalBoundsEmu != Rectangle.Empty) OriginalBoundsEmu = p.OriginalBoundsEmu;
                 if (p.AspectRatioLock) AspectRatioLock = true;
+                if (p.HasFixPosition) FixPosition = p.FixPosition;
                 if (p.ResolvedThemePalette != null) ResolvedThemePalette = p.ResolvedThemePalette;
                 if (p.GroupChildren != null && p.GroupChildren.Count > 0)
                 {
@@ -755,7 +759,7 @@ namespace ZenQOffice.UI
                 return;
             }
 
-            string[] keys = new string[] { "ID=", "TYPE=", "PATH=", "X=", "Y=", "W=", "H=", "WRAP=", "PAGE=", "STYLE=", "YREL=", "SMARTART=", "TITLE=", "TEXT=", "ADJ1=", "ADJ2=", "ADJ3=", "NODES=", "VSTYLE=", "ARLOCK=", "EMUX=", "EMUY=", "EMUW=", "EMUH=", "CHILDREN=" };
+            string[] keys = new string[] { "ID=", "TYPE=", "PATH=", "X=", "Y=", "W=", "H=", "WRAP=", "PAGE=", "STYLE=", "YREL=", "FIXPOS=", "SMARTART=", "TITLE=", "TEXT=", "ADJ1=", "ADJ2=", "ADJ3=", "NODES=", "VSTYLE=", "ARLOCK=", "EMUX=", "EMUY=", "EMUW=", "EMUH=", "CHILDREN=" };
             int curPos = 0;
             string smartArtType = null;
             string smartArtTitle = null;
@@ -766,6 +770,8 @@ namespace ZenQOffice.UI
             bool hasAdj1 = false, hasAdj2 = false, hasAdj3 = false;
             bool arLock = false;
             bool hasArLock = false;
+            bool fixPos = false;
+            bool hasFixPos = false;
             int emuX = 0, emuY = 0, emuW = 0, emuH = 0;
             bool hasEmu = false;
             string childrenMeta = null;
@@ -822,6 +828,7 @@ namespace ZenQOffice.UI
                 else if (matchedKey == "PAGE=") int.TryParse(val, out tagPage);
                 else if (matchedKey == "STYLE=") int.TryParse(val, out tagStyle);
                 else if (matchedKey == "YREL=") int.TryParse(val, out tagYRel);
+                else if (matchedKey == "FIXPOS=") { fixPos = (val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase)); hasFixPos = true; }
                 else if (matchedKey == "SMARTART=") smartArtType = val;
                 else if (matchedKey == "TITLE=") smartArtTitle = val;
                 else if (matchedKey == "TEXT=")
@@ -854,7 +861,7 @@ namespace ZenQOffice.UI
                 }
                 if (!string.IsNullOrEmpty(smartArtType)) p.SmartArtType = smartArtType;
                 if (!string.IsNullOrEmpty(smartArtTitle)) p.SmartArtTitle = smartArtTitle;
-                if (!string.IsNullOrEmpty(textContent)) p.TextContent = textContent;
+                if (textContent != null) { p.TextContent = textContent; p.HasTextContent = true; }
                 if (tagStyle >= 0) p.StylePresetIndex = tagStyle;
                 if (vStyle >= 0) p.VisualStylePreset = vStyle;
                 if (hasAdj1) p.AdjustValue1 = adj1;
@@ -862,6 +869,7 @@ namespace ZenQOffice.UI
                 if (hasAdj3) p.AdjustValue3 = adj3;
                 if (!string.IsNullOrEmpty(nodesMeta)) p.NodesMeta = nodesMeta;
                 if (hasArLock) p.AspectRatioLock = arLock;
+                if (hasFixPos) { p.HasFixPosition = true; p.FixPosition = fixPos; }
                 if (hasEmu) p.OriginalBoundsEmu = new Rectangle(emuX, emuY, emuW, emuH);
                 if (!string.IsNullOrEmpty(childrenMeta))
                 {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -7,7 +7,8 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Interop;
-using ZenQOffice.UI;
+using ZenQOffice.UI;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -132,7 +133,7 @@ namespace ZenQOffice.UI
             // Header: "TẠO TÀI LIỆU MỚI"
             TextBlock header = new TextBlock
             {
-                Text = "TẠO TÀI LIỆU MỚI",
+                Text = AppL10n.T("TẠO TÀI LIỆU MỚI", "CREATE NEW DOCUMENT"),
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
@@ -142,23 +143,23 @@ namespace ZenQOffice.UI
 
             // 5 App Options
             _itemBorders = new Border[5];
-            _itemBorders[0] = CreateItemRow(OfficeAppMode.Writer, "Writer", "Soạn thảo văn bản", "DOCX",
+            _itemBorders[0] = CreateItemRow(OfficeAppMode.Writer, "Writer", AppL10n.T("Soạn thảo văn bản", "Word processing"), "DOCX",
                 Color.FromRgb(37, 99, 235), Color.FromRgb(29, 78, 216),
                 Color.FromRgb(239, 246, 255), Color.FromRgb(191, 219, 254), 0);
 
-            _itemBorders[1] = CreateItemRow(OfficeAppMode.Calc, "Calc", "Bảng tính & Dữ liệu", "XLSX",
+            _itemBorders[1] = CreateItemRow(OfficeAppMode.Calc, "Calc", AppL10n.T("Bảng tính & Dữ liệu", "Spreadsheets & Data"), "XLSX",
                 Color.FromRgb(16, 185, 129), Color.FromRgb(5, 150, 105),
                 Color.FromRgb(236, 253, 245), Color.FromRgb(167, 243, 208), 1);
 
-            _itemBorders[2] = CreateItemRow(OfficeAppMode.Slides, "Slides", "Trình chiếu & Thuyết trình", "PPTX",
+            _itemBorders[2] = CreateItemRow(OfficeAppMode.Slides, "Slides", AppL10n.T("Trình chiếu & Thuyết trình", "Presentations"), "PPTX",
                 Color.FromRgb(249, 115, 22), Color.FromRgb(217, 70, 239),
                 Color.FromRgb(255, 247, 237), Color.FromRgb(254, 215, 170), 2);
 
-            _itemBorders[3] = CreateItemRow(OfficeAppMode.Pdf, "PDF", "Tài liệu PDF", "PDF",
+            _itemBorders[3] = CreateItemRow(OfficeAppMode.Pdf, "PDF", AppL10n.T("Tài liệu PDF", "PDF Documents"), "PDF",
                 Color.FromRgb(220, 38, 38), Color.FromRgb(185, 28, 28),
                 Color.FromRgb(254, 242, 242), Color.FromRgb(254, 202, 202), 3);
 
-            _itemBorders[4] = CreateItemRow(OfficeAppMode.Photo, "Photo", "Thiết kế & Đồ họa", "PSD",
+            _itemBorders[4] = CreateItemRow(OfficeAppMode.Photo, "Photo", AppL10n.T("Thiết kế & Đồ họa", "Design & Graphics"), "PSD",
                 Color.FromRgb(99, 102, 241), Color.FromRgb(79, 70, 229),
                 Color.FromRgb(238, 242, 255), Color.FromRgb(199, 210, 254), 4);
 

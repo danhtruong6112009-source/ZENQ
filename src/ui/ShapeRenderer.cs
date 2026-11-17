@@ -848,31 +848,7 @@ namespace ZenQOffice.UI
 
                     if (shape.IsSelected)
                     {
-                        using (Pen selPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f) { DashStyle = DashStyle.Dash })
-                        {
-                            g.DrawRectangle(selPen, bounds);
-                        }
-                        int hs = Math.Max(5, (int)(7 * zoomLevel));
-                        Point[] handles = new Point[]
-                        {
-                            new Point(bounds.Left, bounds.Top),
-                            new Point(bounds.Left + bounds.Width / 2, bounds.Top),
-                            new Point(bounds.Right, bounds.Top),
-                            new Point(bounds.Right, bounds.Top + bounds.Height / 2),
-                            new Point(bounds.Right, bounds.Bottom),
-                            new Point(bounds.Left + bounds.Width / 2, bounds.Bottom),
-                            new Point(bounds.Left, bounds.Bottom),
-                            new Point(bounds.Left, bounds.Top + bounds.Height / 2)
-                        };
-                        for (int hi = 0; hi < handles.Length; hi++)
-                        {
-                            Rectangle hR = new Rectangle(handles[hi].X - hs / 2, handles[hi].Y - hs / 2, hs, hs);
-                            g.FillRectangle(Brushes.White, hR);
-                            using (Pen hPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                            {
-                                g.DrawRectangle(hPen, hR);
-                            }
-                        }
+                        DrawGrayBoxSelectionHandles(g, bounds, zoomLevel, dashed: shape.IsEditingText);
                     }
                 }
                 else
@@ -1144,31 +1120,7 @@ namespace ZenQOffice.UI
                         Math.Max(6, (int)(rf.Height * bounds.Height))
                     );
 
-                    using (Pen nodePen = new Pen(Color.FromArgb(0, 120, 215), 2.0f) { DashStyle = DashStyle.Dash })
-                    {
-                        g.DrawRectangle(nodePen, nodeRect);
-                    }
-                    int nhs = Math.Max(4, (int)(6 * zoomLevel));
-                    Point[] nhandles = new Point[]
-                    {
-                        new Point(nodeRect.Left, nodeRect.Top),
-                        new Point(nodeRect.Left + nodeRect.Width / 2, nodeRect.Top),
-                        new Point(nodeRect.Right, nodeRect.Top),
-                        new Point(nodeRect.Right, nodeRect.Top + nodeRect.Height / 2),
-                        new Point(nodeRect.Right, nodeRect.Bottom),
-                        new Point(nodeRect.Left + nodeRect.Width / 2, nodeRect.Bottom),
-                        new Point(nodeRect.Left, nodeRect.Bottom),
-                        new Point(nodeRect.Left, nodeRect.Top + nodeRect.Height / 2)
-                    };
-                    for (int nhi = 0; nhi < nhandles.Length; nhi++)
-                    {
-                        Rectangle nhR = new Rectangle(nhandles[nhi].X - nhs / 2, nhandles[nhi].Y - nhs / 2, nhs, nhs);
-                        g.FillRectangle(Brushes.White, nhR);
-                        using (Pen nhPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                        {
-                            g.DrawRectangle(nhPen, nhR);
-                        }
-                    }
+                    DrawGrayBoxSelectionHandles(g, nodeRect, zoomLevel, dashed: true);
                 }
 
                 return;
@@ -1203,44 +1155,13 @@ namespace ZenQOffice.UI
                 }
                 if (selectedChild != null && !selectedChild.LastBounds.IsEmpty)
                 {
-                    using (Pen childPen = new Pen(Color.FromArgb(0, 120, 215), 1.5f) { DashStyle = DashStyle.Dash })
-                    {
-                        g.DrawRectangle(childPen, selectedChild.LastBounds);
-                    }
-                    int cs = 6;
-                    Rectangle cb = selectedChild.LastBounds;
-                    int[] chx = new int[] { cb.Left - cs / 2, cb.Left + cb.Width / 2 - cs / 2, cb.Right - cs / 2, cb.Right - cs / 2, cb.Right - cs / 2, cb.Left + cb.Width / 2 - cs / 2, cb.Left - cs / 2, cb.Left - cs / 2 };
-                    int[] chy = new int[] { cb.Top - cs / 2, cb.Top - cs / 2, cb.Top - cs / 2, cb.Top + cb.Height / 2 - cs / 2, cb.Bottom - cs / 2, cb.Bottom - cs / 2, cb.Bottom - cs / 2, cb.Top + cb.Height / 2 - cs / 2 };
-                    using (SolidBrush hb = new SolidBrush(Color.White))
-                    using (Pen hp = new Pen(Color.FromArgb(0, 120, 215), 1.0f))
-                    {
-                        for (int hi = 0; hi < 8; hi++)
-                        {
-                            g.FillRectangle(hb, chx[hi], chy[hi], cs, cs);
-                            g.DrawRectangle(hp, chx[hi], chy[hi], cs, cs);
-                        }
-                    }
+                    DrawGrayBoxSelectionHandles(g, selectedChild.LastBounds, zoomLevel, dashed: true);
                 }
 
-                // Draw outer dashed frame and handles when group is selected
+                // Draw outer selection frame and circular handles when group is selected
                 if (shape.IsSelected)
                 {
-                    using (Pen grpPen = new Pen(Color.FromArgb(0, 120, 215), 1.5f) { DashStyle = DashStyle.Dash })
-                    {
-                        g.DrawRectangle(grpPen, bounds);
-                    }
-                    int hs = 6;
-                    int[] hx = new int[] { bounds.Left - hs / 2, bounds.Left + bounds.Width / 2 - hs / 2, bounds.Right - hs / 2, bounds.Right - hs / 2, bounds.Right - hs / 2, bounds.Left + bounds.Width / 2 - hs / 2, bounds.Left - hs / 2, bounds.Left - hs / 2 };
-                    int[] hy = new int[] { bounds.Top - hs / 2, bounds.Top - hs / 2, bounds.Top - hs / 2, bounds.Top + bounds.Height / 2 - hs / 2, bounds.Bottom - hs / 2, bounds.Bottom - hs / 2, bounds.Bottom - hs / 2, bounds.Top + bounds.Height / 2 - hs / 2 };
-                    using (SolidBrush hb = new SolidBrush(Color.White))
-                    using (Pen hp = new Pen(Color.FromArgb(0, 120, 215), 1.0f))
-                    {
-                        for (int hi = 0; hi < 8; hi++)
-                        {
-                            g.FillRectangle(hb, hx[hi], hy[hi], hs, hs);
-                            g.DrawRectangle(hp, hx[hi], hy[hi], hs, hs);
-                        }
-                    }
+                    DrawGrayBoxSelectionHandles(g, bounds, zoomLevel, dashed: false);
                 }
                 return;
             }
@@ -1584,68 +1505,18 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                // 4. Selection Handles & Floating Layout Popup
+                // 4. Selection Handles & Floating Layout Popup (Slides-style grey frame + circular handles)
                 if (shape.IsSelected)
                 {
-                    using (Pen selPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                    {
-                        selPen.DashStyle = DashStyle.Dash;
-                        g.DrawRectangle(selPen, bounds);
-                    }
-
-                    int hs = (int)(7 * zoomLevel);
-                    Point[] handles = new Point[]
-                    {
-                        new Point(bounds.Left, bounds.Top),
-                        new Point(bounds.Left + bounds.Width / 2, bounds.Top),
-                        new Point(bounds.Right, bounds.Top),
-                        new Point(bounds.Right, bounds.Top + bounds.Height / 2),
-                        new Point(bounds.Right, bounds.Bottom),
-                        new Point(bounds.Left + bounds.Width / 2, bounds.Bottom),
-                        new Point(bounds.Left, bounds.Bottom),
-                        new Point(bounds.Left, bounds.Top + bounds.Height / 2)
-                    };
-                    for (int hi = 0; hi < handles.Length; hi++)
-                    {
-                        Rectangle hR = new Rectangle(handles[hi].X - hs / 2, handles[hi].Y - hs / 2, hs, hs);
-                        g.FillRectangle(Brushes.White, hR);
-                        using (Pen hPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                        {
-                            g.DrawRectangle(hPen, hR);
-                        }
-                    }
-
-                    int rotY = bounds.Top - (int)(16 * zoomLevel);
-                    int rotX = bounds.Left + bounds.Width / 2;
-                    using (Pen stemPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                    {
-                        g.DrawLine(stemPen, rotX, bounds.Top, rotX, rotY);
-                    }
-                    Rectangle rotR = new Rectangle(rotX - hs / 2, rotY - hs / 2, hs, hs);
-                    using (SolidBrush rotBrush = new SolidBrush(Color.FromArgb(0, 200, 83)))
-                    using (Pen rotPen = new Pen(Color.White, 1f))
-                    {
-                        g.FillEllipse(rotBrush, rotR);
-                        g.DrawEllipse(rotPen, rotR);
-                    }
-
-                    int btnW = (int)(22 * zoomLevel);
-                    int btnH = (int)(22 * zoomLevel);
-                    int btnX = bounds.Right + 6;
-                    int btnY = bounds.Top;
-                    Rectangle layoutBtnRect = new Rectangle(btnX, btnY, btnW, btnH);
-
-                    using (SolidBrush btnBg = new SolidBrush(Color.White))
-                    using (Pen btnPen = new Pen(Color.FromArgb(200, 205, 215), 1f))
-                    {
-                        g.FillRectangle(btnBg, layoutBtnRect);
-                        g.DrawRectangle(btnPen, layoutBtnRect);
-                    }
-                    using (Pen archP = new Pen(Color.FromArgb(0, 120, 215), 1.8f))
-                    {
-                        g.DrawArc(archP, btnX + 3, btnY + 4, btnW - 6, btnH - 8, 200, 140);
-                        g.DrawLine(archP, btnX + 4, btnY + btnH - 5, btnX + btnW - 4, btnY + btnH - 5);
-                    }
+                    DrawSlideStyleSelectionOverlay(
+                        g,
+                        bounds,
+                        zoomLevel,
+                        isInlineEditing: false,
+                        drawRotationHandle: true,
+                        drawLayoutButton: true,
+                        isLayoutOpen: shape.ShowLayoutOptions,
+                        adjHandles: null);
 
                     if (shape.ShowLayoutOptions)
                     {
@@ -1722,7 +1593,7 @@ namespace ZenQOffice.UI
                 // Draw Ghost Placeholder text
                 if (!string.IsNullOrEmpty(shape.PlaceholderText))
                 {
-                    using (Font phFont = new Font(shape.FontFamily, shape.FontSize * zoomLevel, FontStyle.Italic))
+                    using (Font phFont = new Font(shape.FontFamily, Math.Max(0.5f, shape.FontSize * zoomLevel), FontStyle.Italic))
                     using (SolidBrush phBrush = new SolidBrush(Color.FromArgb(160, 160, 160)))
                     using (StringFormat sf = new StringFormat
                     {
@@ -1735,15 +1606,17 @@ namespace ZenQOffice.UI
                     }
                 }
 
-                // Draw Cursor at start of box if selected
-                if (shape.IsSelected)
+                // Draw Cursor respecting TextAlignment/TextLineAlignment & contrasting fill luminance
+                if (shape.IsSelected && (shape.IsEditingText || shape.ShapeType != "Image"))
                 {
-                    int cX = textBounds.X;
-                    int cY = textBounds.Y + 2;
-                    int cH = (int)(shape.FontSize * 1.3f * zoomLevel);
-                    using (Pen curPen = new Pen(shape.ShapeType == "TextBox" ? Color.Black : shape.TextColor, 1.5f))
+                    using (Font emptyFont = new Font(shape.FontFamily, Math.Max(0.5f, shape.FontSize * zoomLevel), shape.Bold ? FontStyle.Bold : FontStyle.Regular))
                     {
-                        g.DrawLine(curPen, cX, cY, cX, cY + cH);
+                        PointF curPt = GetShapeCursorCoordinates(g, shape, textBounds, emptyFont, zoomLevel);
+                        int cH = Math.Max(8, (int)(shape.FontSize * 1.3f * zoomLevel));
+                        using (Pen curPen = new Pen(GetContrastCaretColor(shape), 1.5f))
+                        {
+                            g.DrawLine(curPen, (int)curPt.X, (int)curPt.Y, (int)curPt.X, (int)curPt.Y + cH);
+                        }
                     }
                 }
             }
@@ -1752,7 +1625,7 @@ namespace ZenQOffice.UI
                 FontStyle fStyle = FontStyle.Regular;
                 if (shape.Bold) fStyle |= FontStyle.Bold;
                 if (shape.Italic) fStyle |= FontStyle.Italic;
-                using (Font txtFont = new Font(shape.FontFamily, shape.FontSize * zoomLevel, fStyle))
+                using (Font txtFont = new Font(shape.FontFamily, Math.Max(0.5f, shape.FontSize * zoomLevel), fStyle))
                 using (SolidBrush txtBrush = new SolidBrush(shape.TextColor))
                 {
                     var lines = LayoutShapeText(g, shape, textBounds, txtFont, zoomLevel);
@@ -1766,11 +1639,11 @@ namespace ZenQOffice.UI
                     }
 
                     // Draw Cursor at exact (X, Y) inside shape if selected
-                    if (shape.IsSelected)
+                    if (shape.IsSelected && (shape.IsEditingText || shape.ShapeType != "Image"))
                     {
                         PointF curPt = GetShapeCursorCoordinates(g, shape, textBounds, txtFont, zoomLevel);
-                        int cH = (int)(shape.FontSize * 1.3f * zoomLevel);
-                        using (Pen curPen = new Pen(shape.ShapeType == "TextBox" ? Color.Black : shape.TextColor, 1.5f))
+                        int cH = Math.Max(8, (int)(shape.FontSize * 1.3f * zoomLevel));
+                        using (Pen curPen = new Pen(GetContrastCaretColor(shape), 1.5f))
                         {
                             g.DrawLine(curPen, (int)curPt.X, (int)curPt.Y, (int)curPt.X, (int)curPt.Y + cH);
                         }
@@ -1778,79 +1651,227 @@ namespace ZenQOffice.UI
                 }
             }
 
-            // 5. If Selected -> Draw 8 Resize Handles + Rotation Handle + Yellow Adjustment Handles + Floating Layout Options Button
+            // 5. If Selected -> Draw Slides-style grey frame + circular white handles + Rotation Handle + Adjustment Handles + Layout Button
             if (shape.IsSelected)
             {
-                // Bounding Selection Outline
-                using (Pen selPen = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
-                {
-                    selPen.DashStyle = DashStyle.Dash;
-                    g.DrawRectangle(selPen, bounds);
-                }
-
-                // 8 Circle Handles
-                int hs = (int)(7 * zoomLevel);
-                Point[] handles = new Point[]
-                {
-                    new Point(bounds.Left - hs/2, bounds.Top - hs/2),
-                    new Point(bounds.Left + bounds.Width/2 - hs/2, bounds.Top - hs/2),
-                    new Point(bounds.Right - hs/2, bounds.Top - hs/2),
-                    new Point(bounds.Right - hs/2, bounds.Top + bounds.Height/2 - hs/2),
-                    new Point(bounds.Right - hs/2, bounds.Bottom - hs/2),
-                    new Point(bounds.Left + bounds.Width/2 - hs/2, bounds.Bottom - hs/2),
-                    new Point(bounds.Left - hs/2, bounds.Bottom - hs/2),
-                    new Point(bounds.Left - hs/2, bounds.Top + bounds.Height/2 - hs/2)
-                };
-
-                for (int h = 0; h < 8; h++)
-                {
-                    Rectangle hRect = new Rectangle(handles[h].X, handles[h].Y, hs, hs);
-                    g.FillEllipse(Brushes.White, hRect);
-                    g.DrawEllipse(new Pen(Color.FromArgb(0, 120, 215), 1.2f), hRect);
-                }
-
-                // Rotation Handle at Top
-                int rotY = bounds.Top - (int)(22 * zoomLevel);
-                int rotX = bounds.Left + bounds.Width / 2;
-                g.DrawLine(new Pen(Color.FromArgb(0, 120, 215), 1.0f), rotX, bounds.Top, rotX, rotY + hs/2);
-                Rectangle rotRect = new Rectangle(rotX - hs/2, rotY, hs, hs);
-                g.FillEllipse(Brushes.LightGreen, rotRect);
-                g.DrawEllipse(new Pen(Color.FromArgb(0, 120, 215), 1.2f), rotRect);
-
-                // Yellow Adjustment Handles (Grip vàng điều chỉnh góc bo / mũi tên / chú thích)
                 Point[] adjHandles = GetAdjustmentHandles(shape, bounds, zoomLevel);
-                if (adjHandles != null && adjHandles.Length > 0)
+                DrawSlideStyleSelectionOverlay(
+                    g,
+                    bounds,
+                    zoomLevel,
+                    isInlineEditing: shape.IsEditingText,
+                    drawRotationHandle: true,
+                    drawLayoutButton: true,
+                    isLayoutOpen: shape.ShowLayoutOptions,
+                    adjHandles: adjHandles);
+            }
+        }
+
+        public struct LayoutPopupGeometry
+        {
+            public Rectangle PopupRect;
+            public Rectangle CloseButtonRect;
+            public Rectangle InlineCardRect;
+            public Rectangle[] WrapCardRects;
+            public Rectangle MoveWithTextRect;
+            public Rectangle FixPositionRect;
+            public Rectangle SeeMoreRect;
+            public int HeaderTitleX;
+            public int HeaderTitleY;
+            public int HeaderDividerY;
+            public int Section1Y;
+            public int Section2Y;
+            public int OptionsDividerY;
+            public bool ShowSeeMore;
+        }
+
+        public static Rectangle GetLayoutOptionsButtonRect(Rectangle objectBounds)
+        {
+            return new Rectangle(objectBounds.Right + 6, objectBounds.Top, 24, 24);
+        }
+
+        public static LayoutPopupGeometry GetLayoutPopupGeometry(Rectangle triggerButtonRect, bool showSeeMore = true)
+        {
+            const int popW = 224;
+            int popH = showSeeMore ? 318 : 284;
+            int popX = triggerButtonRect.Right + 10;
+            int popY = triggerButtonRect.Top - 6;
+
+            var geo = new LayoutPopupGeometry
+            {
+                PopupRect = new Rectangle(popX, popY, popW, popH),
+                CloseButtonRect = new Rectangle(popX + popW - 32, popY + 8, 22, 22),
+                HeaderTitleX = popX + 16,
+                HeaderTitleY = popY + 10,
+                HeaderDividerY = popY + 38,
+                Section1Y = popY + 46,
+                InlineCardRect = new Rectangle(popX + 16, popY + 64, 56, 40),
+                Section2Y = popY + 114,
+                WrapCardRects = new Rectangle[6],
+                OptionsDividerY = popY + 226,
+                MoveWithTextRect = new Rectangle(popX + 12, popY + 234, popW - 24, 22),
+                FixPositionRect = new Rectangle(popX + 12, popY + 258, popW - 24, 22),
+                SeeMoreRect = showSeeMore ? new Rectangle(popX + 16, popY + 286, popW - 32, 24) : Rectangle.Empty,
+                ShowSeeMore = showSeeMore
+            };
+
+            for (int r = 0; r < 2; r++)
+            {
+                for (int c = 0; c < 3; c++)
                 {
-                    int adjSize = Math.Max(7, (int)(8 * zoomLevel));
-                    using (SolidBrush yb = new SolidBrush(Color.FromArgb(255, 215, 0))) // Gold Yellow
-                    using (Pen yp = new Pen(Color.FromArgb(50, 50, 50), 1.2f))
+                    geo.WrapCardRects[r * 3 + c] = new Rectangle(popX + 16 + c * 68, popY + 132 + r * 46, 56, 40);
+                }
+            }
+
+            return geo;
+        }
+
+        public static void DrawGrayBoxSelectionHandles(D2DGraphics g, Rectangle bounds, float zoomLevel, bool dashed = false)
+        {
+            if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
+
+            using (Pen boxPen = new Pen(Color.FromArgb(156, 163, 175), 1.0f))
+            {
+                if (dashed) boxPen.DashStyle = DashStyle.Dash;
+                g.DrawRectangle(boxPen, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+            }
+
+            PointF[] localHandles = new PointF[]
+            {
+                new PointF(bounds.Left, bounds.Top),
+                new PointF(bounds.Left + bounds.Width / 2f, bounds.Top),
+                new PointF(bounds.Right, bounds.Top),
+                new PointF(bounds.Right, bounds.Top + bounds.Height / 2f),
+                new PointF(bounds.Right, bounds.Bottom),
+                new PointF(bounds.Left + bounds.Width / 2f, bounds.Bottom),
+                new PointF(bounds.Left, bounds.Bottom),
+                new PointF(bounds.Left, bounds.Top + bounds.Height / 2f)
+            };
+
+            bool isNarrowBox = bounds.Width < 38;
+            bool isShortBox = bounds.Height < 38;
+            float hr = 4.0f;
+
+            using (Pen hPen = new Pen(Color.FromArgb(136, 142, 150), 1.15f))
+            {
+                for (int i = 0; i < localHandles.Length; i++)
+                {
+                    if (isNarrowBox && (i == 1 || i == 5)) continue;
+                    if (isShortBox && (i == 3 || i == 7)) continue;
+                    PointF h = localHandles[i];
+                    RectangleF hRect = new RectangleF(h.X - hr, h.Y - hr, hr * 2f, hr * 2f);
+                    g.FillEllipse(Brushes.White, hRect);
+                    g.DrawEllipse(hPen, hRect.X, hRect.Y, hRect.Width, hRect.Height);
+                }
+            }
+        }
+
+        public static void DrawLayoutTriggerButton(D2DGraphics g, Rectangle btnRect, bool isOpen)
+        {
+            if (g == null || btnRect.IsEmpty) return;
+
+            // Subtle drop shadow
+            using (SolidBrush shBrush = new SolidBrush(Color.FromArgb(20, 15, 23, 42)))
+            {
+                g.FillRoundedRectangle(shBrush, new Rectangle(btnRect.X, btnRect.Y + 1, btnRect.Width, btnRect.Height), 6f);
+            }
+
+            using (SolidBrush bgBrush = new SolidBrush(isOpen ? Color.FromArgb(239, 246, 255) : Color.White))
+            using (Pen borderPen = new Pen(isOpen ? Color.FromArgb(37, 99, 235) : Color.FromArgb(203, 213, 225), 1.0f))
+            {
+                g.FillRoundedRectangle(bgBrush, btnRect, 6f);
+                g.DrawRoundedRectangle(borderPen, btnRect, 6f);
+            }
+
+            Color lineColor = isOpen ? Color.FromArgb(37, 99, 235) : Color.FromArgb(100, 116, 139);
+            Color archColor = isOpen ? Color.FromArgb(37, 99, 235) : Color.FromArgb(51, 65, 85);
+            using (Pen linePen = new Pen(lineColor, 1.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen archPen = new Pen(archColor, 1.7f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                float cx = btnRect.X + btnRect.Width / 2f;
+                float cy = btnRect.Y + btnRect.Height / 2f;
+                g.DrawLine(linePen, cx - 6.5f, cy - 5.5f, cx + 6.5f, cy - 5.5f);
+                DrawVectorArch(g, archPen, cx - 5.0f, cy - 2.0f, 10.0f, 7.5f);
+                g.DrawLine(linePen, cx - 6.5f, cy + 6.0f, cx + 6.5f, cy + 6.0f);
+            }
+        }
+
+        public static void DrawSlideStyleSelectionOverlay(
+            D2DGraphics g,
+            Rectangle bounds,
+            float zoomLevel,
+            bool isInlineEditing,
+            bool drawRotationHandle,
+            bool drawLayoutButton,
+            bool isLayoutOpen,
+            Point[] adjHandles = null)
+        {
+            if (g == null || bounds.Width <= 0 || bounds.Height <= 0) return;
+
+            DrawGrayBoxSelectionHandles(g, bounds, zoomLevel, dashed: isInlineEditing);
+
+            if (drawRotationHandle)
+            {
+                float topCenterX = bounds.Left + bounds.Width / 2f;
+                float topCenterY = bounds.Top;
+                float rotY = bounds.Top - 22f * zoomLevel;
+                bool isNarrowBox = bounds.Width < 38;
+
+                if (!isNarrowBox)
+                {
+                    using (Pen stemPen = new Pen(Color.FromArgb(156, 163, 175), 1.0f))
                     {
-                        for (int ai = 0; ai < adjHandles.Length; ai++)
-                        {
-                            Point ap = adjHandles[ai];
-                            PointF[] diamond = new PointF[]
-                            {
-                                new PointF(ap.X, ap.Y - adjSize / 2f),
-                                new PointF(ap.X + adjSize / 2f, ap.Y),
-                                new PointF(ap.X, ap.Y + adjSize / 2f),
-                                new PointF(ap.X - adjSize / 2f, ap.Y)
-                            };
-                            g.FillPolygon(yb, diamond);
-                            g.DrawPolygon(yp, diamond);
-                        }
+                        g.DrawLine(stemPen, topCenterX, topCenterY - 4.0f, topCenterX, rotY + 8.0f);
                     }
                 }
 
-                // Floating Layout Options Button at Top-Right
-                Rectangle wrapBtn = new Rectangle(bounds.Right + 5, bounds.Top, 22, 22);
-                g.FillRectangle(Brushes.White, wrapBtn);
-                g.DrawRectangle(new Pen(Color.FromArgb(0, 120, 215), 1.2f), wrapBtn);
-                using (Pen iconPen = new Pen(Color.FromArgb(0, 120, 215), 1.5f))
+                // Subtle white circular halo for legibility on dark document pages
+                RectangleF haloR = new RectangleF(topCenterX - 8.0f, rotY - 8.0f, 16.0f, 16.0f);
+                using (SolidBrush haloBg = new SolidBrush(Color.FromArgb(230, 255, 255, 255)))
                 {
-                    g.DrawArc(iconPen, wrapBtn.X + 4, wrapBtn.Y + 5, 14, 10, 180, 180);
-                    g.DrawLine(iconPen, wrapBtn.X + 4, wrapBtn.Y + 14, wrapBtn.X + 18, wrapBtn.Y + 14);
-                    g.DrawLine(iconPen, wrapBtn.X + 4, wrapBtn.Y + 17, wrapBtn.X + 14, wrapBtn.Y + 17);
+                    g.FillEllipse(haloBg, haloR);
                 }
+
+                using (Pen rotPen = new Pen(Color.FromArgb(120, 126, 135), 1.45f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                using (SolidBrush rotHeadB = new SolidBrush(Color.FromArgb(120, 126, 135)))
+                {
+                    RectangleF arcR = new RectangleF(topCenterX - 6.5f, rotY - 6.5f, 13.0f, 13.0f);
+                    g.DrawArc(rotPen, arcR, -55f, 290f);
+                    PointF tip = new PointF(topCenterX + 4.8f, rotY - 4.2f);
+                    g.FillPolygon(rotHeadB, new PointF[]
+                    {
+                        new PointF(tip.X + 1.5f, tip.Y + 2.2f),
+                        new PointF(tip.X - 3.2f, tip.Y + 1.4f),
+                        new PointF(tip.X - 0.4f, tip.Y - 2.8f)
+                    });
+                }
+            }
+
+            if (adjHandles != null && adjHandles.Length > 0)
+            {
+                int adjSize = Math.Max(7, (int)(8 * zoomLevel));
+                using (SolidBrush yb = new SolidBrush(Color.FromArgb(250, 204, 21)))
+                using (Pen yp = new Pen(Color.FromArgb(113, 63, 18), 1.15f))
+                {
+                    for (int ai = 0; ai < adjHandles.Length; ai++)
+                    {
+                        Point ap = adjHandles[ai];
+                        PointF[] diamond = new PointF[]
+                        {
+                            new PointF(ap.X, ap.Y - adjSize / 2f),
+                            new PointF(ap.X + adjSize / 2f, ap.Y),
+                            new PointF(ap.X, ap.Y + adjSize / 2f),
+                            new PointF(ap.X - adjSize / 2f, ap.Y)
+                        };
+                        g.FillPolygon(yb, diamond);
+                        g.DrawPolygon(yp, diamond);
+                    }
+                }
+            }
+
+            if (drawLayoutButton)
+            {
+                DrawLayoutTriggerButton(g, GetLayoutOptionsButtonRect(bounds), isLayoutOpen);
             }
         }
 
@@ -1858,66 +1879,121 @@ namespace ZenQOffice.UI
         {
             if (shape == null || !shape.ShowLayoutOptions) return;
 
-            Rectangle wrapBtn = new Rectangle(bounds.Right + 5, bounds.Top, 22, 22);
-            int popW = 185; int popH = 275;
-            int popX = wrapBtn.Right + 8; int popY = wrapBtn.Top - 5;
-            Rectangle popRect = new Rectangle(popX, popY, popW, popH);
+            Rectangle triggerBtn = GetLayoutOptionsButtonRect(bounds);
+            LayoutPopupGeometry geo = GetLayoutPopupGeometry(triggerBtn, showSeeMore: true);
+            DrawFluentLayoutPopupCore(
+                g,
+                geo,
+                shape.WrapMode,
+                shape.FixPosition,
+                ZenQOffice.Core.AppL10n.T("Tùy chọn bố trí", "Layout Options"));
+        }
 
-            g.FillRectangle(Brushes.White, popX, popY, popW, popH);
-            using (Pen popBorder = new Pen(Color.FromArgb(0, 120, 215), 1.2f))
+        public static void DrawFluentLayoutPopupCore(
+            D2DGraphics g,
+            LayoutPopupGeometry geo,
+            int activeWrapMode,
+            bool fixPosition,
+            string headerTitle)
+        {
+            if (g == null) return;
+            Rectangle pop = geo.PopupRect;
+
+            // Layered soft elevation shadow (Fluent popover)
+            int[] shAlphas = new int[] { 7, 11, 16 };
+            int[] shSpread = new int[] { 5, 3, 1 };
+            int[] shOffsetY = new int[] { 6, 4, 2 };
+            for (int si = 0; si < shAlphas.Length; si++)
             {
-                g.DrawRectangle(popBorder, popX, popY, popW, popH);
-                Point[] pointerPts = new Point[] { new Point(popX, popY + 12), new Point(popX - 6, popY + 18), new Point(popX, popY + 24) };
-                g.FillPolygon(Brushes.White, pointerPts);
-                g.DrawLine(popBorder, popX, popY + 12, popX - 6, popY + 18);
-                g.DrawLine(popBorder, popX - 6, popY + 18, popX, popY + 24);
+                Rectangle sr = new Rectangle(
+                    pop.X - shSpread[si],
+                    pop.Y - shSpread[si] + shOffsetY[si],
+                    pop.Width + shSpread[si] * 2,
+                    pop.Height + shSpread[si] * 2);
+                using (SolidBrush sb = new SolidBrush(Color.FromArgb(shAlphas[si], 15, 23, 42)))
+                {
+                    g.FillRoundedRectangle(sb, sr, 12f);
+                }
             }
 
-            using (Font headerFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
-            using (Font sectionFont = new Font("Segoe UI", 8.0f, FontStyle.Bold))
-            using (Font itemFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
-            using (Font linkFont = new Font("Segoe UI", 8.5f, FontStyle.Underline))
+            // Card container
+            using (SolidBrush cardBg = new SolidBrush(Color.White))
+            using (Pen cardBorder = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
             {
-                g.DrawString("Tùy chọn bố trí", headerFont, new SolidBrush(Color.FromArgb(0, 95, 184)), popX + 12, popY + 10);
-                using (Pen closePen = new Pen(Color.FromArgb(100, 100, 100), 1.5f))
+                g.FillRoundedRectangle(cardBg, pop, 10f);
+                g.DrawRoundedRectangle(cardBorder, pop, 10f);
+            }
+
+            using (Font headerFont = new Font("Segoe UI Semibold", 9.8f, FontStyle.Bold))
+            using (Font sectionFont = new Font("Segoe UI Semibold", 8.0f, FontStyle.Bold))
+            using (Font itemFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
+            using (Font linkFont = new Font("Segoe UI Semibold", 8.3f, FontStyle.Regular))
+            {
+                // Header
+                using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 {
-                    g.DrawLine(closePen, popX + popW - 20, popY + 12, popX + popW - 10, popY + 22);
-                    g.DrawLine(closePen, popX + popW - 10, popY + 12, popX + popW - 20, popY + 22);
+                    g.DrawString(headerTitle, headerFont, hBrush, geo.HeaderTitleX, geo.HeaderTitleY);
                 }
 
-                Rectangle sec1Bar = new Rectangle(popX + 10, popY + 36, popW - 20, 18);
-                using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241))) g.FillRectangle(secBarBrush, sec1Bar);
-                g.DrawString("Cùng dòng với văn bản", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec1Bar.X + 6, sec1Bar.Y + 2);
-
-                Rectangle inlineCard = new Rectangle(popX + 14, popY + 58, 42, 34);
-                DrawVectorWrapCard(g, 0, inlineCard, shape.WrapMode == 0);
-
-                Rectangle sec2Bar = new Rectangle(popX + 10, popY + 98, popW - 20, 18);
-                using (SolidBrush secBarBrush = new SolidBrush(Color.FromArgb(236, 238, 241))) g.FillRectangle(secBarBrush, sec2Bar);
-                g.DrawString("Ngắt dòng văn bản", sectionFont, new SolidBrush(Color.FromArgb(85, 90, 95)), sec2Bar.X + 6, sec2Bar.Y + 2);
-
-                for (int r = 0; r < 2; r++)
+                // Close pill button
+                Rectangle cb = geo.CloseButtonRect;
+                using (SolidBrush cbBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                using (Pen closePen = new Pen(Color.FromArgb(100, 116, 139), 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                 {
-                    for (int c = 0; c < 3; c++)
+                    g.FillRoundedRectangle(cbBg, cb, 6f);
+                    float pad = 6.5f;
+                    g.DrawLine(closePen, cb.X + pad, cb.Y + pad, cb.Right - pad, cb.Bottom - pad);
+                    g.DrawLine(closePen, cb.Right - pad, cb.Y + pad, cb.X + pad, cb.Bottom - pad);
+                }
+
+                // Hairline divider
+                using (Pen divPen = new Pen(Color.FromArgb(241, 245, 249), 1.0f))
+                {
+                    g.DrawLine(divPen, pop.X + 12, geo.HeaderDividerY, pop.Right - 12, geo.HeaderDividerY);
+                }
+
+                // Section 1: In Line with Text
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    g.DrawString(ZenQOffice.Core.AppL10n.T("Cùng dòng với văn bản", "In Line with Text"), sectionFont, secBrush, pop.X + 16, geo.Section1Y);
+                }
+                DrawVectorWrapCard(g, 0, geo.InlineCardRect, activeWrapMode == 0);
+
+                // Section 2: With Text Wrapping (3x2 grid)
+                using (SolidBrush secBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+                {
+                    g.DrawString(ZenQOffice.Core.AppL10n.T("Ngắt dòng văn bản", "With Text Wrapping"), sectionFont, secBrush, pop.X + 16, geo.Section2Y);
+                }
+                for (int i = 0; i < 6; i++)
+                {
+                    DrawVectorWrapCard(g, i + 1, geo.WrapCardRects[i], activeWrapMode == (i + 1));
+                }
+
+                // Anchor options divider
+                using (Pen divPen = new Pen(Color.FromArgb(241, 245, 249), 1.0f))
+                {
+                    g.DrawLine(divPen, pop.X + 12, geo.OptionsDividerY, pop.Right - 12, geo.OptionsDividerY);
+                }
+
+                // Radio options
+                DrawVectorRadioButton(g, geo.MoveWithTextRect.X + 4, geo.MoveWithTextRect.Y + 2, !fixPosition, ZenQOffice.Core.AppL10n.T("Di chuyển cùng văn bản", "Move with text"), itemFont);
+                DrawVectorInfoIcon(g, pop.Right - 28, geo.MoveWithTextRect.Y + 4);
+
+                DrawVectorRadioButton(g, geo.FixPositionRect.X + 4, geo.FixPositionRect.Y + 2, fixPosition, ZenQOffice.Core.AppL10n.T("Cố định vị trí trên trang", "Fix position on page"), itemFont);
+                DrawVectorInfoIcon(g, pop.Right - 28, geo.FixPositionRect.Y + 4);
+
+                // Footer action button ("Xem thêm...")
+                if (geo.ShowSeeMore && !geo.SeeMoreRect.IsEmpty)
+                {
+                    using (SolidBrush btnBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                    using (Pen btnPen = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
+                    using (SolidBrush linkBrush = new SolidBrush(Color.FromArgb(37, 99, 235)))
+                    using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     {
-                        int wIdx = r == 0 ? (1 + c) : (4 + c);
-                        Rectangle cardBox = new Rectangle(popX + 14 + c * 52, popY + 120 + r * 38, 42, 34);
-                        DrawVectorWrapCard(g, wIdx, cardBox, shape.WrapMode == wIdx);
+                        g.FillRoundedRectangle(btnBg, geo.SeeMoreRect, 6f);
+                        g.DrawRoundedRectangle(btnPen, geo.SeeMoreRect, 6f);
+                        g.DrawString(ZenQOffice.Core.AppL10n.T("Xem thêm tùy chọn...", "See more options..."), linkFont, linkBrush, geo.SeeMoreRect, sf);
                     }
-                }
-
-                int r1Y = popY + 202;
-                DrawVectorRadioButton(g, popX + 14, r1Y, !shape.FixPosition, "Di chuyển cùng văn bản", itemFont);
-                DrawVectorInfoIcon(g, popX + popW - 26, r1Y + 2);
-
-                int r2Y = popY + 226;
-                DrawVectorRadioButton(g, popX + 14, r2Y, shape.FixPosition, "Cố định vị trí trên trang", itemFont);
-                DrawVectorInfoIcon(g, popX + popW - 26, r2Y + 2);
-
-                // See more... link
-                using (SolidBrush linkBrush = new SolidBrush(Color.FromArgb(0, 95, 184)))
-                {
-                    g.DrawString("Xem thêm...", linkFont, linkBrush, popX + popW - 85, popY + 252);
                 }
             }
         }
@@ -1926,119 +2002,140 @@ namespace ZenQOffice.UI
         {
             if (isSelected)
             {
-                using (SolidBrush selBg = new SolidBrush(Color.FromArgb(215, 220, 225)))
+                using (SolidBrush selBg = new SolidBrush(Color.FromArgb(239, 246, 255)))
+                using (Pen selBorder = new Pen(Color.FromArgb(37, 99, 235), 1.6f))
                 {
-                    g.FillRectangle(selBg, box);
-                }
-                using (Pen selBorder = new Pen(Color.FromArgb(120, 125, 130), 1.2f))
-                {
-                    g.DrawRectangle(selBorder, box);
+                    g.FillRoundedRectangle(selBg, box, 7f);
+                    g.DrawRoundedRectangle(selBorder, box, 7f);
                 }
             }
             else
             {
-                using (Pen borderPen = new Pen(Color.FromArgb(218, 224, 230), 1.0f))
+                using (SolidBrush normBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                using (Pen borderPen = new Pen(Color.FromArgb(226, 232, 240), 1.0f))
                 {
-                    g.DrawRectangle(borderPen, box);
+                    g.FillRoundedRectangle(normBg, box, 7f);
+                    g.DrawRoundedRectangle(borderPen, box, 7f);
                 }
             }
 
-            using (Pen bluePen = new Pen(Color.FromArgb(0, 120, 215), 1.6f))
-            using (Pen darkArchPen = new Pen(Color.FromArgb(40, 40, 40), 3.0f))
-            using (Pen ghostArchPen = new Pen(Color.FromArgb(180, 185, 192), 3.0f))
+            Color lineColor = isSelected ? Color.FromArgb(59, 130, 246) : Color.FromArgb(148, 163, 184);
+            Color archColor = isSelected ? Color.FromArgb(29, 78, 216) : Color.FromArgb(51, 65, 85);
+            Color ghostColor = isSelected ? Color.FromArgb(147, 197, 253) : Color.FromArgb(203, 213, 225);
+
+            using (Pen linePen = new Pen(lineColor, 1.7f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen archPen = new Pen(archColor, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (Pen ghostArchPen = new Pen(ghostColor, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
             {
-                float archX = box.X + (box.Width - 14) / 2.0f;
-                float archY = box.Y + (box.Height - 12) / 2.0f + 1;
+                float lx = box.X + 8f;
+                float rx = box.Right - 8f;
+                float y1 = box.Y + 8f;
+                float y2 = box.Y + 15.5f;
+                float y3 = box.Y + 23f;
+                float y4 = box.Y + 30.5f;
+
+                float archW = 16f;
+                float archH = 12f;
+                float archX = box.X + (box.Width - archW) / 2f;
+                float archY = box.Y + 12.5f;
 
                 if (wrapMode == 0) // In Line With Text
                 {
-                    float ax = box.X + 6;
-                    float ay = box.Y + 12;
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 7, box.X + 22, box.Y + 7);
-                    DrawVectorArch(g, darkArchPen, ax, ay, 13, 12);
-                    g.DrawLine(bluePen, box.X + 22, box.Y + 17, box.X + 36, box.Y + 17);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 26, box.X + 36, box.Y + 26);
+                    g.DrawLine(linePen, lx, y1, lx + 18f, y1);
+                    DrawVectorArch(g, archPen, lx + 1f, box.Y + 13.5f, 15f, 11.5f);
+                    g.DrawLine(linePen, lx + 21f, box.Y + 21f, rx, box.Y + 21f);
+                    g.DrawLine(linePen, lx, y4, rx, y4);
                 }
                 else if (wrapMode == 1) // Square (Vuông)
                 {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 11, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 31, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 11, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 31, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
+                    g.DrawLine(linePen, lx, y1, rx, y1);
+                    g.DrawLine(linePen, lx, y2, archX - 5f, y2);
+                    g.DrawLine(linePen, archX + archW + 5f, y2, rx, y2);
+                    g.DrawLine(linePen, lx, y3, archX - 5f, y3);
+                    g.DrawLine(linePen, archX + archW + 5f, y3, rx, y3);
+                    g.DrawLine(linePen, lx, y4, rx, y4);
+                    DrawVectorArch(g, archPen, archX, archY, archW, archH);
                 }
                 else if (wrapMode == 2) // Tight (Chặt)
                 {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 12, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 30, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 11, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 31, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
+                    g.DrawLine(linePen, lx, y1, rx, y1);
+                    g.DrawLine(linePen, lx, y2, archX - 2f, y2);
+                    g.DrawLine(linePen, archX + archW + 2f, y2, rx, y2);
+                    g.DrawLine(linePen, lx, y3, archX - 5f, y3);
+                    g.DrawLine(linePen, archX + archW + 5f, y3, rx, y3);
+                    g.DrawLine(linePen, lx, y4, rx, y4);
+                    DrawVectorArch(g, archPen, archX, archY, archW, archH);
                 }
                 else if (wrapMode == 3) // Through (Xuyên qua)
                 {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 13, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 29, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 11, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 31, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
+                    g.DrawLine(linePen, lx, y1, rx, y1);
+                    g.DrawLine(linePen, lx, y2, archX - 0.5f, y2);
+                    g.DrawLine(linePen, archX + archW + 0.5f, y2, rx, y2);
+                    g.DrawLine(linePen, lx, y3, archX - 4f, y3);
+                    g.DrawLine(linePen, archX + archW + 4f, y3, rx, y3);
+                    g.DrawLine(linePen, lx, y4, rx, y4);
+                    DrawVectorArch(g, archPen, archX, archY, archW, archH);
                 }
                 else if (wrapMode == 4) // Top and Bottom (Trên và Dưới)
                 {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
+                    g.DrawLine(linePen, lx, y1, rx, y1);
+                    g.DrawLine(linePen, lx, y4, rx, y4);
+                    DrawVectorArch(g, archPen, archX, archY, archW, archH);
                 }
                 else if (wrapMode == 5) // Behind Text (Dưới văn bản)
                 {
-                    DrawVectorArch(g, ghostArchPen, archX, archY, 13, 12);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
+                    DrawVectorArch(g, ghostArchPen, archX, archY, archW, archH);
+                    g.DrawLine(linePen, lx, y1, rx, y1);
+                    g.DrawLine(linePen, lx, y2, rx, y2);
+                    g.DrawLine(linePen, lx, y3, rx, y3);
+                    g.DrawLine(linePen, lx, y4, rx, y4);
                 }
                 else if (wrapMode == 6) // In Front of Text (Trước văn bản)
                 {
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 6, box.X + 37, box.Y + 6);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 13, box.X + 37, box.Y + 13);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 20, box.X + 37, box.Y + 20);
-                    g.DrawLine(bluePen, box.X + 5, box.Y + 27, box.X + 37, box.Y + 27);
-                    DrawVectorArch(g, darkArchPen, archX, archY, 13, 12);
+                    g.DrawLine(linePen, lx, y1, rx, y1);
+                    g.DrawLine(linePen, lx, y2, rx, y2);
+                    g.DrawLine(linePen, lx, y3, rx, y3);
+                    g.DrawLine(linePen, lx, y4, rx, y4);
+                    // Clean white halo behind foreground arch so layering reads effortlessly
+                    using (SolidBrush haloB = new SolidBrush(isSelected ? Color.FromArgb(239, 246, 255) : Color.FromArgb(248, 250, 252)))
+                    {
+                        g.FillRectangle(haloB, archX - 2f, archY - 1f, archW + 4f, archH * 0.72f);
+                    }
+                    DrawVectorArch(g, archPen, archX, archY, archW, archH);
                 }
             }
         }
 
         public static void DrawVectorRadioButton(D2DGraphics g, int x, int y, bool isChecked, string label, Font font)
         {
-            Rectangle rCircle = new Rectangle(x, y + 2, 12, 12);
-            using (Pen rPen = new Pen(isChecked ? Color.FromArgb(0, 120, 215) : Color.FromArgb(140, 145, 150), 1.2f))
+            RectangleF rCircle = new RectangleF(x, y + 2f, 13f, 13f);
+            using (Pen rPen = new Pen(isChecked ? Color.FromArgb(37, 99, 235) : Color.FromArgb(148, 163, 184), isChecked ? 1.5f : 1.2f))
             {
                 g.DrawEllipse(rPen, rCircle);
                 if (isChecked)
                 {
-                    using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(0, 120, 215)))
+                    using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(37, 99, 235)))
                     {
-                        g.FillEllipse(dotBrush, x + 3, y + 5, 6, 6);
+                        g.FillEllipse(dotBrush, x + 3.5f, y + 5.5f, 6f, 6f);
                     }
                 }
             }
-            g.DrawString(label, font, isChecked ? new SolidBrush(Color.FromArgb(20, 20, 20)) : new SolidBrush(Color.FromArgb(70, 70, 70)), x + 16, y);
+            using (SolidBrush txtBrush = new SolidBrush(isChecked ? Color.FromArgb(15, 23, 42) : Color.FromArgb(71, 85, 105)))
+            {
+                g.DrawString(label, font, txtBrush, x + 19, y);
+            }
         }
 
         public static void DrawVectorInfoIcon(D2DGraphics g, int x, int y)
         {
-            Rectangle infoCircle = new Rectangle(x, y, 11, 11);
-            using (Pen infoPen = new Pen(Color.FromArgb(0, 120, 215), 1.0f))
-            using (Font iFont = new Font("Segoe UI", 6.5f, FontStyle.Bold))
+            RectangleF infoCircle = new RectangleF(x, y, 13f, 13f);
+            using (Pen infoPen = new Pen(Color.FromArgb(148, 163, 184), 1.0f))
+            using (SolidBrush iBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
+            using (Font iFont = new Font("Segoe UI Semibold", 7.0f, FontStyle.Bold))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             {
                 g.DrawEllipse(infoPen, infoCircle);
-                g.DrawString("i", iFont, new SolidBrush(Color.FromArgb(0, 120, 215)), x + 2.5f, y - 0.5f);
+                g.DrawString("i", iFont, iBrush, infoCircle, sf);
             }
         }
 
@@ -2079,7 +2176,10 @@ namespace ZenQOffice.UI
                 string para = paragraphs[p];
                 if (para.Length == 0)
                 {
-                    lines.Add(new ShapeLineInfo { Text = "", StartIndex = charIndex, Length = 0, X = textBounds.X, Y = curY, Width = 0, Height = lineH });
+                    float emptyX = textBounds.X;
+                    if (shape.TextAlignment == StringAlignment.Center) emptyX = textBounds.X + textBounds.Width / 2f;
+                    else if (shape.TextAlignment == StringAlignment.Far) emptyX = textBounds.Right - 2;
+                    lines.Add(new ShapeLineInfo { Text = "", StartIndex = charIndex, Length = 0, X = emptyX, Y = curY, Width = 0, Height = lineH });
                     curY += lineH;
                     charIndex += 1;
                     continue;
@@ -2195,6 +2295,17 @@ namespace ZenQOffice.UI
             }
 
             return lines;
+        }
+
+        private static Color GetContrastCaretColor(DocShapeObject shape)
+        {
+            if (shape == null) return Color.Black;
+            if (shape.FillColor != Color.Transparent && shape.FillColor.A > 60)
+            {
+                double lum = shape.FillColor.R * 0.299 + shape.FillColor.G * 0.587 + shape.FillColor.B * 0.114;
+                return lum < 128 ? Color.White : (shape.ShapeType == "TextBox" ? Color.Black : shape.TextColor);
+            }
+            return shape.ShapeType == "TextBox" ? Color.Black : shape.TextColor;
         }
 
         public static PointF GetShapeCursorCoordinates(D2DGraphics g, DocShapeObject shape, Rectangle textBounds, Font font, float zoomLevel)

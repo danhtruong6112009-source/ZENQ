@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -24,7 +25,7 @@ namespace ZenQOffice.UI
 
         public InsertSymbolForm()
         {
-            this.Text = "Ký Hiệu Đặc Biệt (Symbols)";
+            this.Text = AppL10n.T("Ký Hiệu Đặc Biệt (Symbols)", "Symbol");
             this.Size = new Size(520, 380);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -40,7 +41,7 @@ namespace ZenQOffice.UI
         {
             Label lblTitle = new Label
             {
-                Text = "Chọn ký hiệu để chèn vào vị trí đang chọn:",
+                Text = AppL10n.T("Chọn ký hiệu để chèn vào vị trí đang chọn:", "Select a symbol to insert at the cursor:"),
                 Location = new Point(15, 12),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
@@ -73,7 +74,7 @@ namespace ZenQOffice.UI
                 btnSym.Click += (s, e) =>
                 {
                     SelectedSymbol = captureSym;
-                    lblPreview.Text = "Ký hiệu đã chọn: " + captureSym;
+                    lblPreview.Text = AppL10n.T("Ký hiệu đã chọn: ", "Selected symbol: ") + captureSym;
                 };
                 btnSym.DoubleClick += (s, e) =>
                 {
@@ -86,7 +87,7 @@ namespace ZenQOffice.UI
 
             lblPreview = new Label
             {
-                Text = "Ký hiệu đã chọn: (chưa chọn)",
+                Text = AppL10n.T("Ký hiệu đã chọn: (chưa chọn)", "Selected symbol: (none)"),
                 Location = new Point(15, 280),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
@@ -100,7 +101,7 @@ namespace ZenQOffice.UI
 
             Button btnInsert = new Button
             {
-                Text = "Chèn",
+                Text = AppL10n.T("Chèn", "Insert"),
                 Location = new Point(290, 10),
                 Size = new Size(95, 28),
                 BackColor = Color.FromArgb(16, 124, 65),
@@ -113,7 +114,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 Location = new Point(395, 10),
                 Size = new Size(80, 28),
                 BackColor = Color.White,

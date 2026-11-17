@@ -747,6 +747,7 @@ namespace ZenQOffice.UI
             try {
                 ZenQOffice.Core.OnlineGraphicsManager.OnCatalogUpdated += (catResp) => {
                     if (catResp != null) AddOnlineCategories(catResp);
+                    else ClearOnlineGraphicCategories();
                 };
 
                 var catalog = ZenQOffice.Core.OnlineGraphicsManager.GetCatalogCached();
@@ -757,17 +758,47 @@ namespace ZenQOffice.UI
             } catch { }
         }
 
+        public static void ClearOnlineGraphicCategories()
+        {
+            lock (_categories)
+            {
+                _categories.RemoveAll(x => x.Key.StartsWith("Online_") && !x.Key.StartsWith("Online_Image_") && !x.IsPhotoCategory);
+                List<string> keysToRemove = new List<string>();
+                foreach (var kvp in _lookup)
+                {
+                    if ((kvp.Value.IsOnlineImage || kvp.Value.Category.StartsWith("Online_")) && !kvp.Value.IsPhoto && !kvp.Value.Category.StartsWith("Online_Image_"))
+                        keysToRemove.Add(kvp.Key);
+                }
+                foreach (var k in keysToRemove) _lookup.Remove(k);
+            }
+        }
+
+        public static void ClearOnlineImageCategories()
+        {
+            lock (_categories)
+            {
+                _categories.RemoveAll(x => x.Key.StartsWith("Online_Image_") || x.IsPhotoCategory);
+                List<string> keysToRemove = new List<string>();
+                foreach (var kvp in _lookup)
+                {
+                    if (kvp.Value.IsPhoto || kvp.Value.Category.StartsWith("Online_Image_"))
+                        keysToRemove.Add(kvp.Key);
+                }
+                foreach (var k in keysToRemove) _lookup.Remove(k);
+            }
+        }
+
         public static void AddOnlineCategories(ZenQOffice.Core.OnlineGraphicsResponse catalog)
         {
             if (catalog == null || catalog.categories == null) return;
             lock (_categories)
             {
-                _categories.RemoveAll(x => x.Key.StartsWith("Online_"));
+                _categories.RemoveAll(x => x.Key.StartsWith("Online_") && !x.Key.StartsWith("Online_Image_") && !x.IsPhotoCategory);
 
                 List<string> keysToRemove = new List<string>();
                 foreach (var kvp in _lookup)
                 {
-                    if (kvp.Value.IsOnlineImage || kvp.Value.Category.StartsWith("Online_"))
+                    if ((kvp.Value.IsOnlineImage || kvp.Value.Category.StartsWith("Online_")) && !kvp.Value.IsPhoto && !kvp.Value.Category.StartsWith("Online_Image_"))
                         keysToRemove.Add(kvp.Key);
                 }
                 foreach (var k in keysToRemove) _lookup.Remove(k);
@@ -810,6 +841,7 @@ namespace ZenQOffice.UI
                 ZenQOffice.Core.OnlineImagesManager.OnCatalogUpdated += (catResp) =>
                 {
                     if (catResp != null) AddOnlineImageCategories(catResp);
+                    else ClearOnlineImageCategories();
                 };
 
                 var catalog = ZenQOffice.Core.OnlineImagesManager.GetCatalogCached();

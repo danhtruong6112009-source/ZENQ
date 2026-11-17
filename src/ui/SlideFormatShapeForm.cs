@@ -104,7 +104,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            Text = "Định dạng Hình & Viền (Format Shape)";
+            Text = AppL10n.T("Định dạng Hình & Viền (Format Shape)", "Format Shape");
             Size = new Size(560, 560);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -121,16 +121,16 @@ namespace ZenQOffice.UI
             };
 
             // ==================== Tab 1: Tô màu & Viền ====================
-            TabPage tabFillLine = new TabPage("Tô màu & Viền (Fill & Line)");
+            TabPage tabFillLine = new TabPage(AppL10n.T("Tô màu & Viền (Fill & Line)", "Fill & Line"));
             tabFillLine.BackColor = Color.White;
 
             // Section 1: Tô màu
-            GroupBox grpFill = new GroupBox { Text = "Tô màu (Fill)", Location = new Point(14, 10), Size = new Size(485, 140) };
-            rdoNoFill = new RadioButton { Text = "Không tô (No fill)", Location = new Point(16, 22), AutoSize = true, Checked = (FillColorResult == 0x00FFFFFF) };
-            rdoSolidFill = new RadioButton { Text = "Màu đơn (Solid fill)", Location = new Point(16, 46), AutoSize = true, Checked = (FillColorResult != 0x00FFFFFF && !HasGradientFillResult) };
-            rdoGradFill = new RadioButton { Text = "Chuyển sắc (Gradient)", Location = new Point(16, 70), AutoSize = true, Checked = HasGradientFillResult };
+            GroupBox grpFill = new GroupBox { Text = AppL10n.T("Tô màu (Fill)", "Fill"), Location = new Point(14, 10), Size = new Size(485, 140) };
+            rdoNoFill = new RadioButton { Text = AppL10n.T("Không tô (No fill)", "No fill"), Location = new Point(16, 22), AutoSize = true, Checked = (FillColorResult == 0x00FFFFFF) };
+            rdoSolidFill = new RadioButton { Text = AppL10n.T("Màu đơn (Solid fill)", "Solid fill"), Location = new Point(16, 46), AutoSize = true, Checked = (FillColorResult != 0x00FFFFFF && !HasGradientFillResult) };
+            rdoGradFill = new RadioButton { Text = AppL10n.T("Chuyển sắc (Gradient)", "Gradient fill"), Location = new Point(16, 70), AutoSize = true, Checked = HasGradientFillResult };
 
-            Label lblFClr = new Label { Text = "Màu 1:", Location = new Point(175, 24), AutoSize = true };
+            Label lblFClr = new Label { Text = AppL10n.T("Màu 1:", "Color 1:"), Location = new Point(175, 24), AutoSize = true };
             btnFillColor = new Button { Location = new Point(220, 20), Size = new Size(45, 24), BackColor = currentFillColor, FlatStyle = FlatStyle.Flat };
             btnFillColor.Click += (s, e) => {
                 using (ColorDialog cd = new ColorDialog { Color = currentFillColor }) {
@@ -143,7 +143,7 @@ namespace ZenQOffice.UI
                 }
             };
 
-            Label lblGClr = new Label { Text = "Màu 2:", Location = new Point(280, 24), AutoSize = true };
+            Label lblGClr = new Label { Text = AppL10n.T("Màu 2:", "Color 2:"), Location = new Point(280, 24), AutoSize = true };
             btnGradColor2 = new Button { Location = new Point(325, 20), Size = new Size(45, 24), BackColor = currentGradColor2, FlatStyle = FlatStyle.Flat };
             btnGradColor2.Click += (s, e) => {
                 using (ColorDialog cd = new ColorDialog { Color = currentGradColor2 }) {
@@ -156,7 +156,7 @@ namespace ZenQOffice.UI
                 }
             };
 
-            Label lblOp = new Label { Text = "Độ trong suốt:", Location = new Point(175, 54), AutoSize = true };
+            Label lblOp = new Label { Text = AppL10n.T("Độ trong suốt:", "Transparency:"), Location = new Point(175, 54), AutoSize = true };
             tbFillOpacity = new TrackBar { Location = new Point(265, 50), Size = new Size(160, 30), Minimum = 0, Maximum = 100, Value = (int)(FillOpacityResult * 100) };
             lblOpacityVal = new Label { Text = tbFillOpacity.Value + "%", Location = new Point(430, 54), AutoSize = true };
             tbFillOpacity.ValueChanged += (s, e) => {
@@ -165,7 +165,7 @@ namespace ZenQOffice.UI
                 UpdatePreview();
             };
 
-            Label lblAng = new Label { Text = "Góc độ:", Location = new Point(175, 90), AutoSize = true };
+            Label lblAng = new Label { Text = AppL10n.T("Góc độ:", "Angle:"), Location = new Point(175, 90), AutoSize = true };
             tbGradAngle = new TrackBar { Location = new Point(265, 86), Size = new Size(160, 30), Minimum = 0, Maximum = 360, Value = (int)GradientAngleResult };
             lblAngleVal = new Label { Text = tbGradAngle.Value + "°", Location = new Point(430, 90), AutoSize = true };
             tbGradAngle.ValueChanged += (s, e) => {
@@ -190,11 +190,11 @@ namespace ZenQOffice.UI
             tabFillLine.Controls.Add(grpFill);
 
             // Section 2: Viền hình
-            GroupBox grpLine = new GroupBox { Text = "Viền hình (Line)", Location = new Point(14, 155), Size = new Size(485, 110) };
-            rdoNoLine = new RadioButton { Text = "Không viền (No line)", Location = new Point(16, 24), AutoSize = true, Checked = (StrokeWidthResult <= 0f) };
-            rdoSolidLine = new RadioButton { Text = "Viền đơn (Solid line)", Location = new Point(16, 52), AutoSize = true, Checked = (StrokeWidthResult > 0f) };
+            GroupBox grpLine = new GroupBox { Text = AppL10n.T("Viền hình (Line)", "Line"), Location = new Point(14, 155), Size = new Size(485, 110) };
+            rdoNoLine = new RadioButton { Text = AppL10n.T("Không viền (No line)", "No line"), Location = new Point(16, 24), AutoSize = true, Checked = (StrokeWidthResult <= 0f) };
+            rdoSolidLine = new RadioButton { Text = AppL10n.T("Viền đơn (Solid line)", "Solid line"), Location = new Point(16, 52), AutoSize = true, Checked = (StrokeWidthResult > 0f) };
 
-            Label lblLClr = new Label { Text = "Màu viền:", Location = new Point(175, 24), AutoSize = true };
+            Label lblLClr = new Label { Text = AppL10n.T("Màu viền:", "Color:"), Location = new Point(175, 24), AutoSize = true };
             btnLineColor = new Button { Location = new Point(240, 20), Size = new Size(45, 24), BackColor = currentLineColor, FlatStyle = FlatStyle.Flat };
             btnLineColor.Click += (s, e) => {
                 using (ColorDialog cd = new ColorDialog { Color = currentLineColor }) {
@@ -207,16 +207,16 @@ namespace ZenQOffice.UI
                 }
             };
 
-            Label lblLW = new Label { Text = "Độ dày (pt):", Location = new Point(175, 58), AutoSize = true };
+            Label lblLW = new Label { Text = AppL10n.T("Độ dày (pt):", "Width (pt):"), Location = new Point(175, 58), AutoSize = true };
             numLineWidth = new NumericUpDown { Location = new Point(255, 56), Size = new Size(70, 24), DecimalPlaces = 2, Minimum = 0.25m, Maximum = 20m, Increment = 0.25m, Value = (decimal)Math.Max(0.25f, StrokeWidthResult) };
             numLineWidth.ValueChanged += (s, e) => {
                 if (rdoSolidLine.Checked) StrokeWidthResult = (float)numLineWidth.Value;
                 UpdatePreview();
             };
 
-            Label lblDash = new Label { Text = "Kiểu nét:", Location = new Point(335, 58), AutoSize = true };
+            Label lblDash = new Label { Text = AppL10n.T("Kiểu nét:", "Dash type:"), Location = new Point(335, 58), AutoSize = true };
             cboDashStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(390, 56), Size = new Size(85, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboDashStyle.Items.AddRange(new object[] { "Liền (Solid)", "Nét đứt (Dash)", "Chấm (Dot)" });
+            cboDashStyle.Items.AddRange(new object[] { AppL10n.T("Liền (Solid)", "Solid"), AppL10n.T("Nét đứt (Dash)", "Dash"), AppL10n.T("Chấm (Dot)", "Dot") });
             cboDashStyle.SelectedIndex = DashStyleResult == DashStyle.Dash ? 1 : (DashStyleResult == DashStyle.Dot ? 2 : 0);
             cboDashStyle.SelectedIndexChanged += (s, e) => {
                 DashStyleResult = cboDashStyle.SelectedIndex == 1 ? DashStyle.Dash : (cboDashStyle.SelectedIndex == 2 ? DashStyle.Dot : DashStyle.Solid);
@@ -238,20 +238,20 @@ namespace ZenQOffice.UI
             tabFillLine.Controls.Add(grpLine);
 
             // Preview Box in Tab 1
-            GroupBox grpP = new GroupBox { Text = "Xem trước (Preview)", Location = new Point(14, 270), Size = new Size(485, 140) };
+            GroupBox grpP = new GroupBox { Text = AppL10n.T("Xem trước (Preview)", "Preview"), Location = new Point(14, 270), Size = new Size(485, 140) };
             picPreview = new PictureBox { Dock = DockStyle.Fill, BackColor = Color.White };
             picPreview.Paint += DrawPreviewShape;
             grpP.Controls.Add(picPreview);
             tabFillLine.Controls.Add(grpP);
 
             // ==================== Tab 2: Hiệu ứng & Đổ bóng ====================
-            TabPage tabEffects = new TabPage("Hiệu ứng & Đổ bóng (Effects)");
+            TabPage tabEffects = new TabPage(AppL10n.T("Hiệu ứng & Đổ bóng (Effects)", "Effects"));
             tabEffects.BackColor = Color.White;
 
-            GroupBox grpShadow = new GroupBox { Text = "Đổ bóng (Shadow)", Location = new Point(14, 12), Size = new Size(485, 160) };
-            chkShadow = new CheckBox { Text = "Bật hiệu ứng đổ bóng (Enable Shadow)", Location = new Point(16, 26), AutoSize = true, Checked = HasShadowResult };
+            GroupBox grpShadow = new GroupBox { Text = AppL10n.T("Đổ bóng (Shadow)", "Shadow"), Location = new Point(14, 12), Size = new Size(485, 160) };
+            chkShadow = new CheckBox { Text = AppL10n.T("Bật hiệu ứng đổ bóng (Enable Shadow)", "Enable Shadow"), Location = new Point(16, 26), AutoSize = true, Checked = HasShadowResult };
 
-            Label lblBl = new Label { Text = "Độ mờ (Blur):", Location = new Point(16, 60), AutoSize = true };
+            Label lblBl = new Label { Text = AppL10n.T("Độ mờ (Blur):", "Blur:"), Location = new Point(16, 60), AutoSize = true };
             tbShadowBlur = new TrackBar { Location = new Point(120, 56), Size = new Size(200, 30), Minimum = 0, Maximum = 40, Value = (int)Math.Max(0, Math.Min(40, ShadowBlurResult)) };
             lblBlurVal = new Label { Text = tbShadowBlur.Value + " px", Location = new Point(330, 60), AutoSize = true };
             tbShadowBlur.ValueChanged += (s, e) => {
@@ -260,7 +260,7 @@ namespace ZenQOffice.UI
                 UpdatePreview();
             };
 
-            Label lblDs = new Label { Text = "Khoảng cách:", Location = new Point(16, 100), AutoSize = true };
+            Label lblDs = new Label { Text = AppL10n.T("Khoảng cách:", "Distance:"), Location = new Point(16, 100), AutoSize = true };
             tbShadowDist = new TrackBar { Location = new Point(120, 96), Size = new Size(200, 30), Minimum = 0, Maximum = 40, Value = (int)Math.Max(0, Math.Min(40, ShadowOffsetXResult)) };
             lblDistVal = new Label { Text = tbShadowDist.Value + " px", Location = new Point(330, 100), AutoSize = true };
             tbShadowDist.ValueChanged += (s, e) => {
@@ -280,8 +280,8 @@ namespace ZenQOffice.UI
             grpShadow.Controls.AddRange(new Control[] { chkShadow, lblBl, tbShadowBlur, lblBlurVal, lblDs, tbShadowDist, lblDistVal });
             tabEffects.Controls.Add(grpShadow);
 
-            GroupBox grpSoft = new GroupBox { Text = "Làm mềm mép (Soft Edges)", Location = new Point(14, 185), Size = new Size(485, 80) };
-            Label lblSft = new Label { Text = "Bán kính mép:", Location = new Point(16, 30), AutoSize = true };
+            GroupBox grpSoft = new GroupBox { Text = AppL10n.T("Làm mềm mép (Soft Edges)", "Soft Edges"), Location = new Point(14, 185), Size = new Size(485, 80) };
+            Label lblSft = new Label { Text = AppL10n.T("Bán kính mép:", "Size:"), Location = new Point(16, 30), AutoSize = true };
             tbSoftEdges = new TrackBar { Location = new Point(120, 26), Size = new Size(200, 30), Minimum = 0, Maximum = 40, Value = (int)Math.Max(0, Math.Min(40, SoftEdgeRadiusResult)) };
             lblSoftVal = new Label { Text = tbSoftEdges.Value + " pt", Location = new Point(330, 30), AutoSize = true };
             tbSoftEdges.ValueChanged += (s, e) => {
@@ -293,23 +293,23 @@ namespace ZenQOffice.UI
             tabEffects.Controls.Add(grpSoft);
 
             // ==================== Tab 3: Hộp chữ & Lề ====================
-            TabPage tabMargins = new TabPage("Lề hộp chữ (Margins)");
+            TabPage tabMargins = new TabPage(AppL10n.T("Lề hộp chữ (Margins)", "Text Box Margins"));
             tabMargins.BackColor = Color.White;
 
-            GroupBox grpMargins = new GroupBox { Text = "Lề trong (Internal Margins)", Location = new Point(14, 12), Size = new Size(485, 140) };
-            Label lblML = new Label { Text = "Lề trái (pt):", Location = new Point(20, 30), AutoSize = true };
+            GroupBox grpMargins = new GroupBox { Text = AppL10n.T("Lề trong (Internal Margins)", "Internal Margins"), Location = new Point(14, 12), Size = new Size(485, 140) };
+            Label lblML = new Label { Text = AppL10n.T("Lề trái (pt):", "Left (pt):"), Location = new Point(20, 30), AutoSize = true };
             numMarginL = new NumericUpDown { Location = new Point(110, 28), Size = new Size(80, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 100, Value = (decimal)MarginLeftResult };
             numMarginL.ValueChanged += (s, e) => MarginLeftResult = (float)numMarginL.Value;
 
-            Label lblMR = new Label { Text = "Lề phải (pt):", Location = new Point(240, 30), AutoSize = true };
+            Label lblMR = new Label { Text = AppL10n.T("Lề phải (pt):", "Right (pt):"), Location = new Point(240, 30), AutoSize = true };
             numMarginR = new NumericUpDown { Location = new Point(330, 28), Size = new Size(80, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 100, Value = (decimal)MarginRightResult };
             numMarginR.ValueChanged += (s, e) => MarginRightResult = (float)numMarginR.Value;
 
-            Label lblMT = new Label { Text = "Lề trên (pt):", Location = new Point(20, 75), AutoSize = true };
+            Label lblMT = new Label { Text = AppL10n.T("Lề trên (pt):", "Top (pt):"), Location = new Point(20, 75), AutoSize = true };
             numMarginT = new NumericUpDown { Location = new Point(110, 73), Size = new Size(80, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 100, Value = (decimal)MarginTopResult };
             numMarginT.ValueChanged += (s, e) => MarginTopResult = (float)numMarginT.Value;
 
-            Label lblMB = new Label { Text = "Lề dưới (pt):", Location = new Point(240, 75), AutoSize = true };
+            Label lblMB = new Label { Text = AppL10n.T("Lề dưới (pt):", "Bottom (pt):"), Location = new Point(240, 75), AutoSize = true };
             numMarginB = new NumericUpDown { Location = new Point(330, 73), Size = new Size(80, 24), DecimalPlaces = 1, Minimum = 0, Maximum = 100, Value = (decimal)MarginBottomResult };
             numMarginB.ValueChanged += (s, e) => MarginBottomResult = (float)numMarginB.Value;
 
@@ -322,8 +322,8 @@ namespace ZenQOffice.UI
             Controls.Add(tabCtrl);
 
             // Action Buttons
-            Button btnOk = new Button { Text = "Đồng ý", DialogResult = DialogResult.OK, Location = new Point(360, 475), Size = new Size(80, 30), BackColor = Color.FromArgb(210, 71, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            Button btnCancel = new Button { Text = "Hủy", DialogResult = DialogResult.Cancel, Location = new Point(450, 475), Size = new Size(80, 30), BackColor = Color.FromArgb(229, 231, 235), FlatStyle = FlatStyle.Flat };
+            Button btnOk = new Button { Text = AppL10n.T("Đồng ý", "OK"), DialogResult = DialogResult.OK, Location = new Point(360, 475), Size = new Size(80, 30), BackColor = Color.FromArgb(210, 71, 38), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            Button btnCancel = new Button { Text = AppL10n.T("Hủy", "Cancel"), DialogResult = DialogResult.Cancel, Location = new Point(450, 475), Size = new Size(80, 30), BackColor = Color.FromArgb(229, 231, 235), FlatStyle = FlatStyle.Flat };
 
             btnOk.FlatAppearance.BorderSize = 0;
             btnCancel.FlatAppearance.BorderSize = 0;
@@ -395,7 +395,7 @@ namespace ZenQOffice.UI
             using (SolidBrush tb = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
                 StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                g.DrawString("Mẫu Hình Vẽ", f, tb, rect, sf);
+                g.DrawString(AppL10n.T("Mẫu Hình Vẽ", "Sample Shape"), f, tb, rect, sf);
             }
         }
 

@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -67,7 +68,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Paste Special (Dán đặc biệt)";
+            this.Text = AppL10n.T("Paste Special (Dán đặc biệt)", "Paste Special");
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -78,19 +79,19 @@ namespace ZenQOffice.UI
 
             // Group 1: Paste Options
             GroupBox gbPaste = new GroupBox();
-            gbPaste.Text = "Dán (Paste)";
+            gbPaste.Text = AppL10n.T("Dán (Paste)", "Paste");
             gbPaste.Location = new Point(16, 12);
             gbPaste.Size = new Size(230, 260);
 
-            rbAll = new RadioButton { Text = "Tất cả (All)", Location = new Point(14, 22), AutoSize = true, Checked = true };
-            rbFormulas = new RadioButton { Text = "Công thức (Formulas)", Location = new Point(14, 46), AutoSize = true };
-            rbValues = new RadioButton { Text = "Giá trị (Values)", Location = new Point(14, 70), AutoSize = true };
-            rbFormats = new RadioButton { Text = "Định dạng (Formats)", Location = new Point(14, 94), AutoSize = true };
-            rbComments = new RadioButton { Text = "Ghi chú (Comments)", Location = new Point(14, 118), AutoSize = true };
-            rbAllExceptBorders = new RadioButton { Text = "Trừ đường viền (All except borders)", Location = new Point(14, 142), AutoSize = true };
-            rbColumnWidths = new RadioButton { Text = "Độ rộng cột (Column widths)", Location = new Point(14, 166), AutoSize = true };
-            rbFormulasAndNumberFormats = new RadioButton { Text = "Công thức & Số (Formulas & Numbers)", Location = new Point(14, 190), AutoSize = true };
-            rbValuesAndNumberFormats = new RadioButton { Text = "Giá trị & Số (Values & Numbers)", Location = new Point(14, 214), AutoSize = true };
+            rbAll = new RadioButton { Text = AppL10n.T("Tất cả (All)", "All"), Location = new Point(14, 22), AutoSize = true, Checked = true };
+            rbFormulas = new RadioButton { Text = AppL10n.T("Công thức (Formulas)", "Formulas"), Location = new Point(14, 46), AutoSize = true };
+            rbValues = new RadioButton { Text = AppL10n.T("Giá trị (Values)", "Values"), Location = new Point(14, 70), AutoSize = true };
+            rbFormats = new RadioButton { Text = AppL10n.T("Định dạng (Formats)", "Formats"), Location = new Point(14, 94), AutoSize = true };
+            rbComments = new RadioButton { Text = AppL10n.T("Ghi chú (Comments)", "Comments"), Location = new Point(14, 118), AutoSize = true };
+            rbAllExceptBorders = new RadioButton { Text = AppL10n.T("Trừ đường viền (All except borders)", "All except borders"), Location = new Point(14, 142), AutoSize = true };
+            rbColumnWidths = new RadioButton { Text = AppL10n.T("Độ rộng cột (Column widths)", "Column widths"), Location = new Point(14, 166), AutoSize = true };
+            rbFormulasAndNumberFormats = new RadioButton { Text = AppL10n.T("Công thức & Số (Formulas & Numbers)", "Formulas and number formats"), Location = new Point(14, 190), AutoSize = true };
+            rbValuesAndNumberFormats = new RadioButton { Text = AppL10n.T("Giá trị & Số (Values & Numbers)", "Values and number formats"), Location = new Point(14, 214), AutoSize = true };
 
             gbPaste.Controls.AddRange(new Control[] {
                 rbAll, rbFormulas, rbValues, rbFormats, rbComments,
@@ -100,14 +101,14 @@ namespace ZenQOffice.UI
 
             // Group 2: Operation
             GroupBox gbOp = new GroupBox();
-            gbOp.Text = "Phép tính (Operation)";
+            gbOp.Text = AppL10n.T("Phép tính (Operation)", "Operation");
             gbOp.Location = new Point(256, 12);
             gbOp.Size = new Size(150, 165);
 
-            rbOpNone = new RadioButton { Text = "Không (None)", Location = new Point(14, 22), AutoSize = true, Checked = true };
-            rbOpAdd = new RadioButton { Text = "Cộng (Add)", Location = new Point(14, 48), AutoSize = true };
-            rbOpSubtract = new RadioButton { Text = "Trừ (Subtract)", Location = new Point(14, 74), AutoSize = true };
-            rbOpMultiply = new RadioButton { Text = "Nhân (Multiply)", Location = new Point(14, 100), AutoSize = true };
+            rbOpNone = new RadioButton { Text = AppL10n.T("Không (None)", "None"), Location = new Point(14, 22), AutoSize = true, Checked = true };
+            rbOpAdd = new RadioButton { Text = AppL10n.T("Cộng (Add)", "Add"), Location = new Point(14, 48), AutoSize = true };
+            rbOpSubtract = new RadioButton { Text = AppL10n.T("Trừ (Subtract)", "Subtract"), Location = new Point(14, 74), AutoSize = true };
+            rbOpMultiply = new RadioButton { Text = AppL10n.T("Nhân (Multiply)", "Multiply"), Location = new Point(14, 100), AutoSize = true };
             rbOpDivide = new RadioButton { Text = "Chia (Divide)", Location = new Point(14, 126), AutoSize = true };
 
             gbOp.Controls.AddRange(new Control[] { rbOpNone, rbOpAdd, rbOpSubtract, rbOpMultiply, rbOpDivide });
@@ -115,20 +116,20 @@ namespace ZenQOffice.UI
 
             // Checkboxes
             chkSkipBlanks = new CheckBox();
-            chkSkipBlanks.Text = "Bỏ qua ô trống (Skip blanks)";
+            chkSkipBlanks.Text = AppL10n.T("Bỏ qua ô trống (Skip blanks)", "Skip blanks");
             chkSkipBlanks.Location = new Point(20, 282);
             chkSkipBlanks.AutoSize = true;
             this.Controls.Add(chkSkipBlanks);
 
             chkTranspose = new CheckBox();
-            chkTranspose.Text = "Hoán vị hàng / cột (Transpose)";
+            chkTranspose.Text = AppL10n.T("Hoán vị hàng / cột (Transpose)", "Transpose");
             chkTranspose.Location = new Point(20, 306);
             chkTranspose.AutoSize = true;
             this.Controls.Add(chkTranspose);
 
             // Buttons
             btnOk = new Button();
-            btnOk.Text = "Đồng ý";
+            btnOk.Text = AppL10n.T("Đồng ý", "OK");
             btnOk.DialogResult = DialogResult.OK;
             btnOk.Location = new Point(236, 328);
             btnOk.Size = new Size(80, 28);
@@ -158,7 +159,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(btnOk);
 
             btnCancel = new Button();
-            btnCancel.Text = "Hủy";
+            btnCancel.Text = AppL10n.T("Hủy", "Cancel");
             btnCancel.DialogResult = DialogResult.Cancel;
             btnCancel.Location = new Point(324, 328);
             btnCancel.Size = new Size(80, 28);

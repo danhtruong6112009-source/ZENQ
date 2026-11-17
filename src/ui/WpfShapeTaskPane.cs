@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using ZenQOffice.Core;
 using WpfPoint = System.Windows.Point;
 using WpfRect = System.Windows.Rect;
 using WpfSize = System.Windows.Size;
@@ -64,6 +65,26 @@ namespace ZenQOffice.UI
         public Rectangle BtnClearSearchBounds = Rectangle.Empty;
 
         public Rectangle BtnDismissMagicBounds = Rectangle.Empty;
+        public Rectangle BtnRetryOfflineBounds = Rectangle.Empty;
+
+        public static void ClearOnlineThumbnailsInRam()
+        {
+            lock (_thumbLock)
+            {
+                var toRemove = new List<string>();
+                foreach (var k in _thumbCache.Keys)
+                {
+                    if (k.IndexOf("_online_", StringComparison.OrdinalIgnoreCase) >= 0)
+                        toRemove.Add(k);
+                }
+                foreach (var k in toRemove)
+                {
+                    try { _thumbCache[k]?.Dispose(); } catch { }
+                    _thumbCache.Remove(k);
+                }
+                _loadingThumbs.Clear();
+            }
+        }
         private static string _activeMagicAnchorKey = "__recently_used__";
         private static string _lastClickedGridItemId = null;
         private static List<ShapePresetItem> _expandedMagicItems = null;
@@ -77,6 +98,11 @@ namespace ZenQOffice.UI
         public bool IsDraggingScrollbar { get; private set; } = false;
         private int _dragStartMouseY = 0;
         private int _dragStartScrollY = 0;
+        private float _tabPillAnimX = -1f;
+        private float _tabPillAnimW = -1f;
+        private float _tabPillTargetX = -1f;
+        private float _tabPillTargetW = -1f;
+        private long _tabPillLastTs = 0;
         private Point _lastMousePos = Point.Empty;
         public List<Tuple<Rectangle, string>> ItemClickBounds = new List<Tuple<Rectangle, string>>();
         public List<Tuple<Rectangle, string>> CategorySeeAllBounds = new List<Tuple<Rectangle, string>>();
@@ -519,27 +545,27 @@ namespace ZenQOffice.UI
                 }
 
                 // Tiêu đề
-                string titleText = (Mode == ShapePaneMode.ImagesOnly) ? "Hình ảnh" :
-                                   (Mode == ShapePaneMode.GraphicsOnly) ? "Đồ họa" : "Hình dạng";
+                string titleText = (Mode == ShapePaneMode.ImagesOnly) ? AppL10n.T("Hình ảnh", "Photos") :
+                                   (Mode == ShapePaneMode.GraphicsOnly) ? AppL10n.T("Đồ họa", "Graphics") : AppL10n.T("Hình dạng", "Shapes");
                 if (!string.IsNullOrEmpty(ExpandedCategoryKey))
                 {
                     if (ExpandedCategoryKey == "__recently_used__")
                     {
-                        titleText = "Dùng gần đây";
+                        titleText = AppL10n.T("Dùng gần đây", "Recently Used");
                     }
                     else if (ExpandedCategoryKey == "__magic_recommendations__")
                     {
-                        titleText = "Đề xuất Magic";
+                        titleText = AppL10n.T("Đề xuất Magic", "Magic Recommendations");
                     }
                     else if (ExpandedCategoryKey == "__featured__")
                     {
-                        titleText = "Bộ sưu tập Nổi bật";
+                        titleText = AppL10n.T("Bộ sưu tập Nổi bật", "Featured Collection");
                     }
                     else
                     {
                         foreach (var c in WpfShapeLibrary.Categories)
                         {
-                            if (c.Key == ExpandedCategoryKey) { titleText = c.Title; break; }
+                            if (c.Key == ExpandedCategoryKey) { titleText = AppL10n.TrCategory(c.Title); break; }
                         }
                     }
                 }
@@ -576,78 +602,43 @@ namespace ZenQOffice.UI
             bool isGraphics = (Mode == ShapePaneMode.GraphicsOnly);
             bool isImages = (Mode == ShapePaneMode.ImagesOnly);
 
+            Rectangle activeTabRect = isGraphics ? BtnTabGraphicsBounds : (isImages ? BtnTabImagesBounds : BtnTabShapesBounds);
+            _tabPillTargetX = activeTabRect.X;
+            _tabPillTargetW = activeTabRect.Width;
+            if (_tabPillAnimX < 0f || _tabPillAnimW < 0f)
+            {
+                _tabPillAnimX = _tabPillTargetX;
+                _tabPillAnimW = _tabPillTargetW;
+            }
+
             using (Font tabFont = new Font("Segoe UI", 8.2f, FontStyle.Bold))
             using (StringFormat sfTab = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             {
-                // Tab Hình dạng
-                using (GraphicsPath pShapes = CreateRoundedRectPath(BtnTabShapesBounds, 4))
+                Rectangle[] allTabs = new[] { BtnTabShapesBounds, BtnTabGraphicsBounds, BtnTabImagesBounds };
+                using (SolidBrush inactBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
+                using (Pen inactBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
                 {
-                    if (isShapes)
+                    foreach (Rectangle tb in allTabs)
                     {
-                        using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
-                        {
-                            g.FillPath(actBg, pShapes);
-                            g.DrawString("Hình dạng", tabFont, Brushes.White, BtnTabShapesBounds, sfTab);
-                        }
-                    }
-                    else
-                    {
-                        using (SolidBrush inactBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
-                        using (Pen inactBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
-                        using (SolidBrush inactTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
-                        {
-                            g.FillPath(inactBg, pShapes);
-                            g.DrawPath(inactBorder, pShapes);
-                            g.DrawString("Hình dạng", tabFont, inactTxt, BtnTabShapesBounds, sfTab);
-                        }
+                        g.FillRoundedRectangle(inactBg, tb, 4f);
+                        g.DrawRoundedRectangle(inactBorder, tb, 4f);
                     }
                 }
 
-                // Tab Đồ họa
-                using (GraphicsPath pGraphics = CreateRoundedRectPath(BtnTabGraphicsBounds, 4))
+                RectangleF pillRect = new RectangleF(_tabPillAnimX, activeTabRect.Y, _tabPillAnimW, activeTabRect.Height);
+                using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
                 {
-                    if (isGraphics)
-                    {
-                        using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
-                        {
-                            g.FillPath(actBg, pGraphics);
-                            g.DrawString("Đồ họa", tabFont, Brushes.White, BtnTabGraphicsBounds, sfTab);
-                        }
-                    }
-                    else
-                    {
-                        using (SolidBrush inactBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
-                        using (Pen inactBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
-                        using (SolidBrush inactTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
-                        {
-                            g.FillPath(inactBg, pGraphics);
-                            g.DrawPath(inactBorder, pGraphics);
-                            g.DrawString("Đồ họa", tabFont, inactTxt, BtnTabGraphicsBounds, sfTab);
-                        }
-                    }
+                    g.FillRoundedRectangle(actBg, pillRect, 4f);
                 }
 
-                // Tab Hình ảnh
-                using (GraphicsPath pImages = CreateRoundedRectPath(BtnTabImagesBounds, 4))
+                string[] tabNames = new[] { ZenQOffice.Core.AppL10n.T("Hình dạng", "Shapes"), ZenQOffice.Core.AppL10n.T("Đồ họa", "Graphics"), ZenQOffice.Core.AppL10n.T("Hình ảnh", "Images") };
+                bool[] tabActives = new[] { isShapes, isGraphics, isImages };
+                using (SolidBrush inactTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
                 {
-                    if (isImages)
+                    for (int ti = 0; ti < 3; ti++)
                     {
-                        using (SolidBrush actBg = new SolidBrush(Color.FromArgb(16, 110, 190)))
-                        {
-                            g.FillPath(actBg, pImages);
-                            g.DrawString("Hình ảnh", tabFont, Brushes.White, BtnTabImagesBounds, sfTab);
-                        }
-                    }
-                    else
-                    {
-                        using (SolidBrush inactBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
-                        using (Pen inactBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
-                        using (SolidBrush inactTxt = new SolidBrush(Color.FromArgb(71, 85, 105)))
-                        {
-                            g.FillPath(inactBg, pImages);
-                            g.DrawPath(inactBorder, pImages);
-                            g.DrawString("Hình ảnh", tabFont, inactTxt, BtnTabImagesBounds, sfTab);
-                        }
+                        bool active = tabActives[ti] && Math.Abs(_tabPillAnimX - _tabPillTargetX) < Math.Max(8f, _tabPillTargetW * 0.35f);
+                        g.DrawString(tabNames[ti], tabFont, active ? Brushes.White : inactTxt, allTabs[ti], sfTab);
                     }
                 }
             }
@@ -679,8 +670,8 @@ namespace ZenQOffice.UI
 
                 if (string.IsNullOrEmpty(SearchText))
                 {
-                    string defaultPlaceholder = (Mode == ShapePaneMode.ImagesOnly) ? "Tìm kiếm trong kho ảnh Stock 4K..." :
-                                                 (Mode == ShapePaneMode.GraphicsOnly) ? "Tìm kiếm trong kho đồ họa & biểu tượng..." : "Tìm kiếm trong hơn 500+ hình dạng...";
+                    string defaultPlaceholder = (Mode == ShapePaneMode.ImagesOnly) ? AppL10n.T("Tìm kiếm trong kho ảnh Stock 4K...", "Search 4K Stock photos...") :
+                                                 (Mode == ShapePaneMode.GraphicsOnly) ? AppL10n.T("Tìm kiếm trong kho đồ họa & biểu tượng...", "Search graphics & icons...") : AppL10n.T("Tìm kiếm trong hơn 500+ hình dạng...", "Search 500+ shapes...");
                     g.DrawString(defaultPlaceholder, sFont, sText, SearchBoxBounds.X + 28, SearchBoxBounds.Y + 6);
                     BtnClearSearchBounds = Rectangle.Empty;
                 }
@@ -708,6 +699,49 @@ namespace ZenQOffice.UI
 
             int currentY = contentY - ScrollY;
 
+            BtnRetryOfflineBounds = Rectangle.Empty;
+            bool isGraphicsOffline = (Mode == ShapePaneMode.GraphicsOnly) && (!ZenQOffice.Core.OnlineGraphicsManager.CheckInternetConnected() || ZenQOffice.Core.OnlineGraphicsManager.IsOffline);
+            bool isImagesOffline = (Mode == ShapePaneMode.ImagesOnly) && (!ZenQOffice.Core.OnlineImagesManager.CheckInternetConnected() || ZenQOffice.Core.OnlineImagesManager.IsOffline);
+            if (isGraphicsOffline || isImagesOffline)
+            {
+                if (isGraphicsOffline) WpfShapeLibrary.ClearOnlineGraphicCategories();
+                if (isImagesOffline) WpfShapeLibrary.ClearOnlineImageCategories();
+                ClearOnlineThumbnailsInRam();
+
+                Rectangle offlineBox = new Rectangle(x + 14, contentY + 24, w - 28, 170);
+                using (GraphicsPath offPath = CreateRoundedRectPath(offlineBox, 12))
+                using (SolidBrush offBg = new SolidBrush(Color.FromArgb(254, 242, 242)))
+                using (Pen offBorder = new Pen(Color.FromArgb(252, 165, 165), 1.2f))
+                {
+                    g.FillPath(offBg, offPath);
+                    g.DrawPath(offBorder, offPath);
+                }
+                using (Font fOffTitle = new Font("Segoe UI", 11f, FontStyle.Bold))
+                using (Font fOffSub = new Font("Segoe UI", 8.75f, FontStyle.Regular))
+                using (SolidBrush brTitle = new SolidBrush(Color.FromArgb(185, 28, 28)))
+                using (SolidBrush brSub = new SolidBrush(Color.FromArgb(127, 29, 29)))
+                using (StringFormat sfC = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.DrawString(AppL10n.T("⚠ Mất kết nối Internet", "⚠ No Internet Connection"), fOffTitle, brTitle, new RectangleF(offlineBox.X + 8, offlineBox.Y + 16, offlineBox.Width - 16, 26), sfC);
+                    string subMsg = (Mode == ShapePaneMode.GraphicsOnly)
+                        ? AppL10n.T("Kho Đồ họa Vector hoạt động 100% trên đám mây (không lưu offline).\nVui lòng kiểm tra kết nối mạng và thử lại.", "Vector Graphics library is 100% cloud-based.\nPlease check your internet connection and retry.")
+                        : AppL10n.T("Kho Hình ảnh Cloud hoạt động 100% trên đám mây (không lưu offline).\nVui lòng kiểm tra kết nối mạng và thử lại.", "Stock Photos library is 100% cloud-based.\nPlease check your internet connection and retry.");
+                    g.DrawString(subMsg, fOffSub, brSub, new RectangleF(offlineBox.X + 10, offlineBox.Y + 46, offlineBox.Width - 20, 62), sfC);
+
+                    int retryW = 128, retryH = 32;
+                    BtnRetryOfflineBounds = new Rectangle(offlineBox.X + (offlineBox.Width - retryW) / 2, offlineBox.Bottom - 44, retryW, retryH);
+                    using (GraphicsPath rPath = CreateRoundedRectPath(BtnRetryOfflineBounds, 16))
+                    using (SolidBrush rBg = new SolidBrush(Color.FromArgb(220, 38, 38)))
+                    using (Font fRetry = new Font("Segoe UI", 9f, FontStyle.Bold))
+                    {
+                        g.FillPath(rBg, rPath);
+                        g.DrawString(AppL10n.T("↻ Thử tải lại", "↻ Retry"), fRetry, Brushes.White, BtnRetryOfflineBounds, sfC);
+                    }
+                }
+                g.PopClip();
+                MaxScrollY = 0;
+                return;
+            }
             if (!string.IsNullOrWhiteSpace(SearchText))
             {
                 // Chế độ Tìm kiếm: Hiển thị kết quả dạng lưới
@@ -724,7 +758,7 @@ namespace ZenQOffice.UI
                 {
                     searchResults = searchResults.FindAll(item => item.IsPhoto || item.Category.StartsWith("Online_Image_"));
                 }
-                currentY = RenderShapeGrid(g, x + 12, currentY, w - 24, searchResults, $"Kết quả tìm kiếm ({searchResults.Count})");
+                currentY = RenderShapeGrid(g, x + 12, currentY, w - 24, searchResults, AppL10n.T($"Kết quả tìm kiếm ({searchResults.Count})", $"Search results ({searchResults.Count})"));
             }
             else if (!string.IsNullOrEmpty(ExpandedCategoryKey))
             {
@@ -735,17 +769,17 @@ namespace ZenQOffice.UI
                 if (ExpandedCategoryKey == "__recently_used__")
                 {
                     itemsToRender = GetRecentlyUsedItems();
-                    headerTitle = $"Tất cả mục dùng gần đây ({itemsToRender.Count})";
+                    headerTitle = AppL10n.T($"Tất cả mục dùng gần đây ({itemsToRender.Count})", $"All Recently Used ({itemsToRender.Count})");
                 }
                 else if (ExpandedCategoryKey == "__magic_recommendations__")
                 {
                     itemsToRender = GetMagicExpandedItems();
-                    headerTitle = "Đề xuất Magic";
+                    headerTitle = AppL10n.T("Đề xuất Magic", "Magic Recommendations");
                 }
                 else if (ExpandedCategoryKey == "__featured__")
                 {
                     itemsToRender = GetShuffledFeaturedItems();
-                    headerTitle = $"Bộ sưu tập Nổi bật ({itemsToRender.Count})";
+                    headerTitle = AppL10n.T($"Bộ sưu tập Nổi bật ({itemsToRender.Count})", $"Featured Collection ({itemsToRender.Count})");
                 }
                 else
                 {
@@ -757,7 +791,7 @@ namespace ZenQOffice.UI
                     if (targetCat != null)
                     {
                         itemsToRender = targetCat.Items;
-                        headerTitle = $"Tất cả {targetCat.Title} ({targetCat.Items.Count})";
+                        headerTitle = AppL10n.T($"Tất cả {targetCat.Title} ({targetCat.Items.Count})", $"All {AppL10n.TrCategory(targetCat.Title)} ({targetCat.Items.Count})");
                     }
                 }
 
@@ -798,7 +832,7 @@ namespace ZenQOffice.UI
                 if (recentItems != null && recentItems.Count > 0)
                 {
                     renderedCount++;
-                    currentY = RenderCategoryRow(g, x + 12, currentY, w - 24, "__recently_used__", "Dùng gần đây", recentItems);
+                    currentY = RenderCategoryRow(g, x + 12, currentY, w - 24, "__recently_used__", AppL10n.T("Dùng gần đây", "Recently Used"), recentItems);
                     currentY += 12;
                     if (canShowMagic)
                     {
@@ -815,7 +849,7 @@ namespace ZenQOffice.UI
                 if (featuredPreview != null && featuredPreview.Count > 0)
                 {
                     renderedCount++;
-                    currentY = RenderCategoryRow(g, x + 12, currentY, w - 24, "__featured__", "Nổi bật", featuredPreview);
+                    currentY = RenderCategoryRow(g, x + 12, currentY, w - 24, "__featured__", AppL10n.T("Nổi bật", "Featured"), featuredPreview);
                     currentY += 12;
                     if (canShowMagic && effectiveAnchor == "__featured__")
                     {
@@ -843,10 +877,10 @@ namespace ZenQOffice.UI
                     using (StringFormat sfC = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     {
                         string emptyMsg = (Mode == ShapePaneMode.ImagesOnly)
-                            ? "Đang đồng bộ kho hình ảnh Stock 4K...\nVui lòng kiểm tra kết nối mạng."
+                            ? AppL10n.T("Đang đồng bộ kho hình ảnh Stock 4K...\nVui lòng kiểm tra kết nối mạng.", "Syncing 4K Stock photos...\nPlease check your internet connection.")
                             : (Mode == ShapePaneMode.GraphicsOnly)
-                            ? "Đang đồng bộ dữ liệu đồ họa trực tuyến từ Vercel...\nVui lòng kiểm tra kết nối mạng."
-                            : "Không có danh mục nào.";
+                            ? AppL10n.T("Đang đồng bộ dữ liệu đồ họa trực tuyến từ Vercel...\nVui lòng kiểm tra kết nối mạng.", "Syncing cloud graphics...\nPlease check your internet connection.")
+                            : AppL10n.T("Không có danh mục nào.", "No categories available.");
                         g.DrawString(emptyMsg, emptyF, emptyB, new RectangleF(x + 12, currentY + 40, w - 24, 60), sfC);
                     }
                     currentY += 120;
@@ -927,7 +961,7 @@ namespace ZenQOffice.UI
             using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             using (SolidBrush linkBrush = new SolidBrush(Color.FromArgb(37, 99, 235)))
             {
-                string seeAllText = "Xem tất cả ›";
+                string seeAllText = AppL10n.T("Xem tất cả ›", "See all ›");
                 SizeF seeAllSize = g.MeasureString(seeAllText, seeAllFont);
                 int rightOffset = (key == "__magic_recommendations__") ? 24 : 4;
                 Rectangle seeAllRect = new Rectangle((int)(rx + rw - seeAllSize.Width - rightOffset), ry, (int)seeAllSize.Width + 8, (int)seeAllSize.Height + 4);
@@ -935,7 +969,7 @@ namespace ZenQOffice.UI
                 using (StringFormat sfTitle = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
                 {
                     Rectangle titleRect = new Rectangle(rx, ry, (int)(rw - seeAllSize.Width - rightOffset - 8), (int)(seeAllSize.Height + 4));
-                    g.DrawString(title, catFont, titleBrush, titleRect, sfTitle);
+                    g.DrawString(AppL10n.TrCategory(title), catFont, titleBrush, titleRect, sfTitle);
                 }
 
                 g.DrawString(seeAllText, seeAllFont, linkBrush, seeAllRect.X, seeAllRect.Y);
@@ -1039,7 +1073,7 @@ namespace ZenQOffice.UI
             if (magicItems != null && magicItems.Count > 0)
             {
                 renderedCount++;
-                string magicTitle = "✨ Đề xuất Magic";
+                string magicTitle = AppL10n.T("✨ Đề xuất Magic", "✨ Magic Recommendations");
                 int startY = ry;
                 ry = RenderCategoryRow(g, rx, ry, rw, "__magic_recommendations__", magicTitle, magicItems);
 
@@ -1083,7 +1117,7 @@ namespace ZenQOffice.UI
                 using (Font emptyFont = new Font("Segoe UI", 9f, FontStyle.Italic))
                 using (SolidBrush emptyBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
                 {
-                    g.DrawString("Không tìm thấy mẫu phù hợp.", emptyFont, emptyBrush, rx, ry + 10);
+                    g.DrawString(AppL10n.T("Không tìm thấy mẫu phù hợp.", "No matching items found."), emptyFont, emptyBrush, rx, ry + 10);
                 }
                 return ry + 40;
             }
@@ -1411,6 +1445,17 @@ namespace ZenQOffice.UI
                     targetId = seeAll.Item2;
                     return true;
                 }
+            }
+
+            if (!BtnRetryOfflineBounds.IsEmpty && BtnRetryOfflineBounds.Contains(pt))
+            {
+                if (Mode == ShapePaneMode.GraphicsOnly)
+                    ZenQOffice.Core.OnlineGraphicsManager.RefreshCatalogAsync();
+                else if (Mode == ShapePaneMode.ImagesOnly)
+                    ZenQOffice.Core.OnlineImagesManager.RefreshCatalogAsync();
+                action = "Refresh";
+                targetId = null;
+                return true;
             }
 
             if (!BtnDismissMagicBounds.IsEmpty && BtnDismissMagicBounds.Contains(pt))
@@ -2219,12 +2264,21 @@ namespace ZenQOffice.UI
 
         public bool UpdateSmoothScroll()
         {
+            bool pillAnim = false;
+            if (_tabPillTargetX >= 0f && _tabPillAnimX >= 0f)
+            {
+                double dt = FluentMotion.DeltaSeconds(ref _tabPillLastTs);
+                float blend = FluentMotion.DampFactor(dt, 0.042);
+                if (FluentMotion.StepAxis(ref _tabPillAnimX, _tabPillTargetX, blend, 0.35f)) pillAnim = true;
+                if (FluentMotion.StepAxis(ref _tabPillAnimW, _tabPillTargetW, blend, 0.35f)) pillAnim = true;
+                if (!pillAnim) _tabPillLastTs = 0;
+            }
             TargetScrollY = Math.Clamp((float)Math.Round(TargetScrollY), 0, MaxScrollY);
             if (IsDraggingScrollbar)
             {
                 ScrollY = Math.Clamp(ScrollY, 0, MaxScrollY);
                 SmoothScrollY = TargetScrollY = ScrollY;
-                return false;
+                return pillAnim;
             }
             SmoothScrollY = Math.Clamp(SmoothScrollY, 0, MaxScrollY);
             int prevInt = (int)Math.Round(SmoothScrollY);
@@ -2236,7 +2290,7 @@ namespace ZenQOffice.UI
                 bool changed = (ScrollY != targetInt || SmoothScrollY != TargetScrollY);
                 SmoothScrollY = TargetScrollY;
                 ScrollY = targetInt;
-                return changed;
+                return changed || pillAnim;
             }
 
             // Hệ số 0.45f + ngưỡng cắt đuôi 2px: lướt êm 3-4 khung hình (~55ms) rồi dừng hẳn, không trôi lê thê

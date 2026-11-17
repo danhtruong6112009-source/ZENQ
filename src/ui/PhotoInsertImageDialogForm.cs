@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -43,7 +44,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent(string imagePath, Image img, int canvasW, int canvasH)
         {
-            this.Text = "Nhúng hình ảnh vào tệp Đồ họa Vector (Chuẩn Inkscape)";
+            this.Text = AppL10n.T("Nhúng hình ảnh vào tệp Đồ họa Vector (Chuẩn Inkscape)", "Insert Image into Vector Document");
             this.Size = new Size(580, 520);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -64,7 +65,7 @@ namespace ZenQOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "🖼️ Chèn hình ảnh vào không gian Vector SVG",
+                Text = AppL10n.T("🖼️ Chèn hình ảnh vào không gian Vector SVG", "🖼️ Insert Image into SVG Canvas"),
                 Font = new Font("Segoe UI", 11.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 AutoSize = true,
@@ -74,7 +75,7 @@ namespace ZenQOffice.UI
 
             Label lblSub = new Label
             {
-                Text = "Tùy chọn phương thức lưu trữ hình ảnh và kích thước hiển thị trên khung vẽ.",
+                Text = AppL10n.T("Tùy chọn phương thức lưu trữ hình ảnh và kích thước hiển thị trên khung vẽ.", "Choose image storage mode and initial canvas dimensions."),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 AutoSize = true,
@@ -110,7 +111,7 @@ namespace ZenQOffice.UI
 
             Button btnOK = new Button
             {
-                Text = "Đồng ý (Chèn ảnh)",
+                Text = AppL10n.T("Đồng ý (Chèn ảnh)", "Insert Image"),
                 Size = new Size(150, 34),
                 BackColor = Color.FromArgb(99, 102, 241), // Indigo 500
                 ForeColor = Color.White,
@@ -131,7 +132,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Size = new Size(95, 34),
                 BackColor = Color.White,
                 ForeColor = Color.FromArgb(71, 85, 105),
@@ -185,7 +186,7 @@ namespace ZenQOffice.UI
 
             lblInfo = new Label
             {
-                Text = $"Tệp: {fileName}\nĐộ phân giải gốc: {img?.Width ?? 0} × {img?.Height ?? 0} px\nDung lượng: {sizeStr}  |  Khung vẽ hiện tại: {canvasW} × {canvasH} px",
+                Text = string.Format(AppL10n.T("Tệp: {0}\nĐộ phân giải gốc: {1} × {2} px\nDung lượng: {3}  |  Khung vẽ hiện tại: {4} × {5} px", "File: {0}\nDimensions: {1} × {2} px\nSize: {3}  |  Canvas: {4} × {5} px"), fileName, img?.Width ?? 0, img?.Height ?? 0, sizeStr, canvasW, canvasH),
                 Font = new Font("Segoe UI", 8.8f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 AutoSize = true,
@@ -196,7 +197,7 @@ namespace ZenQOffice.UI
             // Group 1: Chế độ nạp ảnh (Inkscape: Embed vs Link)
             GroupBox grpMode = new GroupBox
             {
-                Text = "Phương thức lưu ảnh trong tài liệu Vector",
+                Text = AppL10n.T("Phương thức lưu ảnh trong tài liệu Vector", "Image Import Type"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(20, 114),
@@ -206,7 +207,7 @@ namespace ZenQOffice.UI
 
             rbEmbed = new RadioButton
             {
-                Text = "Nhúng ảnh trực tiếp vào tài liệu (Embed image) - [Khuyên dùng]",
+                Text = AppL10n.T("Nhúng ảnh trực tiếp vào tài liệu (Embed image) - [Khuyên dùng]", "Embed image directly in document - [Recommended]"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(16, 24),
@@ -217,7 +218,7 @@ namespace ZenQOffice.UI
 
             Label lblEmbedDesc = new Label
             {
-                Text = "Dữ liệu hình ảnh được nhúng trực tiếp vào tệp SVG/ZenQ. Tài liệu tự chứa đầy đủ dữ liệu ảnh, chia sẻ hoặc mang sang máy khác không bao giờ bị mất.",
+                Text = AppL10n.T("Dữ liệu hình ảnh được nhúng trực tiếp vào tệp SVG/ZenQ. Tài liệu tự chứa đầy đủ dữ liệu ảnh, chia sẻ hoặc mang sang máy khác không bao giờ bị mất.", "Image data is stored directly inside the SVG/ZenQ file so it remains portable across devices."),
                 Font = new Font("Segoe UI", 8.2f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(34, 48),
@@ -227,7 +228,7 @@ namespace ZenQOffice.UI
 
             rbLink = new RadioButton
             {
-                Text = "Liên kết đến tệp ảnh bên ngoài (Link image to external file)",
+                Text = AppL10n.T("Liên kết đến tệp ảnh bên ngoài (Link image to external file)", "Link to external image file"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 Location = new Point(16, 80),
@@ -237,7 +238,7 @@ namespace ZenQOffice.UI
 
             Label lblLinkDesc = new Label
             {
-                Text = "Chỉ lưu đường dẫn liên kết đến tệp trên máy tính. Kích thước file tài liệu nhỏ hơn nhưng cần giữ tệp ảnh gốc.",
+                Text = AppL10n.T("Chỉ lưu đường dẫn liên kết đến tệp trên máy tính. Kích thước file tài liệu nhỏ hơn nhưng cần giữ tệp ảnh gốc.", "Stores only the file path. Keeps document smaller, but requires keeping the original image file."),
                 Font = new Font("Segoe UI", 8.2f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(34, 102),
@@ -248,7 +249,7 @@ namespace ZenQOffice.UI
             // Group 2: Kích thước & Tỷ lệ hiển thị
             GroupBox grpSize = new GroupBox
             {
-                Text = "Kích thước & Tỷ lệ khi đưa vào khung vẽ",
+                Text = AppL10n.T("Kích thước & Tỷ lệ khi đưa vào khung vẽ", "Placement & Scaling"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(20, 254),
@@ -258,7 +259,7 @@ namespace ZenQOffice.UI
 
             rbFit = new RadioButton
             {
-                Text = "Tự động co giãn vừa vặn khung vẽ (Fit to canvas) - Giữ gọn gàng",
+                Text = AppL10n.T("Tự động co giãn vừa vặn khung vẽ (Fit to canvas) - Giữ gọn gàng", "Fit to canvas automatically"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(16, 24),
@@ -269,7 +270,7 @@ namespace ZenQOffice.UI
 
             rbOriginal = new RadioButton
             {
-                Text = $"Giữ kích thước pixel gốc ({img?.Width ?? 0} × {img?.Height ?? 0} px, 1:1)",
+                Text = string.Format(AppL10n.T("Giữ kích thước pixel gốc ({0} × {1} px, 1:1)", "Keep original pixel dimensions ({0} × {1} px, 1:1)"), img?.Width ?? 0, img?.Height ?? 0),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(16, 50),
@@ -279,7 +280,7 @@ namespace ZenQOffice.UI
 
             chkLockRatio = new CheckBox
             {
-                Text = "🔒 Khóa tỷ lệ khung hình khi kéo dãn (Lock Aspect Ratio)",
+                Text = AppL10n.T("🔒 Khóa tỷ lệ khung hình khi kéo dãn (Lock Aspect Ratio)", "🔒 Lock Aspect Ratio when resizing"),
                 Font = new Font("Segoe UI", 8.8f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(51, 65, 85),
                 Location = new Point(16, 80),

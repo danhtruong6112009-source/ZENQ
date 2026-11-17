@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -9,6 +9,20 @@ namespace ZenQOffice.Core
     {
         public static List<SparseMatrix> WorkbookSheets = null;
         public static List<string> WorkbookSheetNames = null;
+        public static Dictionary<string, string> WorkbookNamedRanges = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public static Func<string, SparseMatrix, uint, List<Tuple<uint, uint>>> WorkbookStructuredRefResolver = null;
+        public static bool IsManualCalculation = false;
+        public static bool CircularReferenceDetected = false;
+        public static string LastCircularReferenceCell = "";
+        public static uint CurrentEvaluatingRow = 1;
+        public static uint CurrentEvaluatingCol = 1;
+
+        [ThreadStatic]
+        private static HashSet<string> _activeEvalCells;
+        [ThreadStatic]
+        private static HashSet<string> _evaluatedInCurrentPass;
+        [ThreadStatic]
+        private static int _evalRecursionDepth;
 
         public static void SetWorkbookContext(List<SparseMatrix> sheets, List<string> sheetNames)
         {
@@ -16,42 +30,108 @@ namespace ZenQOffice.Core
             WorkbookSheetNames = sheetNames;
         }
 
+        public static void SetWorkbookFormulaMetadata(
+            Dictionary<string, string> namedRanges,
+            Func<string, SparseMatrix, uint, List<Tuple<uint, uint>>> structuredRefResolver)
+        {
+            WorkbookNamedRanges = namedRanges != null
+                ? new Dictionary<string, string>(namedRanges, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            WorkbookStructuredRefResolver = structuredRefResolver;
+        }
+
+        public static bool IsExcelError(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            string t = text.Trim();
+            return t == "#DIV/0!" || t == "#VALUE!" || t == "#NAME?" || t == "#REF!"
+                || t == "#N/A" || t == "#NUM!" || t == "#NULL!" || t == "#SPILL!"
+                || t == "#CALC!" || t == "#CIRC!";
+        }
+
         public static void EvaluateWorkbook(List<SparseMatrix> sheets, List<string> sheetNames)
         {
             SetWorkbookContext(sheets, sheetNames);
             if (sheets == null) return;
-            for (int pass = 0; pass < 2; pass++)
+            CircularReferenceDetected = false;
+            LastCircularReferenceCell = "";
+            for (int pass = 0; pass < 16; pass++)
             {
+                if (_evaluatedInCurrentPass == null) _evaluatedInCurrentPass = new HashSet<string>();
+                else _evaluatedInCurrentPass.Clear();
+                if (_activeEvalCells == null) _activeEvalCells = new HashSet<string>();
+                else _activeEvalCells.Clear();
+                bool anyChanged = false;
                 for (int i = 0; i < sheets.Count; i++)
                 {
-                    EvaluateSheet(sheets[i]);
+                    if (EvaluateSheetSinglePass(sheets[i]))
+                        anyChanged = true;
+                }
+                if (!anyChanged && pass >= 1) break;
+            }
+        }
+
+        private static bool EnsureFormulaCellEvaluated(SparseMatrix refSheet, uint r, uint c, CellData cell, out string circError)
+        {
+            circError = null;
+            string cellKey = GetSheetKey(refSheet, r, c);
+            if (_activeEvalCells != null && _activeEvalCells.Contains(cellKey))
+            {
+                CircularReferenceDetected = true;
+                LastCircularReferenceCell = SparseMatrix.ColIndexToName(c) + r;
+                circError = "#CIRC!";
+                return false;
+            }
+            if (cell != null && cell.Type == CellType.Formula && !string.IsNullOrEmpty(cell.FormulaStr) && _evalRecursionDepth < 64)
+            {
+                if (_evaluatedInCurrentPass != null && _evaluatedInCurrentPass.Contains(cellKey))
+                    return true;
+                if (_activeEvalCells == null) _activeEvalCells = new HashSet<string>();
+                _activeEvalCells.Add(cellKey);
+                _evalRecursionDepth++;
+                uint prevR = CurrentEvaluatingRow, prevC = CurrentEvaluatingCol;
+                SparseMatrix prevSheet = CurrentEvaluatingSheet;
+                CurrentEvaluatingRow = r;
+                CurrentEvaluatingCol = c;
+                CurrentEvaluatingSheet = refSheet;
+                try
+                {
+                    CellData subRes = EvaluateFormula(cell.FormulaStr, refSheet);
+                    cell.NumericValue = subRes.NumericValue;
+                    cell.EvaluatedStr = subRes.EvaluatedStr;
+                    cell.ArrayResult = subRes.ArrayResult;
+                    if (string.Equals(cell.EvaluatedStr, "#CIRC!", StringComparison.Ordinal))
+                    {
+                        circError = "#CIRC!";
+                        return false;
+                    }
+                    if (_evaluatedInCurrentPass != null) _evaluatedInCurrentPass.Add(cellKey);
+                }
+                finally
+                {
+                    CurrentEvaluatingRow = prevR;
+                    CurrentEvaluatingCol = prevC;
+                    CurrentEvaluatingSheet = prevSheet;
+                    _evalRecursionDepth--;
+                    _activeEvalCells.Remove(cellKey);
                 }
             }
+            return true;
+        }
+
+        private static string GetSheetKey(SparseMatrix sheet, uint r, uint c)
+        {
+            int sIdx = (WorkbookSheets != null && sheet != null) ? WorkbookSheets.IndexOf(sheet) : -1;
+            return sIdx + ":" + r + ":" + c;
         }
 
         public static SparseMatrix ResolveSheet(string expr, SparseMatrix defaultSheet)
         {
             if (string.IsNullOrEmpty(expr) || WorkbookSheets == null || WorkbookSheetNames == null) return defaultSheet;
             string s = expr.Trim();
-            int excl = -1;
-            bool inQuotes = false;
-            bool inSingleQuotes = false;
-            for (int i = 0; i < s.Length; i++)
-            {
-                if (s[i] == '"' && !inSingleQuotes) inQuotes = !inQuotes;
-                else if (s[i] == '\'' && !inQuotes) inSingleQuotes = !inSingleQuotes;
-                else if (s[i] == '!' && !inQuotes && !inSingleQuotes)
-                {
-                    excl = i;
-                    break;
-                }
-            }
+            int excl = FindSheetBangIndex(s);
             if (excl <= 0) return defaultSheet;
-            string sheetPart = s.Substring(0, excl).Trim();
-            if (sheetPart.StartsWith("'") && sheetPart.EndsWith("'") && sheetPart.Length >= 2)
-            {
-                sheetPart = sheetPart.Substring(1, sheetPart.Length - 2).Replace("''", "'");
-            }
+            string sheetPart = UnquoteSheetToken(s.Substring(0, excl).Trim());
             for (int i = 0; i < WorkbookSheetNames.Count && i < WorkbookSheets.Count; i++)
             {
                 if (string.Equals(WorkbookSheetNames[i], sheetPart, StringComparison.OrdinalIgnoreCase))
@@ -60,6 +140,66 @@ namespace ZenQOffice.Core
                 }
             }
             return defaultSheet;
+        }
+
+        private static int FindSheetBangIndex(string s)
+        {
+            bool inQuotes = false;
+            bool inSingleQuotes = false;
+            for (int i = 0; i < s.Length; i++)
+            {
+                if (s[i] == '"' && !inSingleQuotes) inQuotes = !inQuotes;
+                else if (s[i] == '\'' && !inQuotes) inSingleQuotes = !inSingleQuotes;
+                else if (s[i] == '!' && !inQuotes && !inSingleQuotes) return i;
+            }
+            return -1;
+        }
+
+        private static string UnquoteSheetToken(string token)
+        {
+            string sheetPart = (token ?? "").Trim();
+            if (sheetPart.StartsWith("'") && sheetPart.EndsWith("'") && sheetPart.Length >= 2)
+            {
+                sheetPart = sheetPart.Substring(1, sheetPart.Length - 2).Replace("''", "'");
+            }
+            return sheetPart;
+        }
+
+        private static bool TryResolve3DSheetSpan(string expr, SparseMatrix defaultSheet, out int startSheetIdx, out int endSheetIdx, out string innerRef)
+        {
+            startSheetIdx = -1;
+            endSheetIdx = -1;
+            innerRef = "";
+            if (string.IsNullOrEmpty(expr) || WorkbookSheets == null || WorkbookSheetNames == null) return false;
+            string s = expr.Trim();
+            int excl = FindSheetBangIndex(s);
+            if (excl <= 0 || excl >= s.Length - 1) return false;
+            string sheetPart = UnquoteSheetToken(s.Substring(0, excl));
+            int colonIdx = sheetPart.IndexOf(':');
+            if (colonIdx <= 0 || colonIdx >= sheetPart.Length - 1) return false;
+            string sh1 = UnquoteSheetToken(sheetPart.Substring(0, colonIdx));
+            string sh2 = UnquoteSheetToken(sheetPart.Substring(colonIdx + 1));
+            int idx1 = WorkbookSheetNames.FindIndex(n => string.Equals(n, sh1, StringComparison.OrdinalIgnoreCase));
+            int idx2 = WorkbookSheetNames.FindIndex(n => string.Equals(n, sh2, StringComparison.OrdinalIgnoreCase));
+            if (idx1 < 0 || idx2 < 0) return false;
+            startSheetIdx = Math.Min(idx1, idx2);
+            endSheetIdx = Math.Max(idx1, idx2);
+            innerRef = s.Substring(excl + 1).Trim();
+            return true;
+        }
+
+        private static string ExpandDefinedNameIfPresent(string token)
+        {
+            if (string.IsNullOrEmpty(token) || WorkbookNamedRanges == null || WorkbookNamedRanges.Count == 0) return null;
+            string key = token.Trim();
+            string refersTo;
+            if (WorkbookNamedRanges.TryGetValue(key, out refersTo) && !string.IsNullOrWhiteSpace(refersTo))
+            {
+                string cleanRef = refersTo.Trim();
+                if (cleanRef.StartsWith("=")) cleanRef = cleanRef.Substring(1).Trim();
+                return cleanRef;
+            }
+            return null;
         }
 
         private static bool IsSingleTopLevelFunctionCall(string expr, out string funcName, out string argsStr)
@@ -112,9 +252,25 @@ namespace ZenQOffice.Core
         public static void EvaluateSheet(SparseMatrix sheet)
         {
             if (sheet == null) return;
+            CircularReferenceDetected = false;
+            LastCircularReferenceCell = "";
+            for (int pass = 0; pass < 16; pass++)
+            {
+                if (_evaluatedInCurrentPass == null) _evaluatedInCurrentPass = new HashSet<string>();
+                else _evaluatedInCurrentPass.Clear();
+                if (_activeEvalCells == null) _activeEvalCells = new HashSet<string>();
+                else _activeEvalCells.Clear();
+                bool changed = EvaluateSheetSinglePass(sheet);
+                if (!changed && pass >= 1) break;
+            }
+        }
+
+        private static bool EvaluateSheetSinglePass(SparseMatrix sheet)
+        {
+            if (sheet == null) return false;
             CurrentEvaluatingSheet = sheet;
+            bool changed = false;
             var cells = new List<KeyValuePair<ulong, CellData>>(sheet.GetAllCells());
-            for (int pass = 0; pass < 2; pass++)
             {
                 foreach (var kvp in cells)
                 {
@@ -124,8 +280,24 @@ namespace ZenQOffice.Core
                         var pos = SparseMatrix.DecodeKey(kvp.Key);
                         uint originR = pos.Item1;
                         uint originC = pos.Item2;
+                        CurrentEvaluatingRow = originR;
+                        CurrentEvaluatingCol = originC;
 
-                        CellData evalRes = EvaluateFormula(cell.FormulaStr, sheet);
+                        string prevEval = cell.EvaluatedStr ?? "";
+                        double prevNum = cell.NumericValue;
+
+                        if (_activeEvalCells == null) _activeEvalCells = new HashSet<string>();
+                        string cellKey = GetSheetKey(sheet, originR, originC);
+                        _activeEvalCells.Add(cellKey);
+                        CellData evalRes;
+                        try
+                        {
+                            evalRes = EvaluateFormula(cell.FormulaStr, sheet);
+                        }
+                        finally
+                        {
+                            _activeEvalCells.Remove(cellKey);
+                        }
 
                         if (evalRes.ArrayResult != null && (evalRes.ArrayResult.GetLength(0) > 1 || evalRes.ArrayResult.GetLength(1) > 1))
                         {
@@ -191,6 +363,12 @@ namespace ZenQOffice.Core
                             cell.NumericValue = evalRes.NumericValue;
                             cell.EvaluatedStr = evalRes.EvaluatedStr;
                         }
+
+                        if (!string.Equals(prevEval, cell.EvaluatedStr ?? "", StringComparison.Ordinal) ||
+                            Math.Abs(prevNum - cell.NumericValue) > 1e-12)
+                        {
+                            changed = true;
+                        }
                     }
                     else if (cell.Type == CellType.Number)
                     {
@@ -202,6 +380,7 @@ namespace ZenQOffice.Core
                     }
                 }
             }
+            return changed;
         }
 
         public static string FormatCellDisplay(CellData cell)
@@ -284,6 +463,54 @@ namespace ZenQOffice.Core
             else if (expr.StartsWith("_xlfn.", StringComparison.OrdinalIgnoreCase))
                 expr = expr.Substring(6).Trim();
 
+            _evalRecursionDepth++;
+            if (_evalRecursionDepth > 64)
+            {
+                _evalRecursionDepth--;
+                CircularReferenceDetected = true;
+                res.SetString("#CIRC!");
+                res.NumericValue = 0.0;
+                return res;
+            }
+            try
+            {
+            string expandedNamed = ExpandDefinedNameIfPresent(expr);
+            if (!string.IsNullOrEmpty(expandedNamed))
+            {
+                return EvaluateFormula("=" + expandedNamed, sheet);
+            }
+
+            if (WorkbookStructuredRefResolver != null && expr.Contains("[") && expr.Contains("]"))
+            {
+                var stCells = WorkbookStructuredRefResolver(expr, sheet, CurrentEvaluatingRow);
+                if (stCells != null && stCells.Count > 0)
+                {
+                    if (stCells.Count == 1)
+                    {
+                        CellData sc = sheet != null ? sheet.GetCell(stCells[0].Item1, stCells[0].Item2) : null;
+                        if (sc != null)
+                        {
+                            res.NumericValue = sc.NumericValue;
+                            res.EvaluatedStr = sc.EvaluatedStr ?? sc.RawValue;
+                            res.RawValue = sc.RawValue;
+                            res.Type = sc.Type == CellType.Empty ? CellType.Empty : sc.Type;
+                            return res;
+                        }
+                        res.SetNumber(0);
+                        res.EvaluatedStr = "0";
+                        return res;
+                    }
+                    CellData[,] spArr = ExtractArray(expr, sheet);
+                    if (spArr != null && spArr.GetLength(0) > 0 && spArr.GetLength(1) > 0)
+                    {
+                        res.ArrayResult = spArr;
+                        res.NumericValue = spArr[0, 0].NumericValue;
+                        res.EvaluatedStr = spArr[0, 0].EvaluatedStr ?? spArr[0, 0].RawValue;
+                        return res;
+                    }
+                }
+            }
+
             if (expr.EndsWith("#"))
             {
                 string baseRef = expr.Substring(0, expr.Length - 1).Trim();
@@ -315,8 +542,22 @@ namespace ZenQOffice.Core
                 SparseMatrix refSheet = ResolveSheet(expr, sheet);
                 var pos = SparseMatrix.ParseCellAddress(expr);
                 CellData src = refSheet != null ? refSheet.GetCell(pos.Item1, pos.Item2) : null;
+                string circErr;
+                if (!EnsureFormulaCellEvaluated(refSheet, pos.Item1, pos.Item2, src, out circErr))
+                {
+                    res.SetString(circErr ?? "#CIRC!");
+                    res.NumericValue = 0.0;
+                    return res;
+                }
                 if (src != null)
                 {
+                    string srcErr = src.EvaluatedStr ?? src.RawValue ?? "";
+                    if (IsExcelError(srcErr))
+                    {
+                        res.SetString(srcErr);
+                        res.NumericValue = 0.0;
+                        return res;
+                    }
                     res.NumericValue = src.NumericValue;
                     res.EvaluatedStr = src.EvaluatedStr ?? src.RawValue;
                     res.RawValue = src.RawValue;
@@ -337,51 +578,32 @@ namespace ZenQOffice.Core
                 // Math & Stats Functions
                 if (funcName == "SUM")
                 {
-                    List<double> values = new List<double>();
-                    foreach (var arg in args)
+                    List<double> values;
+                    string errCode;
+                    if (!CollectNumericAggregateValues(args, sheet, false, out values, out errCode))
                     {
-                        SparseMatrix argSheet = ResolveSheet(arg, sheet);
-                        var range = ParseRange(arg);
-                        if (range.Count > 0)
-                        {
-                            foreach (var cellPos in range)
-                            {
-                                CellData cell = argSheet.GetCell(cellPos.Item1, cellPos.Item2);
-                                if (cell != null && cell.Type != CellType.Empty) values.Add(cell.NumericValue);
-                            }
-                        }
-                        else
-                        {
-                            values.Add(ParseAndEvaluateNumeric(arg, sheet));
-                        }
+                        res.SetString(errCode);
+                        return res;
                     }
-                    double sum = HardwareAsmEngine.FastSum(values.ToArray());
+                    double sum = values.Count > 0 ? HardwareAsmEngine.FastSum(values.ToArray()) : 0.0;
                     res.SetNumber(sum);
                     res.EvaluatedStr = FormatCellDisplay(res);
                     return res;
                 }
                 else if (funcName == "AVERAGE" || funcName == "AVERAGEA")
                 {
-                    List<double> values = new List<double>();
-                    foreach (var arg in args)
+                    List<double> values;
+                    string errCode;
+                    bool includeText = (funcName == "AVERAGEA");
+                    if (!CollectNumericAggregateValues(args, sheet, includeText, out values, out errCode))
                     {
-                        SparseMatrix argSheet = ResolveSheet(arg, sheet);
-                        var range = ParseRange(arg);
-                        if (range.Count > 0)
-                        {
-                            foreach (var cellPos in range)
-                            {
-                                CellData cell = argSheet.GetCell(cellPos.Item1, cellPos.Item2);
-                                if (cell != null && cell.Type != CellType.Empty)
-                                {
-                                    values.Add(cell.NumericValue);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            values.Add(ParseAndEvaluateNumeric(arg, sheet));
-                        }
+                        res.SetString(errCode);
+                        return res;
+                    }
+                    if (values.Count == 0)
+                    {
+                        res.SetString("#DIV/0!");
+                        return res;
                     }
                     double avg = HardwareAsmEngine.FastAverage(values.ToArray());
                     res.SetNumber(avg);
@@ -390,24 +612,48 @@ namespace ZenQOffice.Core
                 }
                 else if (funcName == "SUMPRODUCT")
                 {
-                    if (args.Length >= 2)
+                    if (args.Length >= 1)
                     {
-                        SparseMatrix sA = ResolveSheet(args[0], sheet);
-                        SparseMatrix sB = ResolveSheet(args[1], sheet);
-                        var rangeA = ParseRange(args[0]);
-                        var rangeB = ParseRange(args[1]);
-                        int n = Math.Min(rangeA.Count, rangeB.Count);
-                        double[] arrA = new double[n];
-                        double[] arrB = new double[n];
-                        for (int i = 0; i < n; i++)
+                        var arrays = new List<CellData[,]>();
+                        int rows = -1, cols = -1;
+                        foreach (var a in args)
                         {
-                            CellData cA = sA.GetCell(rangeA[i].Item1, rangeA[i].Item2);
-                            CellData cB = sB.GetCell(rangeB[i].Item1, rangeB[i].Item2);
-                            arrA[i] = (cA != null) ? cA.NumericValue : 0.0;
-                            arrB[i] = (cB != null) ? cB.NumericValue : 0.0;
+                            CellData[,] arr = ExtractArray(a, sheet);
+                            int rLen = arr.GetLength(0);
+                            int cLen = arr.GetLength(1);
+                            if (rows < 0) { rows = rLen; cols = cLen; }
+                            else if (rLen != rows || cLen != cols)
+                            {
+                                res.SetString("#VALUE!");
+                                return res;
+                            }
+                            arrays.Add(arr);
                         }
-                        double dot = HardwareAsmEngine.FastDotProduct(arrA, arrB);
-                        res.SetNumber(dot);
+                        if (rows <= 0 || cols <= 0)
+                        {
+                            res.SetNumber(0.0);
+                            res.EvaluatedStr = "0";
+                            return res;
+                        }
+                        double total = 0.0;
+                        for (int r = 0; r < rows; r++)
+                        {
+                            for (int c = 0; c < cols; c++)
+                            {
+                                double term = 1.0;
+                                foreach (var arr in arrays)
+                                {
+                                    CellData cd = arr[r, c];
+                                    string es = cd != null ? (cd.EvaluatedStr ?? cd.RawValue ?? "") : "";
+                                    if (IsExcelError(es)) { res.SetString(es); return res; }
+                                    double v = (cd != null && (cd.Type == CellType.Number || (cd.Type == CellType.Formula && !IsTextOnlyCell(cd))))
+                                        ? cd.NumericValue : 0.0;
+                                    term *= v;
+                                }
+                                total += term;
+                            }
+                        }
+                        res.SetNumber(total);
                         res.EvaluatedStr = FormatCellDisplay(res);
                         return res;
                     }
@@ -417,15 +663,16 @@ namespace ZenQOffice.Core
                     int count = 0;
                     foreach (var arg in args)
                     {
-                        SparseMatrix argSheet = ResolveSheet(arg, sheet);
-                        var range = ParseRange(arg);
-                        if (range.Count > 0)
+                        var cells = CollectAllCellsFromArg(arg, sheet);
+                        if (cells != null)
                         {
-                            foreach (var cellPos in range)
+                            foreach (var cell in cells)
                             {
-                                CellData cell = argSheet.GetCell(cellPos.Item1, cellPos.Item2);
-                                if (cell != null && (cell.Type == CellType.Number || (cell.Type == CellType.Formula && !string.IsNullOrEmpty(cell.EvaluatedStr))))
-                                    count++;
+                                if (cell != null && !IsExcelError(cell.EvaluatedStr ?? cell.RawValue ?? ""))
+                                {
+                                    if (cell.Type == CellType.Number || (cell.Type == CellType.Formula && !IsTextOnlyCell(cell)))
+                                        count++;
+                                }
                             }
                         }
                         else
@@ -444,14 +691,12 @@ namespace ZenQOffice.Core
                     int count = 0;
                     foreach (var arg in args)
                     {
-                        SparseMatrix argSheet = ResolveSheet(arg, sheet);
-                        var range = ParseRange(arg);
-                        if (range.Count > 0)
+                        var cells = CollectAllCellsFromArg(arg, sheet);
+                        if (cells != null)
                         {
-                            foreach (var cellPos in range)
+                            foreach (var cell in cells)
                             {
-                                CellData cell = argSheet.GetCell(cellPos.Item1, cellPos.Item2);
-                                if (cell != null && (!string.IsNullOrEmpty(cell.RawValue) || !string.IsNullOrEmpty(cell.EvaluatedStr)))
+                                if (cell != null && cell.Type != CellType.Empty && (!string.IsNullOrEmpty(cell.RawValue) || !string.IsNullOrEmpty(cell.EvaluatedStr)))
                                     count++;
                             }
                         }
@@ -466,91 +711,46 @@ namespace ZenQOffice.Core
                 }
                 else if (funcName == "MIN" || funcName == "MINA")
                 {
-                    double minVal = double.MaxValue;
-                    bool found = false;
-                    foreach (var arg in args)
+                    List<double> values;
+                    string errCode;
+                    if (!CollectNumericAggregateValues(args, sheet, funcName == "MINA", out values, out errCode))
                     {
-                        SparseMatrix argSheet = ResolveSheet(arg, sheet);
-                        var range = ParseRange(arg);
-                        if (range.Count > 0)
-                        {
-                            foreach (var cellPos in range)
-                            {
-                                CellData cell = argSheet.GetCell(cellPos.Item1, cellPos.Item2);
-                                if (cell != null && cell.Type != CellType.Empty)
-                                {
-                                    minVal = Math.Min(minVal, cell.NumericValue);
-                                    found = true;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            minVal = Math.Min(minVal, ParseAndEvaluateNumeric(arg, sheet));
-                            found = true;
-                        }
+                        res.SetString(errCode);
+                        return res;
                     }
-                    res.SetNumber(found ? minVal : 0.0);
+                    double minVal = values.Count > 0 ? double.MaxValue : 0.0;
+                    for (int i = 0; i < values.Count; i++) minVal = Math.Min(minVal, values[i]);
+                    res.SetNumber(minVal);
                     res.EvaluatedStr = FormatCellDisplay(res);
                     return res;
                 }
                 else if (funcName == "MAX" || funcName == "MAXA")
                 {
-                    double maxVal = double.MinValue;
-                    bool found = false;
-                    foreach (var arg in args)
+                    List<double> values;
+                    string errCode;
+                    if (!CollectNumericAggregateValues(args, sheet, funcName == "MAXA", out values, out errCode))
                     {
-                        SparseMatrix argSheet = ResolveSheet(arg, sheet);
-                        var range = ParseRange(arg);
-                        if (range.Count > 0)
-                        {
-                            foreach (var cellPos in range)
-                            {
-                                CellData cell = argSheet.GetCell(cellPos.Item1, cellPos.Item2);
-                                if (cell != null && cell.Type != CellType.Empty)
-                                {
-                                    maxVal = Math.Max(maxVal, cell.NumericValue);
-                                    found = true;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            maxVal = Math.Max(maxVal, ParseAndEvaluateNumeric(arg, sheet));
-                            found = true;
-                        }
+                        res.SetString(errCode);
+                        return res;
                     }
-                    res.SetNumber(found ? maxVal : 0.0);
+                    double maxVal = values.Count > 0 ? double.MinValue : 0.0;
+                    for (int i = 0; i < values.Count; i++) maxVal = Math.Max(maxVal, values[i]);
+                    res.SetNumber(maxVal);
                     res.EvaluatedStr = FormatCellDisplay(res);
                     return res;
                 }
                 else if (funcName == "PRODUCT")
                 {
-                    double prod = 1.0;
-                    bool found = false;
-                    foreach (var arg in args)
+                    List<double> values;
+                    string errCode;
+                    if (!CollectNumericAggregateValues(args, sheet, false, out values, out errCode))
                     {
-                        SparseMatrix argSheet = ResolveSheet(arg, sheet);
-                        var range = ParseRange(arg);
-                        if (range.Count > 0)
-                        {
-                            foreach (var cellPos in range)
-                            {
-                                CellData cell = argSheet.GetCell(cellPos.Item1, cellPos.Item2);
-                                if (cell != null && cell.Type != CellType.Empty)
-                                {
-                                    prod *= cell.NumericValue;
-                                    found = true;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            prod *= ParseAndEvaluateNumeric(arg, sheet);
-                            found = true;
-                        }
+                        res.SetString(errCode);
+                        return res;
                     }
-                    res.SetNumber(found ? prod : 0.0);
+                    double prod = values.Count > 0 ? 1.0 : 0.0;
+                    for (int i = 0; i < values.Count; i++) prod *= values[i];
+                    res.SetNumber(prod);
                     res.EvaluatedStr = FormatCellDisplay(res);
                     return res;
                 }
@@ -3735,6 +3935,40 @@ namespace ZenQOffice.Core
                     res.EvaluatedStr = tCode.ToString();
                     return res;
                 }
+                else
+                {
+                    res.SetString("#NAME?");
+                    res.NumericValue = 0.0;
+                    return res;
+                }
+            }
+
+            // Array Literal at top level: ={1,2;3,4}
+            if (expr.StartsWith("{") && expr.EndsWith("}"))
+            {
+                CellData[,] litArr = ExtractArray(expr, sheet);
+                if (litArr.GetLength(0) > 0 && litArr.GetLength(1) > 0)
+                {
+                    res.ArrayResult = litArr;
+                    res.NumericValue = litArr[0, 0].NumericValue;
+                    res.EvaluatedStr = litArr[0, 0].EvaluatedStr ?? litArr[0, 0].RawValue;
+                    res.Type = litArr[0, 0].Type;
+                    return res;
+                }
+            }
+
+            // Element-wise range/array binary expression (e.g. =A1:A5*B1:B5, =A1:A5+10, =(A1:A5>10)*B1:B5)
+            CellData[,] arrayExprRes;
+            if (TryEvaluateArrayBinaryExpression(expr, sheet, out arrayExprRes))
+            {
+                res.ArrayResult = arrayExprRes;
+                if (arrayExprRes.GetLength(0) > 0 && arrayExprRes.GetLength(1) > 0)
+                {
+                    res.NumericValue = arrayExprRes[0, 0].NumericValue;
+                    res.EvaluatedStr = arrayExprRes[0, 0].EvaluatedStr ?? arrayExprRes[0, 0].RawValue;
+                    res.Type = arrayExprRes[0, 0].Type;
+                }
+                return res;
             }
 
             // Check top-level string concatenation operator '&' (e.g. =A1 & " - " & B1)
@@ -3746,7 +3980,13 @@ namespace ZenQOffice.Core
                 {
                     CellData tmp = new CellData();
                     SetResultFromToken(tmp, part, sheet);
-                    sb.Append(tmp.EvaluatedStr ?? tmp.RawValue ?? "");
+                    string s = tmp.EvaluatedStr ?? tmp.RawValue ?? "";
+                    if (IsExcelError(s))
+                    {
+                        res.SetString(s);
+                        return res;
+                    }
+                    sb.Append(s);
                 }
                 res.SetString(sb.ToString());
                 return res;
@@ -3755,14 +3995,35 @@ namespace ZenQOffice.Core
             // Check top-level comparison operators (e.g. =A1>B1, =SUM(A1:A5)>=100)
             if (HasTopLevelComparison(expr))
             {
-                bool cond = EvaluateCondition(expr, sheet);
+                string condErr;
+                bool cond = EvaluateConditionWithError(expr, sheet, out condErr);
+                if (!string.IsNullOrEmpty(condErr))
+                {
+                    res.SetString(condErr);
+                    res.NumericValue = 0.0;
+                    return res;
+                }
                 res.SetString(cond ? "TRUE" : "FALSE");
                 res.NumericValue = cond ? 1.0 : 0.0;
                 return res;
             }
 
-            // General Arithmetic Evaluation (including nested functions, parentheses, %, ^, *, /, +, -)
-            double evalVal = ParseAndEvaluateNumeric(expr, sheet);
+            // String literal alone: ="Hello"
+            if (expr.StartsWith("\"") && expr.EndsWith("\"") && expr.Length >= 2)
+            {
+                res.SetString(expr.Substring(1, expr.Length - 2).Replace("\"\"", "\""));
+                return res;
+            }
+
+            // General Arithmetic Evaluation with full error detection (#DIV/0!, #NAME?, #VALUE!, #REF!, #CIRC!)
+            double evalVal;
+            string numErr;
+            if (!TryEvaluateNumeric(expr, sheet, out evalVal, out numErr))
+            {
+                res.SetString(!string.IsNullOrEmpty(numErr) ? numErr : "#VALUE!");
+                res.NumericValue = 0;
+                return res;
+            }
             if (double.IsNaN(evalVal) || double.IsInfinity(evalVal))
             {
                 res.SetString("#DIV/0!");
@@ -3774,6 +4035,11 @@ namespace ZenQOffice.Core
                 res.EvaluatedStr = FormatCellDisplay(res);
             }
             return res;
+            }
+            finally
+            {
+                _evalRecursionDepth--;
+            }
         }
 
         private static List<string> SplitTopLevelByChar(string expr, char sep)
@@ -3997,7 +4263,15 @@ namespace ZenQOffice.Core
 
         private static bool EvaluateCondition(string condStr, SparseMatrix sheet)
         {
+            string errCode;
+            return EvaluateConditionWithError(condStr, sheet, out errCode);
+        }
+
+        private static bool EvaluateConditionWithError(string condStr, SparseMatrix sheet, out string errorCode)
+        {
+            errorCode = null;
             string clean = (condStr ?? "").Trim();
+            while (HasMatchingOuterParens(clean)) clean = clean.Substring(1, clean.Length - 2).Trim();
             if (string.IsNullOrEmpty(clean)) return false;
             if (clean.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) return true;
             if (clean.Equals("FALSE", StringComparison.OrdinalIgnoreCase)) return false;
@@ -4008,6 +4282,7 @@ namespace ZenQOffice.Core
                 CellData eval = EvaluateFormula("=" + clean, sheet);
                 if (eval != null)
                 {
+                    if (IsExcelError(eval.EvaluatedStr)) { errorCode = eval.EvaluatedStr; return false; }
                     if (eval.EvaluatedStr != null && eval.EvaluatedStr.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) return true;
                     if (eval.EvaluatedStr != null && eval.EvaluatedStr.Equals("FALSE", StringComparison.OrdinalIgnoreCase)) return false;
                     return Math.Abs(eval.NumericValue) > 0.000001;
@@ -4023,13 +4298,20 @@ namespace ZenQOffice.Core
                     string leftStr = clean.Substring(0, opIdx).Trim();
                     string rightStr = clean.Substring(opIdx + op.Length).Trim();
 
-                    bool leftIsString = leftStr.StartsWith("\"") && leftStr.EndsWith("\"");
-                    bool rightIsString = rightStr.StartsWith("\"") && rightStr.EndsWith("\"");
+                    CellData leftCell = EvaluateFormula("=" + leftStr, sheet);
+                    CellData rightCell = EvaluateFormula("=" + rightStr, sheet);
+                    string lsErr = leftCell != null ? (leftCell.EvaluatedStr ?? leftCell.RawValue ?? "") : "";
+                    string rsErr = rightCell != null ? (rightCell.EvaluatedStr ?? rightCell.RawValue ?? "") : "";
+                    if (IsExcelError(lsErr)) { errorCode = lsErr; return false; }
+                    if (IsExcelError(rsErr)) { errorCode = rsErr; return false; }
 
-                    if (leftIsString || rightIsString)
+                    bool leftIsText = (leftStr.StartsWith("\"") && leftStr.EndsWith("\"")) || IsTextOnlyCell(leftCell);
+                    bool rightIsText = (rightStr.StartsWith("\"") && rightStr.EndsWith("\"")) || IsTextOnlyCell(rightCell);
+
+                    if (leftIsText || rightIsText)
                     {
-                        string leftVal = GetStringValue(leftStr, sheet);
-                        string rightVal = GetStringValue(rightStr, sheet);
+                        string leftVal = leftCell != null ? (leftCell.EvaluatedStr ?? leftCell.RawValue ?? "") : GetStringValue(leftStr, sheet);
+                        string rightVal = rightCell != null ? (rightCell.EvaluatedStr ?? rightCell.RawValue ?? "") : GetStringValue(rightStr, sheet);
                         int cmp = string.Compare(leftVal, rightVal, StringComparison.OrdinalIgnoreCase);
                         switch (op)
                         {
@@ -4044,8 +4326,8 @@ namespace ZenQOffice.Core
                     }
                     else
                     {
-                        double leftNum = ParseAndEvaluateNumeric(leftStr, sheet);
-                        double rightNum = ParseAndEvaluateNumeric(rightStr, sheet);
+                        double leftNum = leftCell != null ? leftCell.NumericValue : ParseAndEvaluateNumeric(leftStr, sheet);
+                        double rightNum = rightCell != null ? rightCell.NumericValue : ParseAndEvaluateNumeric(rightStr, sheet);
 
                         switch (op)
                         {
@@ -4061,8 +4343,9 @@ namespace ZenQOffice.Core
                 }
             }
 
-            double singleNum = ParseAndEvaluateNumeric(clean, sheet);
-            return Math.Abs(singleNum) > 0.000001;
+            double singleVal;
+            if (!TryEvaluateNumeric(clean, sheet, out singleVal, out errorCode)) return false;
+            return Math.Abs(singleVal) > 0.000001;
         }
 
         private static int FindTopLevelSubstring(string str, string op)
@@ -4127,60 +4410,410 @@ namespace ZenQOffice.Core
             return depth == 0;
         }
 
+        private static bool IsTextOnlyCell(CellData cell)
+        {
+            if (cell == null) return false;
+            if (cell.Type == CellType.String)
+            {
+                string raw = cell.RawValue ?? "";
+                if (raw.Equals("TRUE", StringComparison.OrdinalIgnoreCase) || raw.Equals("FALSE", StringComparison.OrdinalIgnoreCase)) return false;
+                double d;
+                return !(double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out d));
+            }
+            if (cell.Type == CellType.Formula)
+            {
+                string ev = cell.EvaluatedStr ?? "";
+                if (string.IsNullOrEmpty(ev) || ev.Equals("TRUE", StringComparison.OrdinalIgnoreCase) || ev.Equals("FALSE", StringComparison.OrdinalIgnoreCase)) return false;
+                double d;
+                if (double.TryParse(ev, NumberStyles.Any, CultureInfo.InvariantCulture, out d)) return false;
+                // Formatted numeric strings still have non-zero NumericValue or match formatted cell display
+                if (Math.Abs(cell.NumericValue) > 1e-12) return false;
+                return !string.Equals(ev, FormatCellDisplay(cell), StringComparison.Ordinal);
+            }
+            return false;
+        }
+
+        private static bool CollectNumericAggregateValues(string[] args, SparseMatrix sheet, bool includeTextAsZero, out List<double> values, out string errorCode)
+        {
+            values = new List<double>();
+            errorCode = null;
+            foreach (var arg in args)
+            {
+                if (string.IsNullOrWhiteSpace(arg)) continue;
+                int s1, s2;
+                string innerRef;
+                if (TryResolve3DSheetSpan(arg, sheet, out s1, out s2, out innerRef) && WorkbookSheets != null)
+                {
+                    var range3D = ParseRange(innerRef, WorkbookSheets[s1]);
+                    if (range3D.Count == 0 && IsCellReference(innerRef))
+                    {
+                        range3D.Add(SparseMatrix.ParseCellAddress(innerRef));
+                    }
+                    for (int si = s1; si <= s2 && si < WorkbookSheets.Count; si++)
+                    {
+                        SparseMatrix spSheet = WorkbookSheets[si];
+                        if (spSheet == null) continue;
+                        foreach (var cellPos in range3D)
+                        {
+                            CellData cell = spSheet.GetCell(cellPos.Item1, cellPos.Item2);
+                            if (cell == null || cell.Type == CellType.Empty) continue;
+                            string evErr = cell.EvaluatedStr ?? cell.RawValue ?? "";
+                            if (IsExcelError(evErr)) { errorCode = evErr; return false; }
+                            if (cell.Type == CellType.Number || (cell.Type == CellType.Formula && !IsTextOnlyCell(cell)))
+                                values.Add(cell.NumericValue);
+                            else if (includeTextAsZero)
+                                values.Add(0.0);
+                        }
+                    }
+                    continue;
+                }
+
+                var cells = CollectAllCellsFromArg(arg, sheet);
+                if (cells != null)
+                {
+                    foreach (var cell in cells)
+                    {
+                        if (cell == null || cell.Type == CellType.Empty) continue;
+                        string evErr = cell.EvaluatedStr ?? cell.RawValue ?? "";
+                        if (IsExcelError(evErr)) { errorCode = evErr; return false; }
+                        if (cell.Type == CellType.Number || (cell.Type == CellType.Formula && !IsTextOnlyCell(cell)))
+                            values.Add(cell.NumericValue);
+                        else if (includeTextAsZero)
+                            values.Add(0.0);
+                    }
+                    continue;
+                }
+
+                // Array expression or dynamic array function inside aggregate, e.g. =SUM((A1:A5>10)*B1:B5) or =SUM(FILTER(...))
+                if (ContainsRangeOrArrayOperator(arg))
+                {
+                    CellData[,] arrRes = ExtractArray(arg, sheet);
+                    int rLen = arrRes.GetLength(0), cLen = arrRes.GetLength(1);
+                    if (rLen > 0 && cLen > 0)
+                    {
+                        for (int r = 0; r < rLen; r++)
+                        {
+                            for (int c = 0; c < cLen; c++)
+                            {
+                                CellData cell = arrRes[r, c];
+                                if (cell == null || cell.Type == CellType.Empty) continue;
+                                string evErr = cell.EvaluatedStr ?? cell.RawValue ?? "";
+                                if (IsExcelError(evErr)) { errorCode = evErr; return false; }
+                                if (cell.Type == CellType.Number || (cell.Type == CellType.Formula && !IsTextOnlyCell(cell)))
+                                    values.Add(cell.NumericValue);
+                                else if (includeTextAsZero)
+                                    values.Add(0.0);
+                            }
+                        }
+                        continue;
+                    }
+                }
+
+                double num;
+                string err;
+                if (!TryEvaluateNumeric(arg, sheet, out num, out err))
+                {
+                    errorCode = err;
+                    return false;
+                }
+                if (double.IsNaN(num) || double.IsInfinity(num))
+                {
+                    errorCode = "#DIV/0!";
+                    return false;
+                }
+                values.Add(num);
+            }
+            return true;
+        }
+
+        private static List<CellData> CollectAllCellsFromArg(string arg, SparseMatrix sheet)
+        {
+            string cleanArg = (arg ?? "").Trim();
+            string expanded = ExpandDefinedNameIfPresent(cleanArg);
+            if (!string.IsNullOrEmpty(expanded)) cleanArg = expanded;
+
+            int s1, s2;
+            string innerRef;
+            if (TryResolve3DSheetSpan(cleanArg, sheet, out s1, out s2, out innerRef) && WorkbookSheets != null)
+            {
+                var res3D = new List<CellData>();
+                var range3D = ParseRange(innerRef, WorkbookSheets[s1]);
+                for (int si = s1; si <= s2 && si < WorkbookSheets.Count; si++)
+                {
+                    SparseMatrix sh = WorkbookSheets[si];
+                    if (sh == null) continue;
+                    foreach (var p in range3D) res3D.Add(sh.GetCell(p.Item1, p.Item2));
+                }
+                return res3D;
+            }
+
+            if (WorkbookStructuredRefResolver != null && cleanArg.Contains("[") && cleanArg.Contains("]"))
+            {
+                var stCoords = WorkbookStructuredRefResolver(cleanArg, sheet, CurrentEvaluatingRow);
+                if (stCoords != null && stCoords.Count > 0)
+                {
+                    var stList = new List<CellData>(stCoords.Count);
+                    foreach (var p in stCoords) stList.Add(sheet != null ? sheet.GetCell(p.Item1, p.Item2) : null);
+                    return stList;
+                }
+            }
+
+            SparseMatrix argSheet = ResolveSheet(cleanArg, sheet);
+            var range = ParseRange(cleanArg, sheet);
+            if (range.Count > 0)
+            {
+                var list = new List<CellData>(range.Count);
+                foreach (var p in range) list.Add(argSheet != null ? argSheet.GetCell(p.Item1, p.Item2) : null);
+                return list;
+            }
+            return null;
+        }
+
+        private static bool ContainsRangeOrArrayOperator(string expr)
+        {
+            if (string.IsNullOrEmpty(expr)) return false;
+            return expr.Contains(":") || expr.Contains("{") || expr.Contains("#") || IsSingleTopLevelFunctionCall(expr.Trim(), out _, out _);
+        }
+
+        private static bool TryEvaluateArrayBinaryExpression(string expr, SparseMatrix sheet, out CellData[,] arrayResult)
+        {
+            arrayResult = null;
+            string clean = (expr ?? "").Trim();
+            while (HasMatchingOuterParens(clean)) clean = clean.Substring(1, clean.Length - 2).Trim();
+            if (string.IsNullOrEmpty(clean)) return false;
+
+            // Only handle expressions that reference at least one range/array or element-wise comparison/math
+            string opStr = null;
+            int opPos = -1;
+            int plusMinus = FindLowestPrecedenceOp(clean, '+', '-');
+            if (plusMinus > 0) { opPos = plusMinus; opStr = clean[plusMinus].ToString(); }
+            else
+            {
+                int mulDiv = FindLowestPrecedenceOp(clean, '*', '/');
+                if (mulDiv > 0) { opPos = mulDiv; opStr = clean[mulDiv].ToString(); }
+                else
+                {
+                    int powOp = FindLowestPrecedenceOp(clean, '^', '^');
+                    if (powOp > 0) { opPos = powOp; opStr = "^"; }
+                    else
+                    {
+                        string[] cmpOps = { ">=", "<=", "<>", "!=", ">", "<", "=" };
+                        foreach (var cOp in cmpOps)
+                        {
+                            int idx = FindTopLevelSubstring(clean, cOp);
+                            if (idx > 0) { opPos = idx; opStr = cOp; break; }
+                        }
+                        if (opPos < 0)
+                        {
+                            int amp = FindTopLevelSubstring(clean, "&");
+                            if (amp > 0) { opPos = amp; opStr = "&"; }
+                        }
+                    }
+                }
+            }
+
+            if (opPos <= 0 || string.IsNullOrEmpty(opStr)) return false;
+            string leftExpr = clean.Substring(0, opPos).Trim();
+            string rightExpr = clean.Substring(opPos + opStr.Length).Trim();
+
+            if (!ContainsRangeOrArrayOperator(leftExpr) && !ContainsRangeOrArrayOperator(rightExpr)) return false;
+
+            CellData[,] leftArr = ExtractArray(leftExpr, sheet);
+            CellData[,] rightArr = ExtractArray(rightExpr, sheet);
+            int lR = leftArr.GetLength(0), lC = leftArr.GetLength(1);
+            int rR = rightArr.GetLength(0), rC = rightArr.GetLength(1);
+            if ((lR <= 1 && lC <= 1) && (rR <= 1 && rC <= 1)) return false;
+
+            int outR = Math.Max(lR, rR);
+            int outC = Math.Max(lC, rC);
+            arrayResult = new CellData[outR, outC];
+            for (int r = 0; r < outR; r++)
+            {
+                for (int c = 0; c < outC; c++)
+                {
+                    CellData lc = leftArr[lR == 1 ? 0 : Math.Min(r, lR - 1), lC == 1 ? 0 : Math.Min(c, lC - 1)];
+                    CellData rc = rightArr[rR == 1 ? 0 : Math.Min(r, rR - 1), rC == 1 ? 0 : Math.Min(c, rC - 1)];
+                    CellData cellOut = new CellData();
+
+                    string ls = lc != null ? (lc.EvaluatedStr ?? lc.RawValue ?? "") : "";
+                    string rs = rc != null ? (rc.EvaluatedStr ?? rc.RawValue ?? "") : "";
+                    if (IsExcelError(ls)) { cellOut.SetString(ls); arrayResult[r, c] = cellOut; continue; }
+                    if (IsExcelError(rs)) { cellOut.SetString(rs); arrayResult[r, c] = cellOut; continue; }
+
+                    if (opStr == "&")
+                    {
+                        cellOut.SetString(ls + rs);
+                    }
+                    else if (opStr == "=" || opStr == "<>" || opStr == "!=" || opStr == ">" || opStr == ">=" || opStr == "<" || opStr == "<=")
+                    {
+                        bool b;
+                        if (IsTextOnlyCell(lc) || IsTextOnlyCell(rc))
+                        {
+                            int cmp = string.Compare(ls, rs, StringComparison.OrdinalIgnoreCase);
+                            b = opStr == "=" ? cmp == 0 : (opStr == "<>" || opStr == "!=") ? cmp != 0 : opStr == ">" ? cmp > 0 : opStr == ">=" ? cmp >= 0 : opStr == "<" ? cmp < 0 : cmp <= 0;
+                        }
+                        else
+                        {
+                            double lv = lc != null ? lc.NumericValue : 0.0;
+                            double rv = rc != null ? rc.NumericValue : 0.0;
+                            b = opStr == "=" ? Math.Abs(lv - rv) < 1e-9 : (opStr == "<>" || opStr == "!=") ? Math.Abs(lv - rv) >= 1e-9 : opStr == ">" ? lv > rv : opStr == ">=" ? lv >= rv : opStr == "<" ? lv < rv : lv <= rv;
+                        }
+                        cellOut.SetNumber(b ? 1.0 : 0.0);
+                        cellOut.EvaluatedStr = b ? "TRUE" : "FALSE";
+                    }
+                    else
+                    {
+                        double lv = lc != null ? lc.NumericValue : 0.0;
+                        double rv = rc != null ? rc.NumericValue : 0.0;
+                        if (opStr == "+") { cellOut.SetNumber(lv + rv); cellOut.EvaluatedStr = FormatCellDisplay(cellOut); }
+                        else if (opStr == "-") { cellOut.SetNumber(lv - rv); cellOut.EvaluatedStr = FormatCellDisplay(cellOut); }
+                        else if (opStr == "*") { cellOut.SetNumber(lv * rv); cellOut.EvaluatedStr = FormatCellDisplay(cellOut); }
+                        else if (opStr == "/")
+                        {
+                            if (Math.Abs(rv) <= 1e-12) cellOut.SetString("#DIV/0!");
+                            else { cellOut.SetNumber(lv / rv); cellOut.EvaluatedStr = FormatCellDisplay(cellOut); }
+                        }
+                        else if (opStr == "^") { cellOut.SetNumber(Math.Pow(lv, rv)); cellOut.EvaluatedStr = FormatCellDisplay(cellOut); }
+                    }
+                    arrayResult[r, c] = cellOut;
+                }
+            }
+            return true;
+        }
+
         public static double ParseAndEvaluateNumeric(string expr, SparseMatrix sheet)
         {
+            double val;
+            string err;
+            if (TryEvaluateNumeric(expr, sheet, out val, out err)) return val;
+            if (err == "#DIV/0!") return double.NaN;
+            return 0.0;
+        }
+
+        public static bool TryEvaluateNumeric(string expr, SparseMatrix sheet, out double value, out string errorCode)
+        {
+            value = 0.0;
+            errorCode = null;
             string clean = (expr ?? "").Trim();
-            if (string.IsNullOrEmpty(clean)) return 0.0;
+            if (string.IsNullOrEmpty(clean)) return true;
 
             while (HasMatchingOuterParens(clean))
             {
                 clean = clean.Substring(1, clean.Length - 2).Trim();
             }
-            if (string.IsNullOrEmpty(clean)) return 0.0;
+            if (string.IsNullOrEmpty(clean)) return true;
+
+            if (IsExcelError(clean)) { errorCode = clean; return false; }
+
+            // Array/boolean/comparison expression evaluated as numeric 1/0 if nested (e.g. (A1>10)*B1)
+            if (HasTopLevelComparison(clean))
+            {
+                string cErr;
+                bool cond = EvaluateConditionWithError(clean, sheet, out cErr);
+                if (!string.IsNullOrEmpty(cErr)) { errorCode = cErr; return false; }
+                value = cond ? 1.0 : 0.0;
+                return true;
+            }
 
             // Binary Operations in reverse operator precedence: + / -, then * / /, then ^
             int plusMinus = FindLowestPrecedenceOp(clean, '+', '-');
             if (plusMinus > 0)
             {
                 char op = clean[plusMinus];
-                double left = ParseAndEvaluateNumeric(clean.Substring(0, plusMinus), sheet);
-                double right = ParseAndEvaluateNumeric(clean.Substring(plusMinus + 1), sheet);
-                return (op == '+') ? (left + right) : (left - right);
+                double left, right;
+                if (!TryEvaluateNumeric(clean.Substring(0, plusMinus), sheet, out left, out errorCode)) return false;
+                if (!TryEvaluateNumeric(clean.Substring(plusMinus + 1), sheet, out right, out errorCode)) return false;
+                value = (op == '+') ? (left + right) : (left - right);
+                return true;
             }
 
             int mulDiv = FindLowestPrecedenceOp(clean, '*', '/');
             if (mulDiv > 0)
             {
                 char op = clean[mulDiv];
-                double left = ParseAndEvaluateNumeric(clean.Substring(0, mulDiv), sheet);
-                double right = ParseAndEvaluateNumeric(clean.Substring(mulDiv + 1), sheet);
-                return (op == '*') ? (left * right) : (Math.Abs(right) > 1e-12 ? (left / right) : double.NaN);
+                double left, right;
+                if (!TryEvaluateNumeric(clean.Substring(0, mulDiv), sheet, out left, out errorCode)) return false;
+                if (!TryEvaluateNumeric(clean.Substring(mulDiv + 1), sheet, out right, out errorCode)) return false;
+                if (op == '*') { value = left * right; return true; }
+                if (Math.Abs(right) <= 1e-12) { errorCode = "#DIV/0!"; value = double.NaN; return false; }
+                value = left / right;
+                return true;
             }
 
             int powOp = FindLowestPrecedenceOp(clean, '^', '^');
             if (powOp > 0)
             {
-                double left = ParseAndEvaluateNumeric(clean.Substring(0, powOp), sheet);
-                double right = ParseAndEvaluateNumeric(clean.Substring(powOp + 1), sheet);
-                return Math.Pow(left, right);
+                double left, right;
+                if (!TryEvaluateNumeric(clean.Substring(0, powOp), sheet, out left, out errorCode)) return false;
+                if (!TryEvaluateNumeric(clean.Substring(powOp + 1), sheet, out right, out errorCode)) return false;
+                value = Math.Pow(left, right);
+                return true;
             }
 
             // Unary + or -
             if (clean[0] == '-')
-                return -ParseAndEvaluateNumeric(clean.Substring(1), sheet);
+            {
+                double inner;
+                if (!TryEvaluateNumeric(clean.Substring(1), sheet, out inner, out errorCode)) return false;
+                value = -inner;
+                return true;
+            }
             if (clean[0] == '+')
-                return ParseAndEvaluateNumeric(clean.Substring(1), sheet);
+            {
+                return TryEvaluateNumeric(clean.Substring(1), sheet, out value, out errorCode);
+            }
 
             // Postfix percentage %
             if (clean.EndsWith("%") && clean.Length > 1)
-                return ParseAndEvaluateNumeric(clean.Substring(0, clean.Length - 1), sheet) / 100.0;
+            {
+                double inner;
+                if (!TryEvaluateNumeric(clean.Substring(0, clean.Length - 1), sheet, out inner, out errorCode)) return false;
+                value = inner / 100.0;
+                return true;
+            }
+
+            // String literal used in arithmetic
+            if (clean.StartsWith("\"") && clean.EndsWith("\"") && clean.Length >= 2)
+            {
+                string innerStr = clean.Substring(1, clean.Length - 2);
+                if (double.TryParse(innerStr, NumberStyles.Any, CultureInfo.InvariantCulture, out value)) return true;
+                errorCode = "#VALUE!";
+                return false;
+            }
 
             // Embedded Function Call (e.g. SUM(A1:A5) inside SUM(A1:A5)+AVERAGE(B1:B5))
             string fName, fArgs;
             if (IsSingleTopLevelFunctionCall(clean, out fName, out fArgs))
             {
                 CellData fRes = EvaluateFormula("=" + clean, sheet);
-                return fRes != null ? fRes.NumericValue : 0.0;
+                if (fRes == null) return true;
+                string fStr = fRes.EvaluatedStr ?? fRes.RawValue ?? "";
+                if (IsExcelError(fStr)) { errorCode = fStr; return false; }
+                if (IsTextOnlyCell(fRes)) { errorCode = "#VALUE!"; return false; }
+                value = fRes.NumericValue;
+                return true;
+            }
+
+            // Defined Name lookup
+            string namedExpr = ExpandDefinedNameIfPresent(clean);
+            if (!string.IsNullOrEmpty(namedExpr))
+            {
+                return TryEvaluateNumeric(namedExpr, sheet, out value, out errorCode);
+            }
+
+            // Structured Table Reference
+            if (WorkbookStructuredRefResolver != null && clean.Contains("[") && clean.Contains("]"))
+            {
+                var stCoords = WorkbookStructuredRefResolver(clean, sheet, CurrentEvaluatingRow);
+                if (stCoords != null && stCoords.Count > 0)
+                {
+                    CellData c0 = sheet != null ? sheet.GetCell(stCoords[0].Item1, stCoords[0].Item2) : null;
+                    if (c0 == null) return true;
+                    string sErr = c0.EvaluatedStr ?? c0.RawValue ?? "";
+                    if (IsExcelError(sErr)) { errorCode = sErr; return false; }
+                    value = c0.NumericValue;
+                    return true;
+                }
             }
 
             // Cell Reference (including cross-sheet Sheet2!A1)
@@ -4188,17 +4821,29 @@ namespace ZenQOffice.Core
             {
                 SparseMatrix refSheet = ResolveSheet(clean, sheet);
                 var pos = SparseMatrix.ParseCellAddress(clean);
-                CellData cell = refSheet.GetCell(pos.Item1, pos.Item2);
-                return cell != null ? cell.NumericValue : 0.0;
+                CellData cell = refSheet != null ? refSheet.GetCell(pos.Item1, pos.Item2) : null;
+                string circErr;
+                if (!EnsureFormulaCellEvaluated(refSheet, pos.Item1, pos.Item2, cell, out circErr))
+                {
+                    errorCode = circErr ?? "#CIRC!";
+                    return false;
+                }
+                if (cell == null) return true;
+                string cErr = cell.EvaluatedStr ?? cell.RawValue ?? "";
+                if (IsExcelError(cErr)) { errorCode = cErr; return false; }
+                if (IsTextOnlyCell(cell)) { errorCode = "#VALUE!"; return false; }
+                value = cell.NumericValue;
+                return true;
             }
 
-            if (clean.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) return 1.0;
-            if (clean.Equals("FALSE", StringComparison.OrdinalIgnoreCase)) return 0.0;
+            if (clean.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) { value = 1.0; return true; }
+            if (clean.Equals("FALSE", StringComparison.OrdinalIgnoreCase)) { value = 0.0; return true; }
 
-            double val;
-            if (double.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out val)) return val;
-            if (double.TryParse(clean, out val)) return val;
-            return 0.0;
+            if (double.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out value)) return true;
+            if (double.TryParse(clean, out value)) return true;
+
+            errorCode = "#NAME?";
+            return false;
         }
 
         private static int FindLowestPrecedenceOp(string str, char op1, char op2)
@@ -4254,7 +4899,15 @@ namespace ZenQOffice.Core
         public static List<Tuple<uint, uint>> ParseRange(string rangeStr, SparseMatrix sheet)
         {
             var res = new List<Tuple<uint, uint>>();
-            string clean = (rangeStr ?? "").Trim().Replace("$", "");
+            string rawTrim = (rangeStr ?? "").Trim();
+            string expanded = ExpandDefinedNameIfPresent(rawTrim);
+            if (!string.IsNullOrEmpty(expanded)) rawTrim = expanded;
+            if (WorkbookStructuredRefResolver != null && rawTrim.Contains("[") && rawTrim.Contains("]"))
+            {
+                var stCoords = WorkbookStructuredRefResolver(rawTrim, sheet ?? CurrentEvaluatingSheet, CurrentEvaluatingRow);
+                if (stCoords != null && stCoords.Count > 0) return stCoords;
+            }
+            string clean = rawTrim.Replace("$", "");
             if (string.IsNullOrEmpty(clean) || clean.IndexOf('(') >= 0 || clean.IndexOf(')') >= 0)
             {
                 return res;
@@ -4349,6 +5002,33 @@ namespace ZenQOffice.Core
         {
             if (string.IsNullOrEmpty(arg)) return new CellData[0, 0];
             string trimmed = arg.Trim();
+            while (HasMatchingOuterParens(trimmed)) trimmed = trimmed.Substring(1, trimmed.Length - 2).Trim();
+
+            string expanded = ExpandDefinedNameIfPresent(trimmed);
+            if (!string.IsNullOrEmpty(expanded)) trimmed = expanded;
+
+            if (WorkbookStructuredRefResolver != null && trimmed.Contains("[") && trimmed.Contains("]"))
+            {
+                var stCoords = WorkbookStructuredRefResolver(trimmed, sheet ?? CurrentEvaluatingSheet, CurrentEvaluatingRow);
+                if (stCoords != null && stCoords.Count > 0)
+                {
+                    SparseMatrix sh = sheet ?? CurrentEvaluatingSheet;
+                    CellData[,] stArr = new CellData[stCoords.Count, 1];
+                    for (int i = 0; i < stCoords.Count; i++)
+                    {
+                        CellData c = sh != null ? sh.GetCell(stCoords[i].Item1, stCoords[i].Item2) : null;
+                        stArr[i, 0] = c != null ? c.Clone() : new CellData();
+                    }
+                    return stArr;
+                }
+            }
+
+            CellData[,] binArr;
+            if (TryEvaluateArrayBinaryExpression(trimmed, sheet ?? CurrentEvaluatingSheet, out binArr))
+            {
+                return binArr;
+            }
+
             SparseMatrix sRange = ResolveSheet(trimmed, sheet ?? CurrentEvaluatingSheet);
 
             // 1. Array literal {1, 2; 3, 4}

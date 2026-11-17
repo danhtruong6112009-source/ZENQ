@@ -129,24 +129,25 @@ namespace ZenQOffice.Format
                         sw.WriteLine("  <office:body>");
                         sw.WriteLine("    <office:text>");
 
-                        string[] paras = (textContent ?? "").Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
-                        int charOffset = 0;
+                        var paraSlices = DocxHandler.SplitParagraphSlices(textContent);
 
-                        for (int pIdx = 0; pIdx < paras.Length; pIdx++)
+                        for (int pIdx = 0; pIdx < paraSlices.Count; pIdx++)
                         {
-                            string pStr = paras[pIdx];
+                            int charOffset = paraSlices[pIdx].StartOffset;
+                            string pStr = paraSlices[pIdx].Text;
 
                             // Page Break
-                            if (pStr.Trim() == "[--- PAGE BREAK ---]" || pStr.Contains("TRANG TRẮNG MỚI"))
+                            string pTrim = pStr.Trim();
+                            if (pTrim == "[--- PAGE BREAK ---]" || pStr.Contains("TRANG TRẮNG MỚI")
+                                || pTrim == "[--- COLUMN BREAK ---]"
+                                || pTrim.StartsWith("[--- SECTION BREAK ("))
                             {
                                 sw.WriteLine("      <text:p text:style-name=\"P_Default\"/>");
-                                charOffset += pStr.Length + 1;
                                 continue;
                             }
 
                             if (pStr.Trim() == "[--- COVER PAGE START ---]" || pStr.Trim() == "[--- COVER PAGE END ---]")
                             {
-                                charOffset += pStr.Length + 1;
                                 continue;
                             }
 
@@ -154,17 +155,14 @@ namespace ZenQOffice.Format
                             if (!string.IsNullOrWhiteSpace(pStr) && pStr.Trim().StartsWith("|"))
                             {
                                 List<string> tableLines = new List<string>();
-                                int tblLen = 0;
-                                while (pIdx < paras.Length && !string.IsNullOrWhiteSpace(paras[pIdx]) && paras[pIdx].Trim().StartsWith("|"))
+                                while (pIdx < paraSlices.Count && !string.IsNullOrWhiteSpace(paraSlices[pIdx].Text) && paraSlices[pIdx].Text.Trim().StartsWith("|"))
                                 {
-                                    tableLines.Add(paras[pIdx]);
-                                    tblLen += paras[pIdx].Length + 1;
+                                    tableLines.Add(paraSlices[pIdx].Text);
                                     pIdx++;
                                 }
                                 pIdx--;
 
                                 WriteOdtTable(sw, tableLines);
-                                charOffset += tblLen;
                                 continue;
                             }
 
@@ -216,8 +214,6 @@ namespace ZenQOffice.Format
                                 }
                                 sw.WriteLine("</text:p>");
                             }
-
-                            charOffset += pStr.Length + 1;
                         }
 
                         sw.WriteLine("    </office:text>");

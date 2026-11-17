@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -260,7 +261,7 @@ namespace ZenQOffice.UI
                     }
 
                     // Group Title
-                    g.DrawString(grp.Title, groupFont, groupBrush, 12, grp.Y);
+                    g.DrawString(AppL10n.Tr(grp.Title), groupFont, groupBrush, 12, grp.Y);
                 }
 
                 // Draw Items
@@ -376,7 +377,7 @@ namespace ZenQOffice.UI
                 hoveredItem = hit;
                 if (hoveredItem != null)
                 {
-                    tooltip.SetToolTip(canvas, hoveredItem.DisplayName);
+                    tooltip.SetToolTip(canvas, AppL10n.Tr(hoveredItem.DisplayName));
                 }
                 else
                 {

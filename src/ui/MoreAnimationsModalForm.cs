@@ -39,7 +39,7 @@ namespace ZenQOffice.UI
 
             InitializeData();
 
-            Text = "Thêm hiệu ứng hoạt họa - ZenQ Slides";
+            Text = AppL10n.Tr("Thêm hiệu ứng hoạt họa - ZenQ Slides");
             Size = new Size(800, 580);
             MinimumSize = new Size(740, 500);
             StartPosition = FormStartPosition.CenterParent;
@@ -134,7 +134,7 @@ namespace ZenQOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "🌟 THƯ VIỆN HIỆU ỨNG HOẠT HỌA (ANIMATION EFFECTS)",
+                Text = AppL10n.Tr("🌟 THƯ VIỆN HIỆU ỨNG HOẠT HỌA (ANIMATION EFFECTS)"),
                 Font = new Font("Segoe UI", 11f, FontStyle.Bold),
                 ForeColor = Color.White,
                 AutoSize = true,
@@ -143,7 +143,7 @@ namespace ZenQOffice.UI
             };
             Label lblSub = new Label
             {
-                Text = "Khám phá & áp dụng các hiệu ứng hoạt họa tiêu chuẩn và hiệu ứng độc quyền ZenQ",
+                Text = AppL10n.Tr("Khám phá & áp dụng các hiệu ứng hoạt họa tiêu chuẩn và hiệu ứng độc quyền ZenQ"),
                 Font = new Font("Segoe UI", 8.25f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(233, 213, 255),
                 AutoSize = true,
@@ -186,7 +186,7 @@ namespace ZenQOffice.UI
 
                 Button btnTab = new Button
                 {
-                    Text = label,
+                    Text = AppL10n.Tr(label),
                     Tag = key,
                     Location = new Point(btnX, 7),
                     Size = new Size(btnWidths[i], 28),
@@ -260,7 +260,7 @@ namespace ZenQOffice.UI
 
             _chkPreview = new CheckBox
             {
-                Text = "Xem trước hoạt họa trên hình vẽ (Preview effect)",
+                Text = AppL10n.Tr("Xem trước hoạt họa trên hình vẽ (Preview effect)"),
                 Checked = true,
                 AutoSize = true,
                 Location = new Point(16, 16),
@@ -271,7 +271,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.Tr("Hủy bỏ"),
                 DialogResult = DialogResult.Cancel,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(pnlBottom.Width - 95, 10),
@@ -292,7 +292,7 @@ namespace ZenQOffice.UI
 
             Button btnOK = new Button
             {
-                Text = "Áp dụng",
+                Text = AppL10n.Tr("Áp dụng"),
                 DialogResult = DialogResult.OK,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(pnlBottom.Width - 185, 10),
@@ -435,10 +435,11 @@ namespace ZenQOffice.UI
                 using (SolidBrush tb = new SolidBrush(isSel ? Color.FromArgb(91, 33, 182) : Color.FromArgb(30, 41, 59)))
                 {
                     StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                    g.DrawString(item.NameVi, nameF, tb, new RectangleF(2, 58, cardW - 4, 20), sf);
+                    g.DrawString(AppL10n.IsEn ? item.NameEn : item.NameVi, nameF, tb, new RectangleF(2, 58, cardW - 4, 20), sf);
                 }
 
                 // English sub-label
+                if (!AppL10n.IsEn)
                 using (Font subF = new Font("Segoe UI", 7.0f, FontStyle.Regular))
                 using (SolidBrush stb = new SolidBrush(Color.FromArgb(148, 163, 184)))
                 {

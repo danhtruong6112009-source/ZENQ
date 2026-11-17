@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 using ZenQOffice.Format;
 
 namespace ZenQOffice.UI
@@ -37,7 +38,7 @@ namespace ZenQOffice.UI
             this.totalPages = Math.Max(1, totalPages);
             this.currentPage = Math.Max(1, Math.Min(currentPage, this.totalPages));
 
-            this.Text = "Trích xuất Trang PDF - Extract Pages";
+            this.Text = AppL10n.T("Trích xuất Trang PDF - Extract Pages", "Extract PDF Pages");
             this.Size = new Size(520, 500);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -69,8 +70,8 @@ namespace ZenQOffice.UI
                 using (Font titleF = new Font("Segoe UI", 12f, FontStyle.Bold))
                 using (Font subF = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("Trích xuất Trang Tài liệu (Extract Pages)", titleF, Brushes.White, 44, 12);
-                    e.Graphics.DrawString($"Tài liệu hiện tại có {totalPages} trang. Chọn các trang cần tách thành tệp mới.", subF, Brushes.WhiteSmoke, 44, 38);
+                    e.Graphics.DrawString(AppL10n.T("Trích xuất Trang Tài liệu (Extract Pages)", "Extract Document Pages"), titleF, Brushes.White, 44, 12);
+                    e.Graphics.DrawString(string.Format(AppL10n.T("Tài liệu hiện tại có {0} trang. Chọn các trang cần tách thành tệp mới.", "This document has {0} page(s). Select pages to extract into a new file."), totalPages), subF, Brushes.WhiteSmoke, 44, 38);
                 }
             };
             this.Controls.Add(pnlHeader);
@@ -85,7 +86,7 @@ namespace ZenQOffice.UI
             // Group 1: Phạm vi trang
             GroupBox grpPages = new GroupBox
             {
-                Text = "Phạm vi Trang cần Trích xuất",
+                Text = AppL10n.T("Phạm vi Trang cần Trích xuất", "Page Range to Extract"),
                 Location = new Point(4, 4),
                 Size = new Size(464, 155),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -94,7 +95,7 @@ namespace ZenQOffice.UI
 
             rdoCurrent = new RadioButton
             {
-                Text = $"Trang hiện tại (Trang {currentPage})",
+                Text = string.Format(AppL10n.T("Trang hiện tại (Trang {0})", "Current page (Page {0})"), currentPage),
                 Location = new Point(16, 24),
                 AutoSize = true,
                 Checked = true
@@ -103,7 +104,7 @@ namespace ZenQOffice.UI
 
             rdoRange = new RadioButton
             {
-                Text = "Dải trang chỉ định:",
+                Text = AppL10n.T("Dải trang chỉ định:", "Custom pages:"),
                 Location = new Point(16, 52),
                 AutoSize = true
             };
@@ -120,7 +121,7 @@ namespace ZenQOffice.UI
 
             Label lblRangeHint = new Label
             {
-                Text = "Ví dụ: 1-3, 5, 8-10",
+                Text = AppL10n.T("Ví dụ: 1-3, 5, 8-10", "e.g. 1-3, 5, 8-10"),
                 Location = new Point(345, 52),
                 AutoSize = true,
                 ForeColor = Color.Gray,
@@ -130,7 +131,7 @@ namespace ZenQOffice.UI
 
             rdoOdd = new RadioButton
             {
-                Text = "Tất cả các trang lẻ (1, 3, 5, ...)",
+                Text = AppL10n.T("Tất cả các trang lẻ (1, 3, 5, ...)", "Odd pages only (1, 3, 5, ...)"),
                 Location = new Point(16, 82),
                 AutoSize = true
             };
@@ -138,7 +139,7 @@ namespace ZenQOffice.UI
 
             rdoEven = new RadioButton
             {
-                Text = "Tất cả các trang chẵn (2, 4, 6, ...)",
+                Text = AppL10n.T("Tất cả các trang chẵn (2, 4, 6, ...)", "Even pages only (2, 4, 6, ...)"),
                 Location = new Point(16, 110),
                 AutoSize = true
             };
@@ -149,7 +150,7 @@ namespace ZenQOffice.UI
             // Group 2: Tùy chọn xử lý
             GroupBox grpOptions = new GroupBox
             {
-                Text = "Tùy chọn Đầu ra & Lưu trữ",
+                Text = AppL10n.T("Tùy chọn Đầu ra & Lưu trữ", "Output & Storage Options"),
                 Location = new Point(4, 165),
                 Size = new Size(464, 155),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -158,7 +159,7 @@ namespace ZenQOffice.UI
 
             chkDeleteOriginal = new CheckBox
             {
-                Text = "Xóa các trang này khỏi tài liệu gốc sau khi trích xuất",
+                Text = AppL10n.T("Xóa các trang này khỏi tài liệu gốc sau khi trích xuất", "Delete pages after extracting"),
                 Location = new Point(16, 24),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(185, 28, 28)
@@ -167,7 +168,7 @@ namespace ZenQOffice.UI
 
             rdoOpenNew = new RadioButton
             {
-                Text = "Mở các trang đã trích xuất trong tài liệu mới",
+                Text = AppL10n.T("Mở các trang đã trích xuất trong tài liệu mới", "Open extracted pages in a new tab"),
                 Location = new Point(16, 54),
                 AutoSize = true,
                 Checked = true
@@ -176,7 +177,7 @@ namespace ZenQOffice.UI
 
             rdoSaveDirect = new RadioButton
             {
-                Text = "Lưu trực tiếp vào tệp PDF:",
+                Text = AppL10n.T("Lưu trực tiếp vào tệp PDF:", "Save directly to PDF file:"),
                 Location = new Point(16, 84),
                 AutoSize = true
             };
@@ -192,7 +193,7 @@ namespace ZenQOffice.UI
 
             btnBrowseSave = new Button
             {
-                Text = "Duyệt...",
+                Text = AppL10n.T("Duyệt...", "Browse..."),
                 Location = new Point(356, 110),
                 Size = new Size(88, 28),
                 Enabled = false,
@@ -207,7 +208,7 @@ namespace ZenQOffice.UI
             btnBrowseSave.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnBrowseSave.Click += (s, e) =>
             {
-                using (var sfd = new SaveFileDialog { Filter = "Tệp PDF (*.pdf)|*.pdf", Title = "Chọn vị trí lưu tệp PDF trích xuất" })
+                using (var sfd = new SaveFileDialog { Filter = AppL10n.T("Tệp PDF (*.pdf)|*.pdf", "PDF Files (*.pdf)|*.pdf"), Title = AppL10n.T("Chọn vị trí lưu tệp PDF trích xuất", "Save Extracted PDF") })
                 {
                     if (sfd.ShowDialog(this) == DialogResult.OK)
                     {
@@ -234,7 +235,7 @@ namespace ZenQOffice.UI
 
             btnExtract = new Button
             {
-                Text = "Trích xuất",
+                Text = AppL10n.T("Trích xuất", "Extract"),
                 Size = new Size(130, 34),
                 Location = new Point(230, 10),
                 BackColor = Color.FromArgb(16, 185, 129),
@@ -253,7 +254,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Size = new Size(95, 34),
                 Location = new Point(370, 10),
                 BackColor = Color.White,
@@ -282,14 +283,14 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrWhiteSpace(txtRange.Text))
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng nhập dải trang cần trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Vui lòng nhập dải trang cần trích xuất!", "Please enter the page range to extract!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtRange.Focus();
                     return;
                 }
                 SelectedPageIndices = PdfHandler.ParsePageRange(txtRange.Text, totalPages);
                 if (SelectedPageIndices.Count == 0)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, "Dải trang không hợp lệ hoặc nằm ngoài phạm vi tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Dải trang không hợp lệ hoặc nằm ngoài phạm vi tài liệu!", "Invalid page range or out of document bounds!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtRange.Focus();
                     return;
                 }
@@ -305,7 +306,7 @@ namespace ZenQOffice.UI
 
             if (SelectedPageIndices.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show(this, "Không có trang nào được chọn để trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Không có trang nào được chọn để trích xuất!", "No pages selected to extract!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -313,7 +314,7 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrWhiteSpace(txtSavePath.Text))
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn đường dẫn tệp để lưu các trang trích xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Vui lòng chọn đường dẫn tệp để lưu các trang trích xuất!", "Please select an output file path!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     btnBrowseSave.PerformClick();
                     if (string.IsNullOrWhiteSpace(txtSavePath.Text)) return;
                 }

@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using ZenQOffice.Core;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -35,7 +36,7 @@ namespace ZenQOffice.Setup
             DoubleBuffered = true;
             ShowInTaskbar = true;
             ShowIcon = true;
-            Text = "Gỡ cài đặt ZENQ OFFICE";
+            Text = AppL10n.T("Gỡ cài đặt ZENQ OFFICE", "Uninstall ZENQ OFFICE");
 
             try
             {
@@ -112,7 +113,7 @@ namespace ZenQOffice.Setup
             // Tùy chọn xóa sạch dữ liệu người dùng (Mặc định tích chọn để gỡ triệt để)
             _chkCleanUserData = new ModernRoundedCheckBox
             {
-                Text = "Xóa sạch dữ liệu cá nhân, tệp nháp, lịch sử & cài đặt",
+                Text = AppL10n.T("Xóa sạch dữ liệu cá nhân, tệp nháp, lịch sử & cài đặt", "Remove personal data, drafts, history, and settings"),
                 Checked = true,
                 Size = new Size(410, 24),
                 Location = new Point(54, 280),
@@ -124,7 +125,7 @@ namespace ZenQOffice.Setup
             // Nút Ở lại (Khuyến khích giữ lại app)
             _btnKeep = new ModernRoundedButton
             {
-                Text = "Ở lại với ZENQ OFFICE",
+                Text = AppL10n.T("Ở lại với ZENQ OFFICE", "Keep ZENQ OFFICE"),
                 Size = new Size(184, 42),
                 Location = new Point(78, 328),
                 BaseColor = Color.FromArgb(16, 185, 129), // Emerald Green
@@ -141,7 +142,7 @@ namespace ZenQOffice.Setup
             // Nút Gỡ cài đặt
             _btnUninstall = new ModernRoundedButton
             {
-                Text = "Gỡ cài đặt",
+                Text = AppL10n.T("Gỡ cài đặt", "Uninstall"),
                 Size = new Size(130, 42),
                 Location = new Point(282, 328),
                 BaseColor = Color.FromArgb(241, 245, 249),
@@ -193,7 +194,7 @@ namespace ZenQOffice.Setup
             {
                 try
                 {
-                    SetStatus("Đang đóng các tiến trình ZENQ OFFICE...", 0.15f);
+                    SetStatus(AppL10n.T("Đang đóng các tiến trình ZENQ OFFICE...", "Closing ZENQ OFFICE processes..."), 0.15f);
                     try
                     {
                         foreach (var p in Process.GetProcessesByName("ZenQOffice"))
@@ -208,22 +209,22 @@ namespace ZenQOffice.Setup
                     catch { }
                     Thread.Sleep(400);
 
-                    SetStatus("Đang xóa lối tắt Desktop & Start Menu...", 0.35f);
+                    SetStatus(AppL10n.T("Đang xóa lối tắt Desktop & Start Menu...", "Removing Desktop & Start Menu shortcuts..."), 0.35f);
                     ShortcutHelper.RemoveShortcuts();
                     Thread.Sleep(400);
 
-                    SetStatus("Đang gỡ bỏ cấu hình đăng ký hệ thống...", 0.55f);
+                    SetStatus(AppL10n.T("Đang gỡ bỏ cấu hình đăng ký hệ thống...", "Removing system registrations..."), 0.55f);
                     ShortcutHelper.UnregisterUninstall();
                     Thread.Sleep(400);
 
                     if (cleanUserData)
                     {
-                        SetStatus("Đang xóa dữ liệu cá nhân, lịch sử & tệp nháp...", 0.75f);
+                        SetStatus(AppL10n.T("Đang xóa dữ liệu cá nhân, lịch sử & tệp nháp...", "Deleting user data, history & drafts..."), 0.75f);
                         ShortcutHelper.RemoveUserData();
                         Thread.Sleep(400);
                     }
 
-                    SetStatus("Đang dọn dẹp tập tin ứng dụng...", 0.90f);
+                    SetStatus(AppL10n.T("Đang dọn dẹp tập tin ứng dụng...", "Cleaning up application files..."), 0.90f);
                     string installDir = AppDomain.CurrentDomain.BaseDirectory;
                     if (string.IsNullOrEmpty(installDir) || !Directory.Exists(installDir) || installDir.TrimEnd('\\', '/').Equals(Path.GetTempPath().TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
                     {
@@ -265,12 +266,12 @@ namespace ZenQOffice.Setup
                     psi.UseShellExecute = true;
                     Process.Start(psi);
 
-                    SetStatus("Đã gỡ cài đặt hoàn tất và sạch sẽ. Tạm biệt và hẹn gặp lại bạn nhé!", 1.0f);
+                    SetStatus(AppL10n.T("Đã gỡ cài đặt hoàn tất và sạch sẽ. Tạm biệt và hẹn gặp lại bạn nhé!", "Uninstallation complete. Thank you for using ZENQ OFFICE!"), 1.0f);
                     _isCompleted = true;
                 }
                 catch (Exception ex)
                 {
-                    SetStatus("Lỗi gỡ cài đặt: " + ex.Message, 1.0f);
+                    SetStatus(AppL10n.T("Lỗi gỡ cài đặt: ", "Uninstall error: ") + ex.Message, 1.0f);
                     _isCompleted = true;
                 }
             });
@@ -311,7 +312,7 @@ namespace ZenQOffice.Setup
             using (SolidBrush titleB = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
                 StringFormat sf = new StringFormat { Alignment = StringAlignment.Center };
-                string title = _isUninstalling ? "Đang gỡ cài đặt ZENQ OFFICE..." : "Bạn muốn gỡ cài đặt ZENQ OFFICE?";
+                string title = _isUninstalling ? AppL10n.T("Đang gỡ cài đặt ZENQ OFFICE...", "Uninstalling ZENQ OFFICE...") : AppL10n.T("Bạn muốn gỡ cài đặt ZENQ OFFICE?", "Uninstall ZENQ OFFICE?");
                 g.DrawString(title, titleFont, titleB, new RectangleF(0, textY, Width, 30), sf);
             }
 
@@ -320,8 +321,8 @@ namespace ZenQOffice.Setup
             {
                 StringFormat sf = new StringFormat { Alignment = StringAlignment.Center };
                 string sub = _isUninstalling
-                    ? "Đang dọn dẹp các tài nguyên khỏi máy tính của bạn..."
-                    : "Chúng tôi sẽ rất nhớ bạn... Bạn có chắc chắn muốn chia tay không?";
+                    ? AppL10n.T("Đang dọn dẹp các tài nguyên khỏi máy tính của bạn...", "Removing resources from your computer...")
+                    : AppL10n.T("Chúng tôi sẽ rất nhớ bạn... Bạn có chắc chắn muốn chia tay không?", "Are you sure you want to uninstall ZENQ OFFICE?");
                 g.DrawString(sub, subFont, subB, new RectangleF(0, textY + 28, Width, 20), sf);
             }
 

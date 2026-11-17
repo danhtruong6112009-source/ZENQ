@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -158,7 +159,7 @@ namespace ZenQOffice.UI
                     // Text
                     int textX = itemRect.X + 32;
                     int textY = itemRect.Y + (itemRect.Height - 16) / 2;
-                    g.DrawString(_itemTitles[i], titleFont, Brushes.Black, textX, textY);
+                    g.DrawString(AppL10n.Tr(_itemTitles[i]), titleFont, Brushes.Black, textX, textY);
                 }
             }
         }

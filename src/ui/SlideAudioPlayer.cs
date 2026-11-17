@@ -180,8 +180,8 @@ namespace ZenQOffice.UI
             {
                 using (OpenFileDialog ofd = new OpenFileDialog())
                 {
-                    ofd.Title = "Chọn tệp âm thanh (" + (shape.Name ?? "Audio") + ")...";
-                    ofd.Filter = "Tệp Âm thanh (*.mp3;*.wav;*.wma;*.m4a;*.aac;*.flac)|*.mp3;*.wav;*.wma;*.m4a;*.aac;*.flac|Tất cả tệp (*.*)|*.*";
+                    ofd.Title = ZenQOffice.Core.AppL10n.T("Chọn tệp âm thanh (", "Select audio file (") + (shape.Name ?? "Audio") + ")...";
+                    ofd.Filter = ZenQOffice.Core.AppL10n.T("Tệp Âm thanh (*.mp3;*.wav;*.wma;*.m4a;*.aac;*.flac)|*.mp3;*.wav;*.wma;*.m4a;*.aac;*.flac|Tất cả tệp (*.*)|*.*", "Audio Files (*.mp3;*.wav;*.wma;*.m4a;*.aac;*.flac)|*.mp3;*.wav;*.wma;*.m4a;*.aac;*.flac|All Files (*.*)|*.*");
                     if (ofd.ShowDialog(container) == DialogResult.OK)
                     {
                         shape.AudioPath = ofd.FileName;
@@ -380,7 +380,7 @@ namespace ZenQOffice.UI
 
             int m = (int)(cur / 60);
             int s = (int)(cur % 60);
-            ZenQOffice.UI.FluentMessageBox.Show(container, string.Format("Đã thêm Dấu trang tại mốc thời gian {0:D2}:{1:D2} ({2:0.0}s).", m, s, cur), "Thêm Dấu trang Âm thanh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show(container, ZenQOffice.Core.AppL10n.T(string.Format("Đã thêm Dấu trang tại mốc thời gian {0:D2}:{1:D2} ({2:0.0}s).", m, s, cur), string.Format("Added bookmark at {0:D2}:{1:D2} ({2:0.0}s).", m, s, cur)), ZenQOffice.Core.AppL10n.T("Thêm Dấu trang Âm thanh", "Add Audio Bookmark"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             InvalidateUI();
         }
 
@@ -389,7 +389,7 @@ namespace ZenQOffice.UI
             if (shape == null) return;
             if (shape.AudioBookmarks == null || shape.AudioBookmarks.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show(container, "Âm thanh này hiện chưa có dấu trang nào để xóa.", "Xóa Dấu trang Âm thanh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(container, ZenQOffice.Core.AppL10n.T("Âm thanh này hiện chưa có dấu trang nào để xóa.", "This audio has no bookmarks to remove."), ZenQOffice.Core.AppL10n.T("Xóa Dấu trang Âm thanh", "Remove Audio Bookmark"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -397,7 +397,7 @@ namespace ZenQOffice.UI
             shape.AudioBookmarks.RemoveAt(shape.AudioBookmarks.Count - 1);
             int m = (int)(last / 60);
             int s = (int)(last % 60);
-            ZenQOffice.UI.FluentMessageBox.Show(container, string.Format("Đã xóa Dấu trang tại mốc {0:D2}:{1:D2}.", m, s), "Xóa Dấu trang Âm thanh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show(container, ZenQOffice.Core.AppL10n.T(string.Format("Đã xóa Dấu trang tại mốc {0:D2}:{1:D2}.", m, s), string.Format("Removed bookmark at {0:D2}:{1:D2}.", m, s)), ZenQOffice.Core.AppL10n.T("Xóa Dấu trang Âm thanh", "Remove Audio Bookmark"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             InvalidateUI();
         }
 
@@ -411,7 +411,7 @@ namespace ZenQOffice.UI
                 shape.AudioHideDuringShow = true;
                 shape.AudioStartMode = VideoStartMode.Automatically;
                 shape.AudioRewindAfterPlaying = true;
-                ZenQOffice.UI.FluentMessageBox.Show(container, "Đã thiết lập âm thanh làm NHẠC NỀN (Play in Background):\n- Phát tự động khi vào trang\n- Tiếp tục phát xuyên suốt các trang chiếu\n- Tự động lặp lại liên tục\n- Ẩn biểu tượng khi trình chiếu.", "Phát trong Nền (Play in Background)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(container, ZenQOffice.Core.AppL10n.T("Đã thiết lập âm thanh làm NHẠC NỀN (Play in Background):\n- Phát tự động khi vào trang\n- Tiếp tục phát xuyên suốt các trang chiếu\n- Tự động lặp lại liên tục\n- Ẩn biểu tượng khi trình chiếu.", "Configured audio to Play in Background:\n- Start automatically\n- Play across slides\n- Loop until stopped\n- Hide icon during slideshow."), ZenQOffice.Core.AppL10n.T("Phát trong Nền (Play in Background)", "Play in Background"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
@@ -419,7 +419,7 @@ namespace ZenQOffice.UI
                 shape.AudioLoopUntilStopped = false;
                 shape.AudioHideDuringShow = false;
                 shape.AudioStartMode = VideoStartMode.InClickSequence;
-                ZenQOffice.UI.FluentMessageBox.Show(container, "Đã khôi phục cài đặt phát tiêu chuẩn cho âm thanh.", "Tùy chọn Âm thanh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(container, ZenQOffice.Core.AppL10n.T("Đã khôi phục cài đặt phát tiêu chuẩn cho âm thanh.", "Restored standard audio playback settings."), ZenQOffice.Core.AppL10n.T("Tùy chọn Âm thanh", "Audio Options"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             InvalidateUI();
         }

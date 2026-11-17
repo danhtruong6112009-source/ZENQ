@@ -42,4 +42,9 @@ tools/*.zip
 tools/*.json
 tools/*.ipynb
 tools/__pycache__/
+ZenQOffice-Setup.exe
+user_session.json
+Npgsql.dll
+Microsoft.Extensions.DependencyInjection.Abstractions.dll
+Microsoft.Extensions.Logging.Abstractions.dll
 

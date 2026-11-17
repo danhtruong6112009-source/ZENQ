@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -523,7 +523,7 @@ namespace ZenQOffice.UI
                 _renderTarget.Transform = System.Numerics.Matrix3x2.Identity;
                 _currentTransform = System.Numerics.Matrix3x2.Identity;
                 _renderTarget.AntialiasMode = AntialiasMode.PerPrimitive;
-                _renderTarget.TextAntialiasMode = D2DTextAntialiasMode.Grayscale;
+                _renderTarget.TextAntialiasMode = D2DTextAntialiasMode.Cleartype;
                 _renderTarget.BeginDraw();
                 _isDrawing = true;
             }
@@ -1135,7 +1135,34 @@ namespace ZenQOffice.UI
             {
                 try { stroke = factory.CreateStrokeStyle(new StrokeStyleProperties { DashStyle = Vortice.Direct2D1.DashStyle.Dot }); } catch { }
             }
-            return (b, Math.Max(1.0f, pen.Width), stroke);
+            if (pen.StartCap == System.Drawing.Drawing2D.LineCap.Round || pen.EndCap == System.Drawing.Drawing2D.LineCap.Round ||
+                pen.StartCap == System.Drawing.Drawing2D.LineCap.Square || pen.EndCap == System.Drawing.Drawing2D.LineCap.Square ||
+                pen.LineJoin == System.Drawing.Drawing2D.LineJoin.Round || pen.LineJoin == System.Drawing.Drawing2D.LineJoin.Bevel)
+            {
+                try
+                {
+                    var dash = pen.DashStyle == System.Drawing.Drawing2D.DashStyle.Dash ? Vortice.Direct2D1.DashStyle.Dash : pen.DashStyle == System.Drawing.Drawing2D.DashStyle.Dot ? Vortice.Direct2D1.DashStyle.Dot : Vortice.Direct2D1.DashStyle.Solid;
+                    CapStyle MapCap(System.Drawing.Drawing2D.LineCap c) =>
+                        c == System.Drawing.Drawing2D.LineCap.Round ? CapStyle.Round :
+                        c == System.Drawing.Drawing2D.LineCap.Square ? CapStyle.Square : CapStyle.Flat;
+                    var join = pen.LineJoin == System.Drawing.Drawing2D.LineJoin.Round ? Vortice.Direct2D1.LineJoin.Round :
+                               pen.LineJoin == System.Drawing.Drawing2D.LineJoin.Bevel ? Vortice.Direct2D1.LineJoin.Bevel : Vortice.Direct2D1.LineJoin.Miter;
+                    var ns = factory.CreateStrokeStyle(new StrokeStyleProperties
+                    {
+                        StartCap = MapCap(pen.StartCap),
+                        EndCap = MapCap(pen.EndCap),
+                        DashCap = CapStyle.Round,
+                        LineJoin = join,
+                        MiterLimit = 2.5f,
+                        DashStyle = dash
+                    });
+                    stroke?.Dispose();
+                    stroke = ns;
+                }
+                catch { }
+            }
+            float w = pen.Width > 0f ? Math.Max(0.5f, pen.Width) : 1.0f;
+            return (b, w, stroke);
         }
 
         private static readonly HashSet<string> _registeredFontFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1413,7 +1440,29 @@ namespace ZenQOffice.UI
                 }
                 catch { }
 
-                // Fallback to Segoe UI
+                // Fallback: If condensed display font, prefer Impact over wide Segoe UI
+                string fallbackFam = "Segoe UI";
+                string checkName = (famName ?? "") + " " + (fontName ?? "");
+                if (checkName.IndexOf("Anton", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    checkName.IndexOf("Danh Da", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    checkName.IndexOf("Đanh Đá", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    checkName.IndexOf("Impact", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    fallbackFam = "Impact";
+                }
+                try
+                {
+                    return _dwriteFactory.CreateTextFormat(
+                        fallbackFam,
+                        null,
+                        weight,
+                        style,
+                        FontStretch.Normal,
+                        fontSizeDip
+                    );
+                }
+                catch { }
+
                 return _dwriteFactory.CreateTextFormat(
                     "Segoe UI",
                     null,
@@ -1878,7 +1927,7 @@ namespace ZenQOffice.UI
                 ContentBounds = new Vortice.RawRectF(bounds.Left - 1, bounds.Top - 1, bounds.Right + 1, bounds.Bottom + 1),
                 GeometricMask = geometry, MaskAntialiasMode = antialias,
                 MaskTransform = System.Numerics.Matrix3x2.Identity, Opacity = 1f,
-                LayerOptions = LayerOptions.None
+                LayerOptions = LayerOptions.InitializeForCleartype
             };
             _renderTarget.PushLayer(parameters, null);
             _nativeClipMasks.Add(geometry);
@@ -1907,6 +1956,21 @@ namespace ZenQOffice.UI
         public void FillRectangle(Brush brush, Rectangle rect) => FillRectangle(brush, rect.X, rect.Y, rect.Width, rect.Height);
         public void FillRectangle(Brush brush, int x, int y, int width, int height) => FillRectangle(brush, (float)x, (float)y, (float)width, (float)height);
 
+        private bool IsAxisAlignedUnitScale()
+        {
+            return Math.Abs(_currentTransform.M12) < 1e-4f
+                && Math.Abs(_currentTransform.M21) < 1e-4f
+                && Math.Abs(_currentTransform.M11 - 1f) < 1e-3f
+                && Math.Abs(_currentTransform.M22 - 1f) < 1e-3f;
+        }
+
+        private static bool IsNearInteger(float v) => Math.Abs(v - MathF.Round(v)) < 0.001f;
+
+        private bool ShouldSnapHairline(float penWidth, float a, float b)
+        {
+            return penWidth >= 0.75f && penWidth <= 1.25f && IsAxisAlignedUnitScale() && IsNearInteger(a) && IsNearInteger(b);
+        }
+
         public void DrawRectangle(Pen pen, float x, float y, float width, float height)
         {
             if (_renderTarget != null && pen != null)
@@ -1914,6 +1978,11 @@ namespace ZenQOffice.UI
                 var (b, w, stroke) = GetD2DPen(pen);
                 if (b != null)
                 {
+                    if (ShouldSnapHairline(w, x, y) && IsNearInteger(width) && IsNearInteger(height))
+                    {
+                        x += 0.5f;
+                        y += 0.5f;
+                    }
                     _renderTarget.DrawRectangle(new RectangleF(x, y, width, height), b, w, stroke);
                     b.Dispose();
                     stroke?.Dispose();
@@ -1985,7 +2054,19 @@ namespace ZenQOffice.UI
             DrawPath(pen, path);
         }
 
-        public void DrawRoundedRectangle(Pen pen, Rectangle rect, float radius) => DrawRoundedRectangle(pen, (RectangleF)rect, radius);
+        public void DrawRoundedRectangle(Pen pen, Rectangle rect, float radius)
+        {
+            if (_renderTarget != null && pen != null && rect.Width >= 2 && rect.Height >= 2 && IsAxisAlignedUnitScale())
+            {
+                float pw = pen.Width > 0f ? Math.Max(0.5f, pen.Width) : 1.0f;
+                if (pw >= 0.75f && pw <= 1.25f)
+                {
+                    DrawRoundedRectangle(pen, new RectangleF(rect.X + 0.5f, rect.Y + 0.5f, rect.Width - 1f, rect.Height - 1f), radius);
+                    return;
+                }
+            }
+            DrawRoundedRectangle(pen, (RectangleF)rect, radius);
+        }
 
         public static GraphicsPath CreateRoundedRectanglePath(RectangleF rect, float radius)
         {
@@ -2011,6 +2092,19 @@ namespace ZenQOffice.UI
                 var (b, w, stroke) = GetD2DPen(pen);
                 if (b != null)
                 {
+                    if (w >= 0.75f && w <= 1.25f && IsAxisAlignedUnitScale())
+                    {
+                        if (Math.Abs(y1 - y2) < 0.001f && IsNearInteger(y1))
+                        {
+                            y1 += 0.5f;
+                            y2 += 0.5f;
+                        }
+                        else if (Math.Abs(x1 - x2) < 0.001f && IsNearInteger(x1))
+                        {
+                            x1 += 0.5f;
+                            x2 += 0.5f;
+                        }
+                    }
                     _renderTarget.DrawLine(new System.Numerics.Vector2(x1, y1), new System.Numerics.Vector2(x2, y2), b, w, stroke);
                     b.Dispose();
                     stroke?.Dispose();
@@ -2083,25 +2177,7 @@ namespace ZenQOffice.UI
             return (font.Unit == GraphicsUnit.Pixel ? font.Size : font.SizeInPoints * 96f / 72f) * .9f;
         }
         public void DrawString(string s, Font font, Brush brush, float x, float y)
-        {
-            if(!string.IsNullOrEmpty(s)&&font!=null&&WriterMath.TryDraw(this,s,font,brush,new RectangleF(x,y,100000,100000),null))return;
-            if (string.IsNullOrEmpty(s)) return;
-            if (_renderTarget != null)
-            {
-                using var b = GetD2DBrush(brush);
-                var tf = GetTextFormat(font);
-                if (b != null && tf != null)
-                {
-                    try
-                    {
-                        _renderTarget.DrawText(s, tf, new Vortice.Mathematics.Rect(x, y, 10000.0f, 10000.0f), b, DrawTextOptions.NoSnap);
-                        return;
-                    }
-                    catch { }
-                }
-            }
-            else if (_gdiGraphics != null && !_ownsHdc) _gdiGraphics.DrawString(s, font, brush, x, y);
-        }
+            => DrawString(s, font, brush, x, y, null, 0f);
 
         public void DrawString(string s, Font font, Brush brush, PointF point) => DrawString(s, font, brush, point.X, point.Y);
 
@@ -2123,6 +2199,7 @@ namespace ZenQOffice.UI
                 {
                     float w = Math.Max(1.0f, layoutRectangle.Width);
                     float h = Math.Max(1.0f, layoutRectangle.Height);
+                    IDWriteInlineObject sign = null;
                     try
                     {
                         using var layout = _dwriteFactory.CreateTextLayout(s, tf, w, h);
@@ -2164,23 +2241,34 @@ namespace ZenQOffice.UI
                                         Delimiter = 0,
                                         DelimiterCount = 0
                                     };
-                                    using var sign = _dwriteFactory.CreateEllipsisTrimmingSign(tf);
+                                    sign = _dwriteFactory.CreateEllipsisTrimmingSign(tf);
                                     layout.SetTrimming(trimming, sign);
                                 }
                                 catch { }
                             }
                         }
-                        _renderTarget.DrawTextLayout(new System.Numerics.Vector2(layoutRectangle.X, layoutRectangle.Y), layout, b, DrawTextOptions.NoSnap);
+                        else
+                        {
+                            layout.TextAlignment = TextAlignment.Leading;
+                            layout.ParagraphAlignment = ParagraphAlignment.Near;
+                        }
+                        var textOpts = IsAxisAlignedUnitScale() ? DrawTextOptions.None : DrawTextOptions.NoSnap;
+                        _renderTarget.DrawTextLayout(new System.Numerics.Vector2(layoutRectangle.X, layoutRectangle.Y), layout, b, textOpts);
                         return;
                     }
                     catch
                     {
                         try
                         {
-                            _renderTarget.DrawText(s, tf, new Vortice.Mathematics.Rect(layoutRectangle.X, layoutRectangle.Y, w, h), b, DrawTextOptions.NoSnap);
+                            var textOpts = IsAxisAlignedUnitScale() ? DrawTextOptions.None : DrawTextOptions.NoSnap;
+                            _renderTarget.DrawText(s, tf, new Vortice.Mathematics.Rect(layoutRectangle.X, layoutRectangle.Y, w, h), b, textOpts);
                             return;
                         }
                         catch { }
+                    }
+                    finally
+                    {
+                        try { sign?.Dispose(); } catch { }
                     }
                 }
             }
@@ -2322,7 +2410,18 @@ namespace ZenQOffice.UI
                 {
                     using var b = target.CreateSolidColorBrush(ToColor4(color));
                     var rect = new Vortice.Mathematics.Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height);
-                    target.DrawText(glyph.ToString(), tf, rect, b, DrawTextOptions.None);
+                    var prevAa = target.TextAntialiasMode;
+                    if (prevAa == D2DTextAntialiasMode.Cleartype)
+                        target.TextAntialiasMode = D2DTextAntialiasMode.Grayscale;
+                    try
+                    {
+                        target.DrawText(glyph.ToString(), tf, rect, b, DrawTextOptions.None);
+                    }
+                    finally
+                    {
+                        if (prevAa == D2DTextAntialiasMode.Cleartype)
+                            target.TextAntialiasMode = prevAa;
+                    }
                     return;
                 }
             }
@@ -2554,6 +2653,53 @@ namespace ZenQOffice.UI
 
         public void DrawImage(Image image, Rectangle rect, float opacity = -1.0f) => DrawImage(image, (float)rect.X, (float)rect.Y, (float)rect.Width, (float)rect.Height, opacity);
         public void DrawImage(Image image, RectangleF rect, float opacity = -1.0f) => DrawImage(image, rect.X, rect.Y, rect.Width, rect.Height, opacity);
+        public void DrawRoundedImage(Image image, RectangleF rect, float radius, float opacity = -1.0f)
+        {
+            if (image == null || rect.Width <= 0f || rect.Height <= 0f) return;
+            if (radius <= 0.001f) { DrawImage(image, rect, opacity); return; }
+            float finalOp = (opacity >= 0.0f) ? Math.Max(0.0f, Math.Min(1.0f, opacity)) : _currentImageOpacity;
+            if (_renderTarget != null)
+            {
+                try
+                {
+                    var d2dBmp = GetOrCreateD2DBitmap(image);
+                    if (d2dBmp != null)
+                    {
+                        var bmpSize = d2dBmp.Size;
+                        if (bmpSize.Width > 0f && bmpSize.Height > 0f)
+                        {
+                            using var imgBrush = _renderTarget.CreateBitmapBrush(d2dBmp, new BitmapBrushProperties
+                            {
+                                ExtendModeX = ExtendMode.Clamp,
+                                ExtendModeY = ExtendMode.Clamp,
+                                InterpolationMode = BitmapInterpolationMode.Linear
+                            });
+                            imgBrush.Opacity = finalOp;
+                            imgBrush.Transform = System.Numerics.Matrix3x2.CreateScale(rect.Width / bmpSize.Width, rect.Height / bmpSize.Height)
+                                * System.Numerics.Matrix3x2.CreateTranslation(rect.X, rect.Y);
+                            float rx = Math.Min(radius, rect.Width / 2f);
+                            float ry = Math.Min(radius, rect.Height / 2f);
+                            _renderTarget.FillRoundedRectangle(new RoundedRectangle
+                            {
+                                Rect = new Vortice.Mathematics.Rect(rect.X, rect.Y, rect.Width, rect.Height),
+                                RadiusX = rx,
+                                RadiusY = ry
+                            }, imgBrush);
+                            return;
+                        }
+                    }
+                }
+                catch { }
+            }
+            using var gp = CreateRoundedRectanglePath(rect, radius);
+            var st = Save();
+            try
+            {
+                PushClip(gp);
+                DrawImage(image, rect, opacity);
+            }
+            finally { Restore(st); }
+        }
         public void DrawImage(Image image, Rectangle destRect, int srcX, int srcY, int srcWidth, int srcHeight, GraphicsUnit srcUnit, float opacity = -1.0f)
         {
             if (image == null) return;

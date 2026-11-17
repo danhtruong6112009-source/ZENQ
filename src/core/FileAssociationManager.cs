@@ -175,7 +175,7 @@ namespace ZenQOffice.Core
                     {
                         appKey.SetValue("FriendlyAppName", "ZenQ Office");
                         appKey.SetValue("ApplicationCompany", "NextGenEduSpace Studio");
-                        appKey.SetValue("ApplicationDescription", "Bộ ứng dụng văn phòng thế hệ mới ZenQ Office");
+                        appKey.SetValue("ApplicationDescription", AppL10n.T("Bộ ứng dụng văn phòng thế hệ mới ZenQ Office", "ZenQ Office Productivity Suite"));
                         using (RegistryKey iconKey = appKey.CreateSubKey("DefaultIcon"))
                         {
                             iconKey?.SetValue("", $"{mainIcoPath},0");
@@ -212,7 +212,7 @@ namespace ZenQOffice.Core
                     if (capKey != null)
                     {
                         capKey.SetValue("ApplicationName", "ZenQ Office");
-                        capKey.SetValue("ApplicationDescription", "Bộ ứng dụng văn phòng thế hệ mới ZenQ Office (Writer, Calc, Slides, PDF)");
+                        capKey.SetValue("ApplicationDescription", AppL10n.T("Bộ ứng dụng văn phòng thế hệ mới ZenQ Office (Writer, Calc, Slides, PDF)", "ZenQ Office Suite (Writer, Calc, Slides, PDF)"));
 
                         using (RegistryKey faKey = capKey.CreateSubKey("FileAssociations"))
                         {

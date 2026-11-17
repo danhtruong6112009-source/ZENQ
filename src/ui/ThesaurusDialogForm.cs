@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -33,7 +34,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Từ điển đồng nghĩa (Thesaurus)";
+            this.Text = AppL10n.T("Từ điển đồng nghĩa (Thesaurus)", "Thesaurus");
             this.Size = new Size(380, 480);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -53,15 +54,15 @@ namespace ZenQOffice.UI
                 using (Font hf = new Font("Segoe UI", 11.5f, FontStyle.Bold))
                 using (Font sub = new Font("Segoe UI", 8.2f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("📖 Từ điển đồng nghĩa", hf, Brushes.White, 14, 8);
-                    e.Graphics.DrawString("Gợi ý từ ngữ đồng nghĩa và mở rộng vốn từ cho văn bản", sub, Brushes.WhiteSmoke, 16, 30);
+                    e.Graphics.DrawString(AppL10n.T("📖 Từ điển đồng nghĩa", "📖 Thesaurus"), hf, Brushes.White, 14, 8);
+                    e.Graphics.DrawString(AppL10n.T("Gợi ý từ ngữ đồng nghĩa và mở rộng vốn từ cho văn bản", "Find synonyms and expand your vocabulary"), sub, Brushes.WhiteSmoke, 16, 30);
                 }
             };
             this.Controls.Add(topPanel);
 
             // Search box
             Label lblSearch = new Label();
-            lblSearch.Text = "Tra cứu từ:";
+            lblSearch.Text = AppL10n.T("Tra cứu từ:", "Look up:");
             lblSearch.Location = new Point(14, 64);
             lblSearch.AutoSize = true;
             lblSearch.Font = new Font("Segoe UI", 8.8f, FontStyle.Bold);
@@ -83,7 +84,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(txtSearch);
 
             btnSearch = new Button();
-            btnSearch.Text = "Tìm kiếm";
+            btnSearch.Text = AppL10n.T("Tìm kiếm", "Search");
             btnSearch.Location = new Point(270, 84);
             btnSearch.Size = new Size(82, 28);
             btnSearch.BackColor = Color.FromArgb(16, 110, 190);
@@ -94,7 +95,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(btnSearch);
 
             lblHeader = new Label();
-            lblHeader.Text = "Danh sách từ đồng nghĩa / tương đương:";
+            lblHeader.Text = AppL10n.T("Danh sách từ đồng nghĩa / tương đương:", "Synonyms / Related Words:");
             lblHeader.Location = new Point(14, 122);
             lblHeader.AutoSize = true;
             lblHeader.ForeColor = Color.FromArgb(96, 94, 92);
@@ -117,7 +118,7 @@ namespace ZenQOffice.UI
 
             // Bottom Buttons
             btnInsert = new Button();
-            btnInsert.Text = "Chèn vào tài liệu";
+            btnInsert.Text = AppL10n.T("Chèn vào tài liệu", "Insert");
             btnInsert.Location = new Point(144, 404);
             btnInsert.Size = new Size(120, 30);
             btnInsert.BackColor = Color.FromArgb(16, 110, 190);
@@ -128,7 +129,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(btnInsert);
 
             btnClose = new Button();
-            btnClose.Text = "Đóng";
+            btnClose.Text = AppL10n.T("Đóng", "Close");
             btnClose.Location = new Point(272, 404);
             btnClose.Size = new Size(80, 30);
             btnClose.BackColor = Color.FromArgb(235, 236, 238);
@@ -144,7 +145,7 @@ namespace ZenQOffice.UI
             lstResults.Items.Clear();
             if (string.IsNullOrEmpty(query))
             {
-                lblCount.Text = "Vui lòng nhập từ cần tra cứu.";
+                lblCount.Text = AppL10n.T("Vui lòng nhập từ cần tra cứu.", "Please enter a word to look up.");
                 return;
             }
 
@@ -175,15 +176,15 @@ namespace ZenQOffice.UI
                     lstResults.Items.Add(item);
                 }
                 lstResults.SelectedIndex = 0;
-                lblCount.Text = string.Format("Tìm thấy {0} gợi ý đồng nghĩa.", found.Count);
+                lblCount.Text = string.Format(AppL10n.T("Tìm thấy {0} gợi ý đồng nghĩa.", "Found {0} synonyms."), found.Count);
             }
             else
             {
                 // Smart fallback extensions
-                lstResults.Items.Add(query + " (ngữ cảnh trang trọng)");
-                lstResults.Items.Add(query + " (diễn đạt mở rộng)");
-                lstResults.Items.Add(query + " tương ứng");
-                lblCount.Text = "Không có trong từ điển chuẩn. Đã tạo gợi ý ngữ cảnh.";
+                lstResults.Items.Add(query + AppL10n.T(" (ngữ cảnh trang trọng)", " (formal context)"));
+                lstResults.Items.Add(query + AppL10n.T(" (diễn đạt mở rộng)", " (expanded expression)"));
+                lstResults.Items.Add(query + AppL10n.T(" tương ứng", " equivalent"));
+                lblCount.Text = AppL10n.T("Không có trong từ điển chuẩn. Đã tạo gợi ý ngữ cảnh.", "Not in standard dictionary. Context suggestions generated.");
             }
         }
 

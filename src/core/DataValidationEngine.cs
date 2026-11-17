@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -68,8 +68,8 @@ namespace ZenQOffice.Core
 
         public bool ShowErrorMessage { get; set; } = true;
         public DataValidationErrorStyle ErrorStyle { get; set; } = DataValidationErrorStyle.Stop;
-        public string ErrorTitle { get; set; } = "Giá trị không hợp lệ";
-        public string ErrorMessage { get; set; } = "Giá trị bạn vừa nhập không đáp ứng các ràng buộc xác thực dữ liệu được thiết lập cho ô này.";
+        public string ErrorTitle { get; set; } = AppL10n.T("Giá trị không hợp lệ", "Invalid Value");
+        public string ErrorMessage { get; set; } = AppL10n.T("Giá trị bạn vừa nhập không đáp ứng các ràng buộc xác thực dữ liệu được thiết lập cho ô này.", "This value doesn't match the data validation restrictions defined for this cell.");
 
         public DataValidationRule()
         {
@@ -149,8 +149,8 @@ namespace ZenQOffice.Core
             var res = new DataValidationResult
             {
                 ErrorStyle = this.ErrorStyle,
-                ErrorTitle = string.IsNullOrEmpty(this.ErrorTitle) ? "Giá trị không hợp lệ" : this.ErrorTitle,
-                ErrorMessage = string.IsNullOrEmpty(this.ErrorMessage) ? "Giá trị nhập vào vi phạm quy tắc xác thực ô." : this.ErrorMessage
+                ErrorTitle = string.IsNullOrEmpty(this.ErrorTitle) ? AppL10n.T("Giá trị không hợp lệ", "Invalid Value") : this.ErrorTitle,
+                ErrorMessage = string.IsNullOrEmpty(this.ErrorMessage) ? AppL10n.T("Giá trị nhập vào vi phạm quy tắc xác thực ô.", "The entered value violates cell validation rules.") : this.ErrorMessage
             };
 
             string strVal = rawValue != null ? rawValue.ToString() : "";
@@ -384,7 +384,7 @@ namespace ZenQOffice.Core
     public class ScenarioModel
     {
         public string Id { get; set; }
-        public string Name { get; set; } = "Kịch bản 1";
+        public string Name { get; set; } = AppL10n.T("Kịch bản 1", "Scenario 1");
         public string Comment { get; set; } = "";
         public List<Tuple<uint, uint>> ChangingCells { get; set; } = new List<Tuple<uint, uint>>();
         public List<string> Values { get; set; } = new List<string>();

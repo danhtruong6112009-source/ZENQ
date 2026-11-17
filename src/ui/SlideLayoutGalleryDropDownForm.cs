@@ -146,7 +146,7 @@ namespace ZenQOffice.UI
                     })
                     {
                         Rectangle textRect = new Rectangle(2, sy + sh + 4, cardW - 4, cardH - (sy + sh + 6));
-                        g.DrawString(lName, nameFont, textBrush, textRect, sf);
+                        g.DrawString(AppL10n.Tr(lName), nameFont, textBrush, textRect, sf);
                     }
                 };
 
@@ -299,7 +299,7 @@ namespace ZenQOffice.UI
             using (Font hFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
             using (SolidBrush hBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
             {
-                g.DrawString("Bố cục Office (Slide Layouts)", hFont, hBrush, 12, 10);
+                g.DrawString(AppL10n.Tr("Bố cục Office (Slide Layouts)"), hFont, hBrush, 12, 10);
             }
 
             // 3. Đường phân cách mảnh

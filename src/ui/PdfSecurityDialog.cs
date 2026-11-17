@@ -35,7 +35,7 @@ namespace ZenQOffice.UI
 
         public PdfSecurityDialog(PdfSecuritySettings currentSettings = null)
         {
-            this.Text = "Bảo mật & Mã hóa PDF (Acrobat Security Standard)";
+            this.Text = AppL10n.T("Bảo mật & Mã hóa PDF (Acrobat Security Standard)", "PDF Security & Encryption");
             this.Size = new Size(540, 600);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -67,8 +67,8 @@ namespace ZenQOffice.UI
                 using (Font titleF = new Font("Segoe UI", 12f, FontStyle.Bold))
                 using (Font subF = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("Thiết lập Mật khẩu & Quyền hạn Bảo mật", titleF, Brushes.White, 44, 12);
-                    e.Graphics.DrawString("Mã hóa tài liệu PDF theo chuẩn công nghiệp Acrobat Pro 128-bit / 256-bit AES", subF, Brushes.WhiteSmoke, 44, 38);
+                    e.Graphics.DrawString(AppL10n.T("Thiết lập Mật khẩu & Quyền hạn Bảo mật", "Password & Security Permissions"), titleF, Brushes.White, 44, 12);
+                    e.Graphics.DrawString(AppL10n.T("Mã hóa tài liệu PDF theo chuẩn công nghiệp Acrobat Pro 128-bit / 256-bit AES", "Encrypt PDF document with industry-standard 128-bit / 256-bit AES"), subF, Brushes.WhiteSmoke, 44, 38);
                 }
             };
             this.Controls.Add(pnlHeader);
@@ -86,7 +86,7 @@ namespace ZenQOffice.UI
             // Group 1: Mật khẩu mở tệp
             GroupBox grpOpen = new GroupBox
             {
-                Text = "Mật khẩu Mở Tài liệu (Document Open Password)",
+                Text = AppL10n.T("Mật khẩu Mở Tài liệu (Document Open Password)", "Document Open Password"),
                 Location = new Point(4, curY),
                 Size = new Size(480, 115),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -95,14 +95,14 @@ namespace ZenQOffice.UI
 
             chkOpenPass = new CheckBox
             {
-                Text = "Yêu cầu mật khẩu để mở tài liệu",
+                Text = AppL10n.T("Yêu cầu mật khẩu để mở tài liệu", "Require a password to open the document"),
                 Location = new Point(14, 22),
                 AutoSize = true,
                 Checked = settings != null && settings.IsPasswordProtected && !string.IsNullOrEmpty(settings.UserPasswordHash)
             };
             grpOpen.Controls.Add(chkOpenPass);
 
-            Label lblOpen = new Label { Text = "Mật khẩu mở:", Location = new Point(14, 52), AutoSize = true };
+            Label lblOpen = new Label { Text = AppL10n.T("Mật khẩu mở:", "Open password:"), Location = new Point(14, 52), AutoSize = true };
             grpOpen.Controls.Add(lblOpen);
 
             txtOpenPass = new TextBox
@@ -114,7 +114,7 @@ namespace ZenQOffice.UI
             };
             grpOpen.Controls.Add(txtOpenPass);
 
-            Label lblConfirmOpen = new Label { Text = "Xác nhận:", Location = new Point(275, 52), AutoSize = true };
+            Label lblConfirmOpen = new Label { Text = AppL10n.T("Xác nhận:", "Confirm:"), Location = new Point(275, 52), AutoSize = true };
             grpOpen.Controls.Add(lblConfirmOpen);
 
             txtConfirmOpenPass = new TextBox
@@ -128,7 +128,7 @@ namespace ZenQOffice.UI
 
             Label lblOpenHint = new Label
             {
-                Text = "Người nhận bắt buộc phải nhập mật khẩu này để xem nội dung PDF.",
+                Text = AppL10n.T("Người nhận bắt buộc phải nhập mật khẩu này để xem nội dung PDF.", "Recipients must enter this password to view the PDF."),
                 Location = new Point(14, 82),
                 Size = new Size(450, 22),
                 ForeColor = Color.Gray,
@@ -148,7 +148,7 @@ namespace ZenQOffice.UI
             // Group 2: Quyền hạn & Giới hạn thao tác
             GroupBox grpPerm = new GroupBox
             {
-                Text = "Quyền hạn & Mật khẩu Quản trị (Permissions & Restrictions)",
+                Text = AppL10n.T("Quyền hạn & Mật khẩu Quản trị (Permissions & Restrictions)", "Permissions & Restrictions"),
                 Location = new Point(4, curY),
                 Size = new Size(480, 185),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -157,14 +157,14 @@ namespace ZenQOffice.UI
 
             chkPermPass = new CheckBox
             {
-                Text = "Bật mật khẩu quyền hạn để hạn chế in ấn và sao chép",
+                Text = AppL10n.T("Bật mật khẩu quyền hạn để hạn chế in ấn và sao chép", "Enable permissions password to restrict printing and copying"),
                 Location = new Point(14, 22),
                 AutoSize = true,
                 Checked = settings != null && (!settings.AllowPrinting || !settings.AllowCopying || !settings.AllowModifying || !string.IsNullOrEmpty(settings.OwnerPasswordHash))
             };
             grpPerm.Controls.Add(chkPermPass);
 
-            Label lblPerm = new Label { Text = "Mật khẩu quyền:", Location = new Point(14, 52), AutoSize = true };
+            Label lblPerm = new Label { Text = AppL10n.T("Mật khẩu quyền:", "Permissions pw:"), Location = new Point(14, 52), AutoSize = true };
             grpPerm.Controls.Add(lblPerm);
 
             txtPermPass = new TextBox
@@ -176,7 +176,7 @@ namespace ZenQOffice.UI
             };
             grpPerm.Controls.Add(txtPermPass);
 
-            Label lblConfirmPerm = new Label { Text = "Xác nhận:", Location = new Point(275, 52), AutoSize = true };
+            Label lblConfirmPerm = new Label { Text = AppL10n.T("Xác nhận:", "Confirm:"), Location = new Point(275, 52), AutoSize = true };
             grpPerm.Controls.Add(lblConfirmPerm);
 
             txtConfirmPermPass = new TextBox
@@ -190,7 +190,7 @@ namespace ZenQOffice.UI
 
             chkPrint = new CheckBox
             {
-                Text = "Cho phép In ấn tài liệu (Printing)",
+                Text = AppL10n.T("Cho phép In ấn tài liệu (Printing)", "Allow Printing"),
                 Location = new Point(14, 82),
                 AutoSize = true,
                 Checked = settings == null || settings.AllowPrinting,
@@ -200,7 +200,7 @@ namespace ZenQOffice.UI
 
             chkCopy = new CheckBox
             {
-                Text = "Cho phép Sao chép nội dung văn bản & hình ảnh (Copying)",
+                Text = AppL10n.T("Cho phép Sao chép nội dung văn bản & hình ảnh (Copying)", "Allow Copying of Text and Images"),
                 Location = new Point(14, 110),
                 AutoSize = true,
                 Checked = settings == null || settings.AllowCopying,
@@ -210,7 +210,7 @@ namespace ZenQOffice.UI
 
             chkModify = new CheckBox
             {
-                Text = "Cho phép Chỉnh sửa và thay đổi cấu trúc trang (Modifying)",
+                Text = AppL10n.T("Cho phép Chỉnh sửa và thay đổi cấu trúc trang (Modifying)", "Allow Editing and Page Modifications"),
                 Location = new Point(14, 138),
                 AutoSize = true,
                 Checked = settings == null || settings.AllowModifying,
@@ -233,14 +233,14 @@ namespace ZenQOffice.UI
             // Group 3: Chuẩn mã hóa
             GroupBox grpEnc = new GroupBox
             {
-                Text = "Mức độ Mã hóa (Encryption Level)",
+                Text = AppL10n.T("Mức độ Mã hóa (Encryption Level)", "Encryption Level"),
                 Location = new Point(4, curY),
                 Size = new Size(480, 70),
                 ForeColor = Color.FromArgb(30, 41, 59)
             };
             pnlBody.Controls.Add(grpEnc);
 
-            Label lblEnc = new Label { Text = "Thuật toán:", Location = new Point(14, 28), AutoSize = true };
+            Label lblEnc = new Label { Text = AppL10n.T("Thuật toán:", "Algorithm:"), Location = new Point(14, 28), AutoSize = true };
             grpEnc.Controls.Add(lblEnc);
 
             cboKeyLength = new ZenQOffice.UI.FluentComboBox
@@ -249,8 +249,8 @@ namespace ZenQOffice.UI
                 Location = new Point(120, 24),
                 Width = 345
             };
-            cboKeyLength.Items.Add("128-bit AES (Chuẩn Adobe Reader / Acrobat 7.0+)");
-            cboKeyLength.Items.Add("256-bit AES (Mức độ bảo mật quân sự / Acrobat 9.0+)");
+            cboKeyLength.Items.Add(AppL10n.T("128-bit AES (Chuẩn Adobe Reader / Acrobat 7.0+)", "128-bit AES (Acrobat 7.0+ Standard)"));
+            cboKeyLength.Items.Add(AppL10n.T("256-bit AES (Mức độ bảo mật quân sự / Acrobat 9.0+)", "256-bit AES (Acrobat 9.0+ High Security)"));
             cboKeyLength.SelectedIndex = (settings != null && settings.EncryptionKeyLength == 256) ? 1 : 0;
             grpEnc.Controls.Add(cboKeyLength);
 
@@ -265,7 +265,7 @@ namespace ZenQOffice.UI
 
             btnApply = new Button
             {
-                Text = "Áp dụng",
+                Text = AppL10n.T("Áp dụng", "Apply"),
                 Size = new Size(115, 34),
                 Location = new Point(145, 10),
                 BackColor = Color.FromArgb(220, 38, 38),
@@ -285,7 +285,7 @@ namespace ZenQOffice.UI
             bool isCurrentlyProtected = (settings != null && settings.IsPasswordProtected);
             btnRemove = new Button
             {
-                Text = "Gỡ Mật khẩu",
+                Text = AppL10n.T("Gỡ Mật khẩu", "Remove Password"),
                 Size = new Size(125, 34),
                 Location = new Point(270, 10),
                 BackColor = Color.FromArgb(239, 246, 255),
@@ -309,7 +309,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Size = new Size(95, 34),
                 Location = new Point(isCurrentlyProtected ? 405 : 270, 10),
                 BackColor = Color.White,
@@ -332,13 +332,13 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrEmpty(txtOpenPass.Text))
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng nhập mật khẩu mở tài liệu!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Vui lòng nhập mật khẩu mở tài liệu!", "Please enter the document open password!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtOpenPass.Focus();
                     return;
                 }
                 if (txtOpenPass.Text != txtConfirmOpenPass.Text)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, "Mật khẩu mở tài liệu xác nhận không khớp!", "Lỗi xác nhận", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Mật khẩu mở tài liệu xác nhận không khớp!", "Open password confirmation does not match!"), AppL10n.T("Lỗi xác nhận", "Confirmation Error"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtConfirmOpenPass.Focus();
                     return;
                 }
@@ -348,13 +348,13 @@ namespace ZenQOffice.UI
             {
                 if (string.IsNullOrEmpty(txtPermPass.Text))
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng nhập mật khẩu quyền hạn!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Vui lòng nhập mật khẩu quyền hạn!", "Please enter the permissions password!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtPermPass.Focus();
                     return;
                 }
                 if (txtPermPass.Text != txtConfirmPermPass.Text)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(this, "Mật khẩu quyền hạn xác nhận không khớp!", "Lỗi xác nhận", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Mật khẩu quyền hạn xác nhận không khớp!", "Permissions password confirmation does not match!"), AppL10n.T("Lỗi xác nhận", "Confirmation Error"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txtConfirmPermPass.Focus();
                     return;
                 }
@@ -362,7 +362,7 @@ namespace ZenQOffice.UI
 
             if (!chkOpenPass.Checked && !chkPermPass.Checked)
             {
-                ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn ít nhất một hình thức bảo mật (Mật khẩu mở hoặc Mật khẩu quyền hạn)!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Vui lòng chọn ít nhất một hình thức bảo mật (Mật khẩu mở hoặc Mật khẩu quyền hạn)!", "Please select at least one security option (Open password or Permissions password)!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 

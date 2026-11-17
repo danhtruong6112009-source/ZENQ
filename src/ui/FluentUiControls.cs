@@ -55,6 +55,50 @@ namespace ZenQOffice.UI
         }
     }
 
+    internal static class FluentMotion
+    {
+        internal static double NowMs => System.Diagnostics.Stopwatch.GetTimestamp() * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        internal static float Clamp01(float v) => v < 0f ? 0f : (v > 1f ? 1f : v);
+        internal static float EaseOutCubic(float t)
+        {
+            t = Clamp01(t);
+            float u = 1f - t;
+            return 1f - (u * u * u);
+        }
+        internal static float EaseOutQuint(float t)
+        {
+            t = Clamp01(t);
+            float u = 1f - t;
+            return 1f - (u * u * u * u * u);
+        }
+        internal static float Lerp(float a, float b, float t) => a + (b - a) * t;
+        internal static double DeltaSeconds(ref long lastTimestamp)
+        {
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            double dt = lastTimestamp == 0 ? 0.016 : Math.Clamp((now - lastTimestamp) / (double)System.Diagnostics.Stopwatch.Frequency, 0.004, 0.05);
+            lastTimestamp = now;
+            return dt;
+        }
+        internal static float DampFactor(double dt, double timeConstantSec)
+        {
+            if (timeConstantSec <= 0.0001) return 1f;
+            return Clamp01(1f - (float)Math.Exp(-dt / timeConstantSec));
+        }
+        internal static bool StepAxis(ref float current, float target, float blend, float snapEps = 0.5f)
+        {
+            float diff = target - current;
+            if (Math.Abs(diff) <= snapEps)
+            {
+                if (current != target) { current = target; return true; }
+                return false;
+            }
+            float next = current + diff * blend;
+            if (Math.Abs(target - next) <= snapEps) current = target;
+            else current = next;
+            return true;
+        }
+    }
+
     public sealed class FluentMenuRenderer : ToolStripProfessionalRenderer
     {
         public FluentMenuRenderer(){RoundedEdges=false;}
@@ -181,6 +225,26 @@ namespace ZenQOffice.UI
         private static readonly ConditionalWeakTable<ToolStrip,object> ConfiguredMenus=new();
         private static readonly ConditionalWeakTable<ToolStripItem,object> ConfiguredItems=new();
         private static readonly ConditionalWeakTable<ToolStrip,ToolStripItem> HoverItems=new();
+        private static readonly ConditionalWeakTable<ToolStripItem,string> OriginalItemTexts=new();
+        private static string GetOriginalText(ToolStripItem item)
+        {
+            if(OriginalItemTexts.TryGetValue(item,out string orig))return orig;
+            orig=item.Text??"";
+            OriginalItemTexts.Add(item,orig);
+            return orig;
+        }
+        private static void LocalizeItems(ToolStripDropDown menu)
+        {
+            foreach(ToolStripItem item in menu.Items)
+            {
+                if(item is ToolStripSeparator||item is ToolStripControlHost)continue;
+                string orig=GetOriginalText(item);
+                string tr=ZenQOffice.Core.AppL10n.Tr(orig);
+                if(!string.Equals(item.Text,tr,StringComparison.Ordinal))item.Text=tr;
+                if(item is ToolStripMenuItem sub&&sub.HasDropDownItems&&!sub.DropDown.Visible)
+                    LocalizeItems(sub.DropDown);
+            }
+        }
         internal static void PopulateOnDemand(ToolStripMenuItem item,Action populate)
         {
             item.DropDownItems.Add(new ToolStripMenuItem("…"));
@@ -215,6 +279,7 @@ namespace ZenQOffice.UI
         internal static void Configure(ToolStripDropDown menu)
         {
             menu.Renderer=FluentUi.MenuRenderer;menu.BackColor=Color.FromArgb(253,254,255);menu.DropShadowEnabled=false;
+            LocalizeItems(menu);
             if(!ConfiguredMenus.TryGetValue(menu,out _))
             {
                 ConfiguredMenus.Add(menu,new object());
@@ -297,20 +362,182 @@ namespace ZenQOffice.UI
     }
     public class FluentTabControl : System.Windows.Forms.TabControl
     {
-        public FluentTabControl(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);Padding=new Point(14,6);}
-        protected override void OnControlAdded(ControlEventArgs e){base.OnControlAdded(e);if(e.Control is TabPage page&&page.BackColor==SystemColors.Control)page.BackColor=Color.White;}
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        private int _hoverTab = -1;
+        private float _indX = -1f, _indW = -1f, _indTargetX = -1f, _indTargetW = -1f;
+        private Timer _animTimer;
+
+        public FluentTabControl()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            Padding = new Point(16, 7);
+        }
+
+        protected override void OnControlAdded(ControlEventArgs e)
+        {
+            base.OnControlAdded(e);
+            if (e.Control is TabPage page && page.BackColor == SystemColors.Control) page.BackColor = Color.White;
+        }
+
+        protected override void OnSelectedIndexChanged(EventArgs e)
+        {
+            base.OnSelectedIndexChanged(e);
+            UpdateIndicatorTarget();
+            StartAnimIfNeeded();
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            int maxR = GetTabStripMaxRight();
+            int hit = -1;
+            for (int i = 0; i < TabCount; i++)
+            {
+                var r = GetTabRect(i);
+                if (r.Left >= maxR) continue;
+                var clipped = new Rectangle(r.X, r.Y, Math.Min(r.Right, maxR) - r.X, r.Height);
+                if (clipped.Contains(e.Location)) { hit = i; break; }
+            }
+            if (hit != _hoverTab)
+            {
+                _hoverTab = hit;
+                Invalidate();
+            }
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            if (_hoverTab != -1) { _hoverTab = -1; Invalidate(); }
+        }
+
+        private void UpdateIndicatorTarget()
+        {
+            if (IsHandleCreated && SelectedIndex >= 0 && SelectedIndex < TabCount)
+            {
+                Rectangle r = GetTabRect(SelectedIndex);
+                _indTargetX = r.Left + 10f;
+                _indTargetW = Math.Max(12f, r.Width - 20f);
+                if (_indX < 0f || _indW < 0f) { _indX = _indTargetX; _indW = _indTargetW; }
+            }
+        }
+
+        private void StartAnimIfNeeded()
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            if (Math.Abs(_indTargetX - _indX) <= 0.5f && Math.Abs(_indTargetW - _indW) <= 0.5f) return;
+            if (_animTimer == null)
+            {
+                _animTimer = new Timer { Interval = 15 };
+                _animTimer.Tick += (s, ev) =>
+                {
+                    if (IsDisposed) { _animTimer?.Stop(); return; }
+                    float dx = _indTargetX - _indX;
+                    float dw = _indTargetW - _indW;
+                    if (Math.Abs(dx) <= 0.4f && Math.Abs(dw) <= 0.4f)
+                    {
+                        _indX = _indTargetX;
+                        _indW = _indTargetW;
+                        _animTimer.Stop();
+                    }
+                    else
+                    {
+                        _indX += dx * 0.28f;
+                        _indW += dw * 0.28f;
+                    }
+                    Invalidate();
+                };
+            }
+            if (!_animTimer.Enabled) _animTimer.Start();
+        }
+
+        private int GetTabStripMaxRight()
+        {
+            if (!IsHandleCreated) return Width - 2;
+            IntPtr updown = FindWindowEx(Handle, IntPtr.Zero, "msctls_updown32", null);
+            if (updown != IntPtr.Zero && IsWindowVisible(updown) && GetWindowRect(updown, out RECT wr))
+            {
+                Point pt = PointToClient(new Point(wr.Left, wr.Top));
+                if (pt.X > 20 && pt.X < Width) return pt.X - 6;
+            }
+            return Width - 2;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _animTimer?.Stop();
+                _animTimer?.Dispose();
+                _animTimer = null;
+            }
+            base.Dispose(disposing);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
-            using var g=new D2DGraphics(e.Graphics,Width,Height);g.Clear(Parent?.BackColor??Color.White);
-            using var border=new Pen(FluentUi.Border);
-            g.DrawRectangle(border,DisplayRectangle.X-1,DisplayRectangle.Y-1,DisplayRectangle.Width+1,DisplayRectangle.Height+1);
-            for(int i=0;i<TabCount;i++)
+            using var g = new D2DGraphics(e.Graphics, Width, Height);
+            g.Clear(Parent?.BackColor ?? Color.FromArgb(248, 250, 252));
+
+            Rectangle disp = DisplayRectangle;
+            using var pageBg = new SolidBrush(Color.White);
+            using var border = new Pen(Color.FromArgb(226, 232, 240));
+            RectangleF pageBox = new RectangleF(disp.X - 2f, disp.Y - 1f, disp.Width + 3f, disp.Height + 2f);
+            g.FillRoundedRectangle(pageBg, pageBox, 8f);
+            g.DrawRoundedRectangle(border, pageBox, 8f);
+
+            UpdateIndicatorTarget();
+            int maxRight = GetTabStripMaxRight();
+            int stripBottom = disp.Y;
+
+            g.PushClip(new Rectangle(2, 0, Math.Max(10, maxRight - 2), Math.Max(24, stripBottom + 2)));
+            using var boldFont = new Font(Font.FontFamily, Font.Size, FontStyle.Bold);
+            for (int i = 0; i < TabCount; i++)
             {
-                var r=GetTabRect(i);bool selected=i==SelectedIndex;
-                using var fill=new SolidBrush(selected?FluentUi.Hover:Color.White);g.FillRoundedRectangle(fill,new RectangleF(r.X+1,r.Y+1,r.Width-2,r.Height-2),5);
-                FluentUi.Text(g,FluentUi.MnemonicText(TabPages[i].Text,out _),Font,selected?Color.FromArgb(29,91,157):FluentUi.Ink,r,true);
-                if(selected){using var pen=new Pen(Color.FromArgb(40,117,195),2);g.DrawLine(pen,r.Left+8,r.Bottom-2,r.Right-8,r.Bottom-2);}
+                var r = GetTabRect(i);
+                if (r.Left >= maxRight) continue;
+                bool selected = (i == SelectedIndex);
+                bool hovered = (i == _hoverTab && !selected);
+                float tabW = Math.Min(r.Right - 2f, maxRight - 1f) - (r.X + 2f);
+                if (tabW < 10f) continue;
+                RectangleF tabRect = new RectangleF(r.X + 2f, r.Y + 2f, tabW, r.Height - 4f);
+
+                if (selected)
+                {
+                    using var fill = new SolidBrush(Color.White);
+                    using var tabPen = new Pen(Color.FromArgb(226, 232, 240));
+                    g.FillRoundedRectangle(fill, tabRect, 6f);
+                    g.DrawRoundedRectangle(tabPen, tabRect, 6f);
+                }
+                else if (hovered)
+                {
+                    using var fill = new SolidBrush(Color.FromArgb(234, 240, 248));
+                    g.FillRoundedRectangle(fill, tabRect, 6f);
+                }
+
+                Color txtColor = selected
+                    ? Color.FromArgb(37, 99, 235)
+                    : (hovered ? Color.FromArgb(15, 23, 42) : Color.FromArgb(100, 116, 139));
+                string caption = FluentUi.MnemonicText(TabPages[i].Text, out _);
+                FluentUi.Text(g, caption, selected ? boldFont : Font, txtColor, tabRect, true);
             }
+
+            if (_indX >= 0f && _indW > 0f && SelectedIndex >= 0 && SelectedIndex < TabCount)
+            {
+                Rectangle selRect = GetTabRect(SelectedIndex);
+                float lineY = selRect.Bottom - 4f;
+                using var indBrush = new SolidBrush(Color.FromArgb(37, 99, 235));
+                g.FillRoundedRectangle(indBrush, new RectangleF(_indX, lineY, _indW, 2.5f), 1.25f);
+            }
+            g.PopClip();
         }
     }
 }

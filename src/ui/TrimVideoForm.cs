@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -27,7 +27,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Cắt Video (Trim Video)";
+            this.Text = AppL10n.T("Cắt Video (Trim Video)", "Trim Video");
             this.Size = new Size(600, 480);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -45,7 +45,7 @@ namespace ZenQOffice.UI
             };
             Label title = new Label
             {
-                Text = "✂️ Cắt bỏ phần đầu và phần cuối của đoạn video",
+                Text = AppL10n.T("✂️ Cắt bỏ phần đầu và phần cuối của đoạn video", "✂️ Trim the beginning and end of your video clip"),
                 Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 AutoSize = true,
@@ -81,7 +81,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(_timelinePanel);
 
             // Controls Group
-            Label lblStart = new Label { Text = "Thời gian Bắt đầu:", Location = new Point(20, 330), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblStart = new Label { Text = AppL10n.T("Thời gian Bắt đầu:", "Start Time:"), Location = new Point(20, 330), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             _numStart = new NumericUpDown
             {
                 Location = new Point(20, 354),
@@ -99,7 +99,7 @@ namespace ZenQOffice.UI
                 _timelinePanel.Invalidate();
             };
 
-            Label lblEnd = new Label { Text = "Thời gian Kết thúc:", Location = new Point(424, 330), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblEnd = new Label { Text = AppL10n.T("Thời gian Kết thúc:", "End Time:"), Location = new Point(424, 330), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             _numEnd = new NumericUpDown
             {
                 Location = new Point(424, 354),
@@ -119,7 +119,7 @@ namespace ZenQOffice.UI
 
             _lblDuration = new Label
             {
-                Text = "Thời lượng sau cắt: 00:30.00",
+                Text = AppL10n.T("Thời lượng sau cắt: 00:30.00", "Trimmed duration: 00:30.00"),
                 Location = new Point(180, 358),
                 Width = 224,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -132,7 +132,7 @@ namespace ZenQOffice.UI
             // Bottom Buttons
             Button btnOk = new Button
             {
-                Text = "Cắt (OK)",
+                Text = AppL10n.T("Cắt (OK)", "OK"),
                 DialogResult = DialogResult.OK,
                 Location = new Point(374, 396),
                 Size = new Size(94, 32),
@@ -144,7 +144,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(476, 396),
                 Size = new Size(88, 32),
@@ -209,7 +209,7 @@ namespace ZenQOffice.UI
             decimal diff = Math.Max(0M, _numEnd.Value - _numStart.Value);
             int mins = (int)(diff / 60M);
             decimal secs = diff % 60M;
-            _lblDuration.Text = string.Format("Thời lượng: {0:D2}:{1:00.00}", mins, secs);
+            _lblDuration.Text = string.Format(AppL10n.T("Thời lượng: {0:D2}:{1:00.00}", "Duration: {0:D2}:{1:00.00}"), mins, secs);
         }
 
         private void TimelinePanel_Paint(object sender, PaintEventArgs e)

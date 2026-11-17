@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -37,7 +38,7 @@ namespace ZenQOffice.UI
 
         public CustomWatermarkDialogForm(string currentText, bool currentDiagonal)
         {
-            this.Text = "In Hình mờ (Printed Watermark)";
+            this.Text = AppL10n.T("In Hình mờ (Printed Watermark)", "Printed Watermark");
             this.ClientSize = new Size(530, 430);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -55,7 +56,7 @@ namespace ZenQOffice.UI
             // 1. Radio: No Watermark
             rbNoWatermark = new RadioButton
             {
-                Text = "Không có hình mờ (No watermark)",
+                Text = AppL10n.T("Không có hình mờ (No watermark)", "No watermark"),
                 Location = new Point(24, 18),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.2f, FontStyle.Regular),
@@ -67,7 +68,7 @@ namespace ZenQOffice.UI
             // 2. Radio: Picture Watermark
             rbPictureWatermark = new RadioButton
             {
-                Text = "Hình ảnh mờ (Picture watermark)",
+                Text = AppL10n.T("Hình ảnh mờ (Picture watermark)", "Picture watermark"),
                 Location = new Point(24, 46),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.2f, FontStyle.Regular),
@@ -78,7 +79,7 @@ namespace ZenQOffice.UI
 
             btnSelectPicture = new Button
             {
-                Text = "Chọn hình ảnh (Select Picture)...",
+                Text = AppL10n.T("Chọn hình ảnh (Select Picture)...", "Select Picture..."),
                 Location = new Point(48, 72),
                 Size = new Size(200, 26),
                 BackColor = Color.White,
@@ -89,7 +90,7 @@ namespace ZenQOffice.UI
             {
                 using (OpenFileDialog ofd = new OpenFileDialog())
                 {
-                    ofd.Filter = "Tệp hình ảnh (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp|Tất cả tệp (*.*)|*.*";
+                    ofd.Filter = AppL10n.T("Tệp hình ảnh (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp|Tất cả tệp (*.*)|*.*", "Image Files (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp|All Files (*.*)|*.*");
                     if (ofd.ShowDialog(this) == DialogResult.OK)
                     {
                         try
@@ -100,14 +101,14 @@ namespace ZenQOffice.UI
                         }
                         catch (Exception ex)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Không thể nạp tệp hình ảnh: " + ex.Message, "Lỗi hình ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể nạp tệp hình ảnh: ", "Unable to load image file: ") + ex.Message, AppL10n.T("Lỗi hình ảnh", "Image Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }
             };
             this.Controls.Add(btnSelectPicture);
 
-            Label lblScale = new Label { Text = "Tỉ lệ (Scale):", Location = new Point(48, 106), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblScale = new Label { Text = AppL10n.T("Tỉ lệ (Scale):", "Scale:"), Location = new Point(48, 106), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblScale);
 
             cbScale = new ZenQOffice.UI.FluentComboBox
@@ -117,13 +118,13 @@ namespace ZenQOffice.UI
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 9)
             };
-            cbScale.Items.AddRange(new object[] { "Tự động (Auto)", "500%", "200%", "150%", "100%", "50%" });
+            cbScale.Items.AddRange(new object[] { AppL10n.T("Tự động (Auto)", "Auto"), "500%", "200%", "150%", "100%", "50%" });
             cbScale.SelectedIndex = 0;
             this.Controls.Add(cbScale);
 
             chkWashout = new CheckBox
             {
-                Text = "Làm mờ (Washout)",
+                Text = AppL10n.T("Làm mờ (Washout)", "Washout"),
                 Location = new Point(290, 105),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9),
@@ -134,7 +135,7 @@ namespace ZenQOffice.UI
             // 3. Radio: Text Watermark
             rbTextWatermark = new RadioButton
             {
-                Text = "Chữ hình mờ (Text watermark)",
+                Text = AppL10n.T("Chữ hình mờ (Text watermark)", "Text watermark"),
                 Location = new Point(24, 140),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.2f, FontStyle.Regular),
@@ -144,7 +145,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(rbTextWatermark);
 
             // Language
-            Label lblLang = new Label { Text = "Ngôn ngữ (Language):", Location = new Point(48, 171), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblLang = new Label { Text = AppL10n.T("Ngôn ngữ (Language):", "Language:"), Location = new Point(48, 171), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblLang);
 
             cbLanguage = new ZenQOffice.UI.FluentComboBox { Location = new Point(185, 168), Size = new Size(305, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
@@ -153,16 +154,16 @@ namespace ZenQOffice.UI
             this.Controls.Add(cbLanguage);
 
             // Text
-            Label lblText = new Label { Text = "Văn bản (Text):", Location = new Point(48, 203), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblText = new Label { Text = AppL10n.T("Văn bản (Text):", "Text:"), Location = new Point(48, 203), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblText);
 
             cbText = new ZenQOffice.UI.FluentComboBox { Location = new Point(185, 200), Size = new Size(305, 24), Font = new Font("Segoe UI", 9) };
             cbText.Items.AddRange(new object[] { "BẢO MẬT", "KHÔNG SAO CHÉP", "BẢN THẢO", "TUYỆT MẬT", "CONFIDENTIAL", "DO NOT COPY", "DRAFT", "ORIGINAL", "SAMPLE", "ASAP" });
-            cbText.Text = !string.IsNullOrEmpty(currentText) ? currentText : "BẢO MẬT";
+            cbText.Text = !string.IsNullOrEmpty(currentText) ? currentText : AppL10n.T("BẢO MẬT", "CONFIDENTIAL");
             this.Controls.Add(cbText);
 
             // Font
-            Label lblFont = new Label { Text = "Phông chữ (Font):", Location = new Point(48, 235), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblFont = new Label { Text = AppL10n.T("Phông chữ (Font):", "Font:"), Location = new Point(48, 235), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblFont);
 
             cbFont = new ZenQOffice.UI.FluentComboBox { Location = new Point(185, 232), Size = new Size(305, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
@@ -171,21 +172,21 @@ namespace ZenQOffice.UI
             this.Controls.Add(cbFont);
 
             // Size
-            Label lblSize = new Label { Text = "Cỡ chữ (Size):", Location = new Point(48, 267), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblSize = new Label { Text = AppL10n.T("Cỡ chữ (Size):", "Size:"), Location = new Point(48, 267), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblSize);
 
             cbSize = new ZenQOffice.UI.FluentComboBox { Location = new Point(185, 264), Size = new Size(130, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9) };
-            cbSize.Items.AddRange(new object[] { "Tự động (Auto)", "36", "44", "48", "54", "66", "72", "80", "96" });
+            cbSize.Items.AddRange(new object[] { AppL10n.T("Tự động (Auto)", "Auto"), "36", "44", "48", "54", "66", "72", "80", "96" });
             cbSize.SelectedIndex = 0;
             this.Controls.Add(cbSize);
 
             // Color & Semitransparent
-            Label lblColor = new Label { Text = "Màu sắc (Color):", Location = new Point(48, 299), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblColor = new Label { Text = AppL10n.T("Màu sắc (Color):", "Color:"), Location = new Point(48, 299), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblColor);
 
             btnColor = new Button
             {
-                Text = "Tự động (Xám)",
+                Text = AppL10n.T("Tự động (Xám)", "Automatic (Gray)"),
                 Location = new Point(185, 296),
                 Size = new Size(130, 26),
                 BackColor = Color.White,
@@ -200,7 +201,7 @@ namespace ZenQOffice.UI
                     if (cd.ShowDialog(this) == DialogResult.OK)
                     {
                         SelectedColor = cd.Color;
-                        btnColor.Text = "Đã chọn màu";
+                        btnColor.Text = AppL10n.T("Đã chọn màu", "Color selected");
                     }
                 }
             };
@@ -208,7 +209,7 @@ namespace ZenQOffice.UI
 
             chkSemitransparent = new CheckBox
             {
-                Text = "Bán trong suốt (Semitransparent)",
+                Text = AppL10n.T("Bán trong suốt (Semitransparent)", "Semitransparent"),
                 Location = new Point(325, 299),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.5f),
@@ -217,12 +218,12 @@ namespace ZenQOffice.UI
             this.Controls.Add(chkSemitransparent);
 
             // Layout (Diagonal / Horizontal)
-            Label lblLayout = new Label { Text = "Bố cục (Layout):", Location = new Point(48, 332), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            Label lblLayout = new Label { Text = AppL10n.T("Bố cục (Layout):", "Layout:"), Location = new Point(48, 332), AutoSize = true, Font = new Font("Segoe UI", 9) };
             this.Controls.Add(lblLayout);
 
             rbDiagonal = new RadioButton
             {
-                Text = "Chéo (Diagonal)",
+                Text = AppL10n.T("Chéo (Diagonal)", "Diagonal"),
                 Location = new Point(185, 330),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9),
@@ -243,7 +244,7 @@ namespace ZenQOffice.UI
             // Action Buttons (Apply, OK, Cancel) placed with clean vertical clearance at Y = 380
             btnApply = new Button
             {
-                Text = "Áp dụng (Apply)",
+                Text = AppL10n.T("Áp dụng (Apply)", "Apply"),
                 Location = new Point(205, 380),
                 Size = new Size(110, 30),
                 BackColor = Color.White,
@@ -255,7 +256,7 @@ namespace ZenQOffice.UI
 
             btnOK = new Button
             {
-                Text = "Đồng ý (OK)",
+                Text = AppL10n.T("Đồng ý (OK)", "OK"),
                 Location = new Point(325, 380),
                 Size = new Size(100, 30),
                 BackColor = Color.FromArgb(43, 87, 154),
@@ -273,7 +274,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Location = new Point(435, 380),
                 Size = new Size(80, 30),
                 BackColor = Color.White,
@@ -315,7 +316,7 @@ namespace ZenQOffice.UI
             }
             else if (rbTextWatermark != null && rbTextWatermark.Checked)
             {
-                string txt = (cbText != null && cbText.Text != null) ? cbText.Text.Trim() : "BẢO MẬT";
+                string txt = (cbText != null && cbText.Text != null) ? cbText.Text.Trim() : AppL10n.T("BẢO MẬT", "CONFIDENTIAL");
                 bool isDiag = (rbDiagonal != null) ? rbDiagonal.Checked : true;
                 bool isSemi = (chkSemitransparent != null) ? chkSemitransparent.Checked : true;
                 if (OnApplyTextWatermark != null)

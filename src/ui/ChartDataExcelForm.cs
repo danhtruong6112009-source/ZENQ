@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -26,7 +27,7 @@ namespace ZenQOffice.UI
         public DocChartData()
         {
             ChartType = "Column_Clustered";
-            Title = "Tiêu đề Biểu đồ";
+            Title = AppL10n.T("Tiêu đề Biểu đồ", "Chart Title");
             Categories = new List<string>();
             SeriesNames = new List<string>();
             Values = new List<List<double>>();
@@ -105,9 +106,9 @@ namespace ZenQOffice.UI
             DocChartData data = new DocChartData
             {
                 ChartType = string.IsNullOrEmpty(chartType) ? "Column_Clustered" : chartType,
-                Title = "Tiêu đề Biểu đồ",
-                Categories = new List<string> { "Danh mục 1", "Danh mục 2", "Danh mục 3", "Danh mục 4" },
-                SeriesNames = new List<string> { "Chuỗi 1", "Chuỗi 2", "Chuỗi 3" },
+                Title = AppL10n.T("Tiêu đề Biểu đồ", "Chart Title"),
+                Categories = new List<string> { AppL10n.T("Danh mục 1", "Category 1"), AppL10n.T("Danh mục 2", "Category 2"), AppL10n.T("Danh mục 3", "Category 3"), AppL10n.T("Danh mục 4", "Category 4") },
+                SeriesNames = new List<string> { AppL10n.T("Chuỗi 1", "Series 1"), AppL10n.T("Chuỗi 2", "Series 2"), AppL10n.T("Chuỗi 3", "Series 3") },
                 Values = new List<List<double>>
                 {
                     new List<double> { 4.3, 2.4, 2.0 },
@@ -118,8 +119,8 @@ namespace ZenQOffice.UI
             };
             if (chartType == "Pie" || chartType == "Doughnut")
             {
-                data.Categories = new List<string> { "Quý 1", "Quý 2", "Quý 3", "Quý 4" };
-                data.SeriesNames = new List<string> { "Doanh số" };
+                data.Categories = new List<string> { AppL10n.T("Quý 1", "Q1"), AppL10n.T("Quý 2", "Q2"), AppL10n.T("Quý 3", "Q3"), AppL10n.T("Quý 4", "Q4") };
+                data.SeriesNames = new List<string> { AppL10n.T("Doanh số", "Sales") };
                 data.Values = new List<List<double>>
                 {
                     new List<double> { 8.2 },
@@ -130,9 +131,9 @@ namespace ZenQOffice.UI
             }
             else if (chartType != null && (chartType.StartsWith("Map") || chartType.StartsWith("FilledMap")))
             {
-                data.Title = "Bản đồ Phân bổ Mật độ / Doanh thu (Filled Map)";
-                data.Categories = new List<string> { "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ", "Quảng Ninh" };
-                data.SeriesNames = new List<string> { "Doanh thu (Tỷ VNĐ)" };
+                data.Title = AppL10n.T("Bản đồ Phân bổ Mật độ / Doanh thu (Filled Map)", "Density / Revenue Distribution Map (Filled Map)");
+                data.Categories = new List<string> { "Ha Noi", "Ho Chi Minh City", "Da Nang", "Hai Phong", "Can Tho", "Quang Ninh" };
+                data.SeriesNames = new List<string> { AppL10n.T("Doanh thu (Tỷ VNĐ)", "Revenue (Billion)") };
                 data.Values = new List<List<double>>
                 {
                     new List<double> { 88.5 },
@@ -145,9 +146,9 @@ namespace ZenQOffice.UI
             }
             else if (chartType != null && chartType.StartsWith("PivotChart"))
             {
-                data.Title = "Biểu đồ Pivot Đa chiều (PivotChart)";
-                data.Categories = new List<string> { "Miền Bắc", "Miền Trung", "Miền Nam", "Xuất khẩu" };
-                data.SeriesNames = new List<string> { "Sản phẩm A", "Sản phẩm B", "Sản phẩm C" };
+                data.Title = AppL10n.T("Biểu đồ Pivot Đa chiều (PivotChart)", "Multi-dimensional PivotChart");
+                data.Categories = new List<string> { AppL10n.T("Miền Bắc", "North"), AppL10n.T("Miền Trung", "Central"), AppL10n.T("Miền Nam", "South"), AppL10n.T("Xuất khẩu", "Export") };
+                data.SeriesNames = new List<string> { AppL10n.T("Sản phẩm A", "Product A"), AppL10n.T("Sản phẩm B", "Product B"), AppL10n.T("Sản phẩm C", "Product C") };
                 data.Values = new List<List<double>>
                 {
                     new List<double> { 120.5, 95.2, 45.0 },
@@ -158,9 +159,9 @@ namespace ZenQOffice.UI
             }
             else if (chartType != null && (chartType.StartsWith("3DMap") || chartType.StartsWith("Map3D")))
             {
-                data.Title = "Bản đồ 3D Không gian (3D Maps / Power Map)";
-                data.Categories = new List<string> { "Đông Nam Á", "Đông Á", "Bắc Mỹ", "Tây Âu", "Châu Úc" };
-                data.SeriesNames = new List<string> { "Khối lượng 3D (Tấn/Tháng)" };
+                data.Title = AppL10n.T("Bản đồ 3D Không gian (3D Maps / Power Map)", "3D Spatial Map (Power Map)");
+                data.Categories = new List<string> { AppL10n.T("Đông Nam Á", "SE Asia"), AppL10n.T("Đông Á", "East Asia"), AppL10n.T("Bắc Mỹ", "North America"), AppL10n.T("Tây Âu", "West Europe"), AppL10n.T("Châu Úc", "Australia") };
+                data.SeriesNames = new List<string> { AppL10n.T("Khối lượng 3D (Tấn/Tháng)", "3D Volume (Tons/Mo)") };
                 data.Values = new List<List<double>>
                 {
                     new List<double> { 450.0 },
@@ -193,7 +194,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Bảng dữ liệu Biểu đồ (ZenQ Calc Mini)";
+            this.Text = AppL10n.T("Bảng dữ liệu Biểu đồ (ZenQ Calc Mini)", "Edit Chart Data (ZenQ Calc Mini)");
             this.Size = new Size(640, 380);
             this.MinimumSize = new Size(420, 240);
             this.StartPosition = FormStartPosition.Manual;
@@ -212,7 +213,7 @@ namespace ZenQOffice.UI
 
             lblTitle = new Label
             {
-                Text = "📊 Bảng số liệu Biểu đồ (Nhập số liệu để cập nhật biểu đồ tức thì)",
+                Text = AppL10n.T("📊 Bảng số liệu Biểu đồ (Nhập số liệu để cập nhật biểu đồ tức thì)", "📊 Chart Data Table (Edit values to update chart live)"),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 Location = new Point(10, 7),
@@ -349,7 +350,7 @@ namespace ZenQOffice.UI
                         seriesList.Add(val.ToString().Trim());
                     }
                 }
-                if (seriesList.Count == 0) seriesList.Add("Chuỗi 1");
+                if (seriesList.Count == 0) seriesList.Add(AppL10n.T("Chuỗi 1", "Series 1"));
 
                 List<string> catList = new List<string>();
                 List<List<double>> valMatrix = new List<List<double>>();
@@ -370,7 +371,7 @@ namespace ZenQOffice.UI
 
                     if ((catVal != null && !string.IsNullOrWhiteSpace(catVal.ToString())) || hasAnyVal)
                     {
-                        string catName = (catVal != null && !string.IsNullOrWhiteSpace(catVal.ToString())) ? catVal.ToString().Trim() : ("Danh mục " + r);
+                        string catName = (catVal != null && !string.IsNullOrWhiteSpace(catVal.ToString())) ? catVal.ToString().Trim() : (AppL10n.T("Danh mục ", "Category ") + r);
                         catList.Add(catName);
 
                         List<double> rowVals = new List<double>();

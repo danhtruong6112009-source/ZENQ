@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -16,14 +17,14 @@ namespace ZenQOffice.UI
         private Button _btnCancel;
 
         public bool Ascending { get { return _radAscending.Checked; } }
-        public string SortType { get { return _cboType.SelectedItem != null ? _cboType.SelectedItem.ToString() : "Văn bản (Text)"; } }
+        public string SortType { get { return _cboType.SelectedItem != null ? _cboType.SelectedItem.ToString() : AppL10n.T("Văn bản (Text)", "Text"); } }
         public bool HasHeader { get { return _radHeader.Checked; } }
 
         public event Action<bool, string, bool> OnSortExecute;
 
         public SortDialogForm()
         {
-            Text = "Sắp xếp văn bản (Sort Text)";
+            Text = AppL10n.T("Sắp xếp văn bản (Sort Text)", "Sort Text");
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -40,42 +41,42 @@ namespace ZenQOffice.UI
             // 1. GroupBox: Sort by
             GroupBox grpSort = new GroupBox
             {
-                Text = "Sắp xếp theo (Sort by)",
+                Text = AppL10n.T("Sắp xếp theo (Sort by)", "Sort by"),
                 Location = new Point(16, 12),
                 Size = new Size(348, 120),
                 ForeColor = Color.FromArgb(15, 23, 42)
             };
 
-            Label lblSortBy = new Label { Text = "Đối tượng:", Location = new Point(14, 26), AutoSize = true };
+            Label lblSortBy = new Label { Text = AppL10n.T("Đối tượng:", "By:"), Location = new Point(14, 26), AutoSize = true };
             _cboSortBy = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(80, 23),
                 Size = new Size(130, 23),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            _cboSortBy.Items.AddRange(new object[] { "Đoạn văn", "Tiêu đề", "Cột (Field 1)" });
+            _cboSortBy.Items.AddRange(new object[] { AppL10n.T("Đoạn văn", "Paragraphs"), AppL10n.T("Tiêu đề", "Headings"), AppL10n.T("Cột (Field 1)", "Field 1") });
             _cboSortBy.SelectedIndex = 0;
 
-            Label lblType = new Label { Text = "Kiểu dữ liệu:", Location = new Point(14, 56), AutoSize = true };
+            Label lblType = new Label { Text = AppL10n.T("Kiểu dữ liệu:", "Type:"), Location = new Point(14, 56), AutoSize = true };
             _cboType = new ZenQOffice.UI.FluentComboBox
             {
                 Location = new Point(80, 53),
                 Size = new Size(130, 23),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            _cboType.Items.AddRange(new object[] { "Văn bản (Text)", "Số (Number)", "Ngày tháng (Date)" });
+            _cboType.Items.AddRange(new object[] { AppL10n.T("Văn bản (Text)", "Text"), AppL10n.T("Số (Number)", "Number"), AppL10n.T("Ngày tháng (Date)", "Date") });
             _cboType.SelectedIndex = 0;
 
             _radAscending = new RadioButton
             {
-                Text = "Tăng dần (A → Z, 0 → 9)",
+                Text = AppL10n.T("Tăng dần (A → Z, 0 → 9)", "Ascending (A → Z, 0 → 9)"),
                 Location = new Point(220, 24),
                 Size = new Size(122, 22),
                 Checked = true
             };
             _radDescending = new RadioButton
             {
-                Text = "Giảm dần (Z → A, 9 → 0)",
+                Text = AppL10n.T("Giảm dần (Z → A, 9 → 0)", "Descending (Z → A, 9 → 0)"),
                 Location = new Point(220, 54),
                 Size = new Size(122, 22)
             };
@@ -91,7 +92,7 @@ namespace ZenQOffice.UI
             // 2. GroupBox: My list has
             GroupBox grpHeader = new GroupBox
             {
-                Text = "Danh sách của tôi (My list has)",
+                Text = AppL10n.T("Danh sách của tôi (My list has)", "My list has"),
                 Location = new Point(16, 138),
                 Size = new Size(348, 52),
                 ForeColor = Color.FromArgb(15, 23, 42)
@@ -99,14 +100,14 @@ namespace ZenQOffice.UI
 
             _radNoHeader = new RadioButton
             {
-                Text = "Không có dòng tiêu đề",
+                Text = AppL10n.T("Không có dòng tiêu đề", "No header row"),
                 Location = new Point(16, 20),
                 Size = new Size(150, 22),
                 Checked = true
             };
             _radHeader = new RadioButton
             {
-                Text = "Có dòng tiêu đề (Header row)",
+                Text = AppL10n.T("Có dòng tiêu đề (Header row)", "Header row"),
                 Location = new Point(170, 20),
                 Size = new Size(170, 22)
             };
@@ -118,7 +119,7 @@ namespace ZenQOffice.UI
             // 3. Action Buttons
             _btnOk = new Button
             {
-                Text = "Sắp xếp (OK)",
+                Text = AppL10n.T("Sắp xếp (OK)", "OK"),
                 Location = new Point(172, 200),
                 Size = new Size(95, 28),
                 BackColor = Color.FromArgb(16, 110, 190),
@@ -139,7 +140,7 @@ namespace ZenQOffice.UI
 
             _btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(274, 200),
                 Size = new Size(90, 28),
                 BackColor = Color.White,

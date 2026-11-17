@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -246,7 +246,7 @@ namespace ZenQOffice.Core
                         int idx = calc.SheetNames != null ? calc.SheetNames.IndexOf(sName) : -1;
                         if (idx >= 0) calc.ActiveSheetIndex = idx;
                         sheet = calc.CurrentSheet;
-                        summaries.Add(string.Format("Đã tạo sheet mới '{0}'", sName));
+                        summaries.Add(AppL10n.T(string.Format("Đã tạo sheet mới '{0}'", sName), string.Format("Created new sheet '{0}'", sName)));
                         anyExecuted = true;
                     }
                 }
@@ -314,7 +314,7 @@ namespace ZenQOffice.Core
                                 SetCellSmartValue(targetMatrix.GetOrCreateCell(startR + (uint)li, startC), line);
                             }
                         }
-                        summaries.Add(string.Format("Đã ghi dữ liệu vào ô {0}", startCellRef));
+                        summaries.Add(AppL10n.T(string.Format("Đã ghi dữ liệu vào ô {0}", startCellRef), string.Format("Wrote data to cell {0}", startCellRef)));
                         anyExecuted = true;
                     }
                 }
@@ -353,7 +353,7 @@ namespace ZenQOffice.Core
                                 if (isBold) cell.Format.Bold = true;
                             }
                         }
-                        summaries.Add(string.Format("Đã tô màu {0} cho vùng {1}", colorStr, rangeStr));
+                        summaries.Add(AppL10n.T(string.Format("Đã tô màu {0} cho vùng {1}", colorStr, rangeStr), string.Format("Applied fill color {0} to {1}", colorStr, rangeStr)));
                         anyExecuted = true;
                     }
                 }
@@ -383,13 +383,13 @@ namespace ZenQOffice.Core
                         {
                             if (!formula.StartsWith("=")) formula = "=" + formula;
                             cell.SetFormula(formula);
-                            summaries.Add(string.Format("Đã điền công thức {0} vào ô {1}", formula, cellRef));
+                            summaries.Add(AppL10n.T(string.Format("Đã điền công thức {0} vào ô {1}", formula, cellRef), string.Format("Entered formula {0} in {1}", formula, cellRef)));
                             anyExecuted = true;
                         }
                         else if (!string.IsNullOrEmpty(val))
                         {
                             SetCellSmartValue(cell, val);
-                            summaries.Add(string.Format("Đã điền giá trị '{0}' vào ô {1}", val, cellRef));
+                            summaries.Add(AppL10n.T(string.Format("Đã điền giá trị '{0}' vào ô {1}", val, cellRef), string.Format("Entered value '{0}' in {1}", val, cellRef)));
                             anyExecuted = true;
                         }
                     }
@@ -420,7 +420,7 @@ namespace ZenQOffice.Core
                                 if (cell.Format != null) cell.Format.BgColor = unchecked((int)0xFFFFFFFF);
                             }
                         }
-                        summaries.Add(string.Format("Đã xóa dữ liệu vùng {0}", rangeStr));
+                        summaries.Add(AppL10n.T(string.Format("Đã xóa dữ liệu vùng {0}", rangeStr), string.Format("Cleared range {0}", rangeStr)));
                         anyExecuted = true;
                     }
                 }
@@ -436,7 +436,7 @@ namespace ZenQOffice.Core
                 foreach (Match sm in slideMatches)
                 {
                     var sAttrs = ParseXmlAttributes(sm.Groups[1].Value);
-                    string title = sAttrs.ContainsKey("title") ? sAttrs["title"] : (sAttrs.ContainsKey("tieu_de") ? sAttrs["tieu_de"] : "Slide mới");
+                    string title = sAttrs.ContainsKey("title") ? sAttrs["title"] : (sAttrs.ContainsKey("tieu_de") ? sAttrs["tieu_de"] : AppL10n.T("Slide mới", "New Slide"));
                     string bgStr = sAttrs.ContainsKey("background") ? sAttrs["background"] : (sAttrs.ContainsKey("bg") ? sAttrs["bg"] : (sAttrs.ContainsKey("nen") ? sAttrs["nen"] : ""));
                     string themeStr = sAttrs.ContainsKey("theme") ? sAttrs["theme"] : (sAttrs.ContainsKey("style") ? sAttrs["style"] : "");
                     string transStr = sAttrs.ContainsKey("transition") ? sAttrs["transition"] : (sAttrs.ContainsKey("trans") ? sAttrs["trans"] : (sAttrs.ContainsKey("chuyen_canh") ? sAttrs["chuyen_canh"] : ""));
@@ -538,8 +538,8 @@ namespace ZenQOffice.Core
                             if (string.IsNullOrEmpty(vId)) vId = "vec_" + Guid.NewGuid().ToString("N").Substring(0, 8);
 
                             bool isSvg = resolved.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) || tag == "vector" || tag == "icon" || tag == "svg";
-                            Bitmap bmp = OnlineGraphicsManager.GetCachedOrDownloadImage(vId, resolved, 1600);
-                            string localCached = OnlineGraphicsManager.GetCachedImagePath(vId, resolved);
+                            var (localCached, bmp) = OnlineGraphicsManager.DownloadGraphicForTabUse(vId, resolved, 1600);
+
 
                             var imgNode = new ShapeNode
                             {
@@ -635,14 +635,14 @@ namespace ZenQOffice.Core
                         targetSlide.BgGradientAngle = newSlide.BgGradientAngle;
                         targetSlide.BgGradientStops = newSlide.BgGradientStops;
                         targetSlide.Transition = newSlide.Transition;
-                        summaries.Add(string.Format("🎨 Đã cập nhật lại nội dung Slide #{0} ('{1}') với {2} thành phần sắc nét chuẩn Canva", targetIdx + 1, title, elemCount));
+                        summaries.Add(AppL10n.T(string.Format("🎨 Đã cập nhật lại nội dung Slide #{0} ('{1}') với {2} thành phần sắc nét chuẩn Canva", targetIdx + 1, title, elemCount), string.Format("🎨 Updated Slide #{0} ('{1}') with {2} styled elements", targetIdx + 1, title, elemCount)));
                         anyExecuted = true;
                     }
                     else if (pres != null)
                     {
                         pres.Slides.Add(newSlide);
                         slides.ActiveSlideIndex = pres.Slides.Count - 1;
-                        summaries.Add(string.Format("🎨 Đã tạo slide '{0}' với {1} thành phần sắc nét chuẩn Canva", title, elemCount));
+                        summaries.Add(AppL10n.T(string.Format("🎨 Đã tạo slide '{0}' với {1} thành phần sắc nét chuẩn Canva", title, elemCount), string.Format("🎨 Created slide '{0}' with {1} styled elements", title, elemCount)));
                         anyExecuted = true;
                     }
                 }
@@ -659,7 +659,7 @@ namespace ZenQOffice.Core
                     if (!string.IsNullOrEmpty(txt))
                     {
                         writer.InsertTextFromAI(txt);
-                        summaries.Add("Đã chèn nội dung vào văn bản");
+                        summaries.Add(AppL10n.T("Đã chèn nội dung vào văn bản", "Inserted content into document"));
                         anyExecuted = true;
                     }
                 }
@@ -679,7 +679,7 @@ namespace ZenQOffice.Core
                     if (corrs.Count > 0)
                     {
                         writer.SetPendingAiCorrections(corrs);
-                        summaries.Add(string.Format("Đã tạo đề xuất sửa {0} vị trí trên trang (đoạn đỏ xoá, đoạn xanh thêm)", corrs.Count));
+                        summaries.Add(AppL10n.T(string.Format("Đã tạo đề xuất sửa {0} vị trí trên trang (đoạn đỏ xoá, đoạn xanh thêm)", corrs.Count), string.Format("Created {0} suggested edits on page (red = delete, green = insert)", corrs.Count)));
                         anyExecuted = true;
                     }
                 }
@@ -700,7 +700,7 @@ namespace ZenQOffice.Core
                         pdf.ActivePageIndex = targetPage - 1;
                         pdf.ScrollToPage(targetPage - 1, appForm.ClientSize.Width, appForm.ClientSize.Height);
                         appForm.Invalidate();
-                        summaries.Add(string.Format("Đã chuyển đến Trang {0} của tài liệu PDF", targetPage));
+                        summaries.Add(AppL10n.T(string.Format("Đã chuyển đến Trang {0} của tài liệu PDF", targetPage), string.Format("Navigated to Page {0} of PDF document", targetPage)));
                         anyExecuted = true;
                     }
                 }
@@ -846,12 +846,12 @@ namespace ZenQOffice.Core
                         if (appForm.WriterView != null)
                         {
                             appForm.WriterView.SetPendingAiCorrections(corrs);
-                            result.ExecutionSummary = "⏳ Vui lòng kiểm tra và xác nhận sửa lỗi trên trang văn bản.";
+                            result.ExecutionSummary = AppL10n.T("⏳ Vui lòng kiểm tra và xác nhận sửa lỗi trên trang văn bản.", "⏳ Please review and confirm the suggested edits on the page.");
                         }
                         else
                         {
                             int applied = ExecuteApplySpellCorrections(appForm, corrs);
-                            result.ExecutionSummary = string.Format("✅ Đã sửa {0} lỗi chính tả vào văn bản.", applied > 0 ? applied : corrs.Count);
+                            result.ExecutionSummary = AppL10n.T(string.Format("✅ Đã sửa {0} lỗi chính tả vào văn bản.", applied > 0 ? applied : corrs.Count), string.Format("✅ Fixed {0} spelling issue(s) in the document.", applied > 0 ? applied : corrs.Count));
                         }
                     }
                 }
@@ -877,7 +877,7 @@ namespace ZenQOffice.Core
             catch (Exception ex)
             {
                 result.Success = false;
-                result.ExecutionSummary = "Lỗi khi thực thi: " + ex.Message;
+                result.ExecutionSummary = AppL10n.T("Lỗi khi thực thi: ", "Execution error: ") + ex.Message;
             }
 
             return result;
@@ -1069,7 +1069,7 @@ namespace ZenQOffice.Core
             {
                 writer.ReplaceSelectedText(newText, true);
                 appForm.Invalidate();
-                result.ExecutionSummary = "✅ Đã tự động thay thế trực tiếp vào vùng quét khối (áp dụng bôi đen cho đoạn mới).";
+                result.ExecutionSummary = AppL10n.T("✅ Đã tự động thay thế trực tiếp vào vùng quét khối (áp dụng bôi đen cho đoạn mới).", "✅ Replaced selected text cleanly.");
             }
         }
 
@@ -1183,11 +1183,11 @@ namespace ZenQOffice.Core
                 writer.CursorPosition = Math.Min(writer.CursorPosition, fullText.Length);
                 appForm.Invalidate();
 
-                result.ExecutionSummary = string.Format("✅ Đã sửa trực tiếp {0} lỗi trên văn bản: {1}", fixedList.Count, string.Join(", ", fixedList.ToArray()));
+                result.ExecutionSummary = AppL10n.T(string.Format("✅ Đã sửa trực tiếp {0} lỗi trên văn bản: {1}", fixedList.Count, string.Join(", ", fixedList.ToArray())), string.Format("✅ Fixed {0} issue(s) inline: {1}", fixedList.Count, string.Join(", ", fixedList.ToArray())));
             }
             else
             {
-                result.ExecutionSummary = "ℹ️ Đã quét xong văn bản.";
+                result.ExecutionSummary = AppL10n.T("ℹ️ Đã quét xong văn bản.", "ℹ️ Document scan complete.");
             }
         }
 
@@ -1205,7 +1205,7 @@ namespace ZenQOffice.Core
                 writer.CursorPosition = cleanText.Length;
                 appForm.Invalidate();
 
-                result.ExecutionSummary = "✅ Đã cập nhật toàn bộ nội dung văn bản mới từ AI.";
+                result.ExecutionSummary = AppL10n.T("✅ Đã cập nhật toàn bộ nội dung văn bản mới từ AI.", "✅ Updated document content from AI.");
             }
         }
 
@@ -1389,11 +1389,11 @@ namespace ZenQOffice.Core
 
             if (formulasApplied > 0)
             {
-                result.ExecutionSummary = string.Format("📊 AI đã cập nhật {0} ô tính, tự động áp dụng {1} công thức và tính toán kết quả chính xác!", cellsUpdated, formulasApplied);
+                result.ExecutionSummary = AppL10n.T(string.Format("📊 AI đã cập nhật {0} ô tính, tự động áp dụng {1} công thức và tính toán kết quả chính xác!", cellsUpdated, formulasApplied), string.Format("📊 AI updated {0} cell(s) and calculated {1} formula(s)!", cellsUpdated, formulasApplied));
             }
             else
             {
-                result.ExecutionSummary = string.Format("📊 AI đã cập nhật và định dạng thành công {0} ô tính trên bảng tính!", cellsUpdated);
+                result.ExecutionSummary = AppL10n.T(string.Format("📊 AI đã cập nhật và định dạng thành công {0} ô tính trên bảng tính!", cellsUpdated), string.Format("📊 AI updated and formatted {0} cell(s) on the sheet!", cellsUpdated));
             }
         }
 
@@ -1522,8 +1522,8 @@ namespace ZenQOffice.Core
             }
             result.HasAction = true;
             result.ActionType = "SET_CALC_DATA";
-            result.ExecutionSummary = string.Format("✅ Đã tự động tạo bảng {0} dòng x {1} cột ({2} ô) vào Bảng tính thành công.", tableRows.Count, tableRows[0].Count, cellsCount);
-            result.CleanUserMessage = "✅ Đã tự động ghi dữ liệu bảng mới vào Bảng tính.";
+            result.ExecutionSummary = AppL10n.T(string.Format("✅ Đã tự động tạo bảng {0} dòng x {1} cột ({2} ô) vào Bảng tính thành công.", tableRows.Count, tableRows[0].Count, cellsCount), string.Format("✅ Created {0} x {1} table ({2} cells) in Spreadsheet.", tableRows.Count, tableRows[0].Count, cellsCount));
+            result.CleanUserMessage = AppL10n.T("✅ Đã tự động ghi dữ liệu bảng mới vào Bảng tính.", "✅ Wrote table data into Spreadsheet.");
             return true;
         }
 
@@ -1854,7 +1854,7 @@ namespace ZenQOffice.Core
                     }
                     slides.ActiveSlideIndex = 0;
                     appForm.Invalidate();
-                    result.ExecutionSummary = string.Format("🎨 AI đã kiến tạo thành công bộ {0} Slide thuyết trình hoàn chỉnh!", pres.Slides.Count);
+                    result.ExecutionSummary = AppL10n.T(string.Format("🎨 AI đã kiến tạo thành công bộ {0} Slide thuyết trình hoàn chỉnh!", pres.Slides.Count), string.Format("🎨 AI generated {0} presentation slides!", pres.Slides.Count));
                     return;
                 }
             }
@@ -1890,7 +1890,7 @@ namespace ZenQOffice.Core
                                 RenderSlideFromCanvasDict(pres.Slides[curIdx], (Dictionary<string, object>)slideList[0], globalPal, canvasW, canvasH);
                             }
                             appForm.Invalidate();
-                            result.ExecutionSummary = string.Format("🎨 AI đã cập nhật lại nội dung Slide hiện tại (Slide #{0}) theo phong cách Canva chuẩn mực!", curIdx + 1);
+                            result.ExecutionSummary = AppL10n.T(string.Format("🎨 AI đã cập nhật lại nội dung Slide hiện tại (Slide #{0}) theo phong cách Canva chuẩn mực!", curIdx + 1), string.Format("🎨 AI updated Slide #{0} with modern styling!", curIdx + 1));
                             return;
                         }
                         else if (isInsert)
@@ -1908,7 +1908,7 @@ namespace ZenQOffice.Core
                             }
                             slides.ActiveSlideIndex = targetPos;
                             appForm.Invalidate();
-                            result.ExecutionSummary = string.Format("🎨 AI đã chèn thành công {0} Slide vào vị trí #{1}!", slideList.Count, targetPos + 1);
+                            result.ExecutionSummary = AppL10n.T(string.Format("🎨 AI đã chèn thành công {0} Slide vào vị trí #{1}!", slideList.Count, targetPos + 1), string.Format("🎨 AI inserted {0} slide(s) at position #{1}!", slideList.Count, targetPos + 1));
                             return;
                         }
                         else if (append)
@@ -1925,7 +1925,7 @@ namespace ZenQOffice.Core
                             }
                             slides.ActiveSlideIndex = startIdx;
                             appForm.Invalidate();
-                            result.ExecutionSummary = string.Format("🎨 AI đã thêm thành công {0} Slide mới vào cuối bài thuyết trình!", slideList.Count);
+                            result.ExecutionSummary = AppL10n.T(string.Format("🎨 AI đã thêm thành công {0} Slide mới vào cuối bài thuyết trình!", slideList.Count), string.Format("🎨 AI appended {0} new slide(s) to the presentation!", slideList.Count));
                             return;
                         }
                         else
@@ -1942,7 +1942,7 @@ namespace ZenQOffice.Core
                             }
                             slides.ActiveSlideIndex = 0;
                             appForm.Invalidate();
-                            result.ExecutionSummary = string.Format("🎨 AI đã kiến tạo thành công bộ {0} Slide thuyết trình hoàn chỉnh theo yêu cầu!", slideList.Count);
+                            result.ExecutionSummary = AppL10n.T(string.Format("🎨 AI đã kiến tạo thành công bộ {0} Slide thuyết trình hoàn chỉnh theo yêu cầu!", slideList.Count), string.Format("🎨 AI created {0} presentation slide(s) as requested!", slideList.Count));
                             return;
                         }
                     }
@@ -2047,8 +2047,8 @@ namespace ZenQOffice.Core
             RenderSlideFromCanvasDict(targetSlide, dict, pal, canvasW, canvasH);
 
             appForm.Invalidate();
-            string slideTitle = GetString(dict, "title", "Slide Tùy Biến Tự Do");
-            result.ExecutionSummary = string.Format("🎨 AI đã kiến tạo thành công Slide: '{0}' ({1} phần tử, phong cách: {2})!", slideTitle, targetSlide.Shapes.Count, styleName);
+            string slideTitle = GetString(dict, "title", AppL10n.T("Slide Tùy Biến Tự Do", "Custom Slide"));
+            result.ExecutionSummary = AppL10n.T(string.Format("🎨 AI đã kiến tạo thành công Slide: '{0}' ({1} phần tử, phong cách: {2})!", slideTitle, targetSlide.Shapes.Count, styleName), string.Format("🎨 AI created Slide '{0}' ({1} elements, style: {2})!", slideTitle, targetSlide.Shapes.Count, styleName));
         }
 
         private static void RenderSlideFromCanvasDict(SlideNode targetSlide, Dictionary<string, object> dict, SlidePalette globalPal, float canvasW, float canvasH)
@@ -2342,7 +2342,7 @@ namespace ZenQOffice.Core
             else if (type == "smartart" || type == "diagram")
             {
                 string saType = GetString(elem, "smartArtType", "Process_Chevron");
-                string saTitle = GetString(elem, "title", "Sơ đồ Quy trình");
+                string saTitle = GetString(elem, "title", AppL10n.T("Sơ đồ Quy trình", "Process Diagram"));
                 string saText = "";
 
                 if (elem.ContainsKey("nodes") && elem["nodes"] is List<object>)
@@ -2356,7 +2356,7 @@ namespace ZenQOffice.Core
                 }
                 else
                 {
-                    saText = GetString(elem, "text", "Giai đoạn 1\nGiai đoạn 2\nGiai đoạn 3\nGiai đoạn 4");
+                    saText = GetString(elem, "text", AppL10n.T("Giai đoạn 1\nGiai đoạn 2\nGiai đoạn 3\nGiai đoạn 4", "Stage 1\nStage 2\nStage 3\nStage 4"));
                 }
 
                 ShapeNode smartArt = new ShapeNode
@@ -2376,7 +2376,7 @@ namespace ZenQOffice.Core
             else if (type == "chart")
             {
                 string chartType = GetString(elem, "chartType", "Column_Clustered");
-                string chartTitle = GetString(elem, "title", "Biểu Đồ Thống Kê");
+                string chartTitle = GetString(elem, "title", AppL10n.T("Biểu Đồ Thống Kê", "Statistics Chart"));
 
                 DocChartData chartData = DocChartData.CreateDefault(chartType);
                 chartData.Title = chartTitle;
@@ -2401,7 +2401,7 @@ namespace ZenQOffice.Core
                         if (sObj is Dictionary<string, object>)
                         {
                             var sDict = (Dictionary<string, object>)sObj;
-                            chartData.SeriesNames.Add(GetString(sDict, "name", "Chuỗi"));
+                            chartData.SeriesNames.Add(GetString(sDict, "name", AppL10n.T("Chuỗi", "Series")));
                             List<double> vals = new List<double>();
                             if (sDict.ContainsKey("values") && sDict["values"] is List<object>)
                             {
@@ -2594,8 +2594,8 @@ namespace ZenQOffice.Core
                 if (string.IsNullOrEmpty(iconId)) iconId = "icon_" + Guid.NewGuid().ToString("N").Substring(0, 8);
 
                 float iconSize = 48f;
-                Bitmap iconBmp = OnlineGraphicsManager.GetCachedOrDownloadImage(iconId, resolvedUrl, 512);
-                string localCached = OnlineGraphicsManager.GetCachedImagePath(iconId, resolvedUrl);
+                var (localCached, iconBmp) = OnlineGraphicsManager.DownloadGraphicForTabUse(iconId, resolvedUrl, 512);
+
 
                 var iconShape = new ShapeNode
                 {
@@ -2647,7 +2647,7 @@ namespace ZenQOffice.Core
             {
                 int width=(int)Math.Clamp(bounds.Width,1,1920),height=(int)Math.Clamp(bounds.Height,1,1920);
                 var bitmap=SvgRasterizer.RenderSvgToBitmap(inlineSvg,width,height);
-                if(bitmap==null)throw new FormatException("Không thể dựng minh họa SVG của slide.");
+                if(bitmap==null)throw new FormatException(AppL10n.T("Không thể dựng minh họa SVG của slide.", "Failed to render slide SVG graphic."));
                 targetSlide.Shapes.Add(new ShapeNode{Type=ShapeType.Image,IsSvg=true,IsGraphic=true,SvgContent=inlineSvg,OriginalSvgContent=inlineSvg,CachedImage=bitmap,OriginalWidth=bitmap.Width,OriginalHeight=bitmap.Height,Transform=bounds});
                 return;
             }
@@ -2657,8 +2657,8 @@ namespace ZenQOffice.Core
             if (string.IsNullOrEmpty(id)) id = "img_" + Guid.NewGuid().ToString("N").Substring(0, 8);
 
             bool isSvg = resolvedUrl.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) || type == "svg" || type == "vector" || type == "icon";
-            Bitmap bmp = OnlineGraphicsManager.GetCachedOrDownloadImage(id, resolvedUrl, 1600);
-            string localCached = OnlineGraphicsManager.GetCachedImagePath(id, resolvedUrl);
+            var (localCached, bmp) = OnlineGraphicsManager.DownloadGraphicForTabUse(id, resolvedUrl, 1600);
+
 
             var imgNode = new ShapeNode
             {
@@ -2829,7 +2829,7 @@ namespace ZenQOffice.Core
                             s.BgGradientStops = new List<GradientStop> { new GradientStop(c1, 0f), new GradientStop(c2, 1f) };
                         }
                     }
-                    changesDone.Add(string.Format("Đổi màu nền {0} slide", targetSlides.Count));
+                    changesDone.Add(AppL10n.T(string.Format("Đổi màu nền {0} slide", targetSlides.Count), string.Format("Updated background color for {0} slide(s)", targetSlides.Count)));
                 }
                 else if (pal != null)
                 {
@@ -2842,7 +2842,7 @@ namespace ZenQOffice.Core
                         s.BgGradientAngle = 135f;
                         s.BgGradientStops = new List<GradientStop> { new GradientStop(pal.Bg1, 0f), new GradientStop(pal.Bg2, 1f) };
                     }
-                    changesDone.Add(string.Format("Áp dụng phong cách '{0}' cho {1} slide", themeStr, targetSlides.Count));
+                    changesDone.Add(AppL10n.T(string.Format("Áp dụng phong cách '{0}' cho {1} slide", themeStr, targetSlides.Count), string.Format("Applied theme '{0}' to {1} slide(s)", themeStr, targetSlides.Count)));
                 }
 
                 if (dict.ContainsKey("transition") || dict.ContainsKey("transitionType") || dict.ContainsKey("effect"))
@@ -2871,7 +2871,7 @@ namespace ZenQOffice.Core
                             }
                         }
                     }
-                    changesDone.Add(string.Format("Đổi hiệu ứng chuyển cảnh thành '{0}' cho {1} slide", transStr, targetSlides.Count));
+                    changesDone.Add(AppL10n.T(string.Format("Đổi hiệu ứng chuyển cảnh thành '{0}' cho {1} slide", transStr, targetSlides.Count), string.Format("Changed slide transition to '{0}' for {1} slide(s)", transStr, targetSlides.Count)));
                 }
 
                 if (dict.ContainsKey("find") && dict.ContainsKey("replace"))
@@ -2958,7 +2958,7 @@ namespace ZenQOffice.Core
                             s.BgGradientAngle = 135f;
                             s.BgGradientStops = new List<GradientStop> { new GradientStop(pal.Bg1, 0f), new GradientStop(pal.Bg2, 1f) };
                         }
-                        changesDone.Add("Đổi màu giao diện sang " + val);
+                        changesDone.Add(AppL10n.T("Đổi màu giao diện sang ", "Changed theme color to ") + val);
                     }
                     else
                     {
@@ -2969,7 +2969,7 @@ namespace ZenQOffice.Core
                             {
                                 shape.Text = val;
                                 found = true;
-                                changesDone.Add(string.Format("Cập nhật '{0}' ➔ '{1}'", key, val));
+                                changesDone.Add(AppL10n.T(string.Format("Cập nhật '{0}' ➔ '{1}'", key, val), string.Format("Updated '{0}' ➔ '{1}'", key, val)));
                                 break;
                             }
                         }
@@ -2983,7 +2983,7 @@ namespace ZenQOffice.Core
                                     if (i + 1 < targetSlide.Shapes.Count && targetSlide.Shapes[i + 1].Type == ShapeType.TextBox)
                                     {
                                         targetSlide.Shapes[i + 1].Text = val;
-                                        changesDone.Add(string.Format("Cập nhật '{0}' ➔ '{1}'", key, val));
+                                        changesDone.Add(AppL10n.T(string.Format("Cập nhật '{0}' ➔ '{1}'", key, val), string.Format("Updated '{0}' ➔ '{1}'", key, val)));
                                         found = true;
                                         break;
                                     }
@@ -3001,7 +3001,7 @@ namespace ZenQOffice.Core
             }
             else
             {
-                result.ExecutionSummary = "✅ Đã sửa đổi nội dung trên slide.";
+                result.ExecutionSummary = AppL10n.T("✅ Đã sửa đổi nội dung trên slide.", "✅ Updated slide content.");
             }
         }
 
@@ -3038,7 +3038,7 @@ namespace ZenQOffice.Core
             }
 
             appForm.Invalidate();
-            result.ExecutionSummary = string.Format("🎨 Đã tự động tạo hoàn chỉnh {0} Slide theo yêu cầu!", count);
+            result.ExecutionSummary = AppL10n.T(string.Format("🎨 Đã tự động tạo hoàn chỉnh {0} Slide theo yêu cầu!", count), string.Format("🎨 Automatically created {0} slide(s) as requested!", count));
         }
 
         private static void ExecuteDesignSlide(AppForm appForm, string payload, AiActionResult result)
@@ -3454,7 +3454,7 @@ namespace ZenQOffice.Core
                                     var cDict = (Dictionary<string, object>)cObj;
                                     var card = new AiSlideCardSpec
                                     {
-                                        Title = GetString(cDict, "title", "Ý chính"),
+                                        Title = GetString(cDict, "title", AppL10n.T("Ý chính", "Key Point")),
                                         Description = GetString(cDict, "desc", GetString(cDict, "description", "")),
                                         IconOrBadge = GetString(cDict, "icon", ""),
                                         StatNumber = GetString(cDict, "stat", GetString(cDict, "value", ""))

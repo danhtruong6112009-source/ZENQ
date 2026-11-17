@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -45,7 +46,7 @@ namespace ZenQOffice.UI
             ShapeHeightInches = activeShape != null ? (activeShape.BaseHeight + activeShape.HeightDelta) / 96f : 1.8f;
             RotationAngle = activeShape != null ? activeShape.RotationAngle : 0f;
 
-            Text = "Bố cục đối tượng (Layout)";
+            Text = AppL10n.T("Bố cục đối tượng (Layout)", "Layout");
             Size = new Size(500, 480);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -62,74 +63,74 @@ namespace ZenQOffice.UI
             };
 
             // ==================== TAB 1: POSITION ====================
-            TabPage tabPos = new TabPage("Vị trí (Position)");
+            TabPage tabPos = new TabPage(AppL10n.T("Vị trí (Position)", "Position"));
             tabPos.BackColor = Color.White;
 
             // Horizontal Group
-            GroupBox grpHoriz = new GroupBox { Text = "Theo chiều ngang (Horizontal)", Location = new Point(10, 10), Size = new Size(430, 130) };
-            RadioButton rdoHAlign = new RadioButton { Text = "Căn gióng (Alignment)", Location = new Point(15, 22), Size = new Size(150, 22), Checked = true };
+            GroupBox grpHoriz = new GroupBox { Text = AppL10n.T("Theo chiều ngang (Horizontal)", "Horizontal"), Location = new Point(10, 10), Size = new Size(430, 130) };
+            RadioButton rdoHAlign = new RadioButton { Text = AppL10n.T("Căn gióng (Alignment)", "Alignment"), Location = new Point(15, 22), Size = new Size(150, 22), Checked = true };
             ComboBox cboHAlign = new ZenQOffice.UI.FluentComboBox { Location = new Point(170, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboHAlign.Items.AddRange(new object[] { "Trái (Left)", "Giữa (Center)", "Phải (Right)" });
+            cboHAlign.Items.AddRange(new object[] { AppL10n.T("Trái (Left)", "Left"), AppL10n.T("Giữa (Center)", "Center"), AppL10n.T("Phải (Right)", "Right") });
             cboHAlign.SelectedIndex = 0;
-            Label lblHRel = new Label { Text = "so với", Location = new Point(275, 23), AutoSize = true };
+            Label lblHRel = new Label { Text = AppL10n.T("so với", "relative to"), Location = new Point(275, 23), AutoSize = true };
             ComboBox cboHRel = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboHRel.Items.AddRange(new object[] { "Cột (Column)", "Lề (Margin)", "Trang (Page)" });
+            cboHRel.Items.AddRange(new object[] { AppL10n.T("Cột (Column)", "Column"), AppL10n.T("Lề (Margin)", "Margin"), AppL10n.T("Trang (Page)", "Page") });
             cboHRel.SelectedIndex = 0;
 
-            RadioButton rdoHAbs = new RadioButton { Text = "Vị trí tuyệt đối (Absolute)", Location = new Point(15, 54), Size = new Size(150, 22) };
+            RadioButton rdoHAbs = new RadioButton { Text = AppL10n.T("Vị trí tuyệt đối (Absolute)", "Absolute position"), Location = new Point(15, 54), Size = new Size(150, 22) };
             NumericUpDown numHAbs = new NumericUpDown { Location = new Point(170, 52), Size = new Size(95, 24), DecimalPlaces = 2, Increment = 0.1m, Minimum = -5m, Maximum = 20m, Value = 0m };
-            Label lblHAbsRel = new Label { Text = "bên phải", Location = new Point(275, 55), AutoSize = true };
+            Label lblHAbsRel = new Label { Text = AppL10n.T("bên phải", "to the right of"), Location = new Point(275, 55), AutoSize = true };
             ComboBox cboHAbsRel = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 52), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboHAbsRel.Items.AddRange(new object[] { "Cột (Column)", "Lề (Margin)", "Trang (Page)" });
+            cboHAbsRel.Items.AddRange(new object[] { AppL10n.T("Cột (Column)", "Column"), AppL10n.T("Lề (Margin)", "Margin"), AppL10n.T("Trang (Page)", "Page") });
             cboHAbsRel.SelectedIndex = 0;
 
-            RadioButton rdoHRel = new RadioButton { Text = "Vị trí tương đối (Relative)", Location = new Point(15, 86), Size = new Size(150, 22) };
+            RadioButton rdoHRel = new RadioButton { Text = AppL10n.T("Vị trí tương đối (Relative)", "Relative position"), Location = new Point(15, 86), Size = new Size(150, 22) };
             NumericUpDown numHRelVal = new NumericUpDown { Location = new Point(170, 84), Size = new Size(95, 24), Minimum = 0, Maximum = 100, Value = 0 };
-            Label lblHRelUnit = new Label { Text = "% so với", Location = new Point(275, 87), AutoSize = true };
+            Label lblHRelUnit = new Label { Text = AppL10n.T("% so với", "% relative to"), Location = new Point(275, 87), AutoSize = true };
             ComboBox cboHRelTo = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 84), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboHRelTo.Items.AddRange(new object[] { "Trang (Page)", "Lề (Margin)" });
+            cboHRelTo.Items.AddRange(new object[] { AppL10n.T("Trang (Page)", "Page"), AppL10n.T("Lề (Margin)", "Margin") });
             cboHRelTo.SelectedIndex = 0;
 
             grpHoriz.Controls.AddRange(new Control[] { rdoHAlign, cboHAlign, lblHRel, cboHRel, rdoHAbs, numHAbs, lblHAbsRel, cboHAbsRel, rdoHRel, numHRelVal, lblHRelUnit, cboHRelTo });
             tabPos.Controls.Add(grpHoriz);
 
             // Vertical Group
-            GroupBox grpVert = new GroupBox { Text = "Theo chiều dọc (Vertical)", Location = new Point(10, 145), Size = new Size(430, 100) };
-            RadioButton rdoVAlign = new RadioButton { Text = "Căn gióng (Alignment)", Location = new Point(15, 22), Size = new Size(150, 22), Checked = true };
+            GroupBox grpVert = new GroupBox { Text = AppL10n.T("Theo chiều dọc (Vertical)", "Vertical"), Location = new Point(10, 145), Size = new Size(430, 100) };
+            RadioButton rdoVAlign = new RadioButton { Text = AppL10n.T("Căn gióng (Alignment)", "Alignment"), Location = new Point(15, 22), Size = new Size(150, 22), Checked = true };
             ComboBox cboVAlign = new ZenQOffice.UI.FluentComboBox { Location = new Point(170, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboVAlign.Items.AddRange(new object[] { "Trên (Top)", "Giữa (Middle)", "Dưới (Bottom)" });
+            cboVAlign.Items.AddRange(new object[] { AppL10n.T("Trên (Top)", "Top"), AppL10n.T("Giữa (Middle)", "Centered"), AppL10n.T("Dưới (Bottom)", "Bottom") });
             cboVAlign.SelectedIndex = 0;
-            Label lblVRel = new Label { Text = "so với", Location = new Point(275, 23), AutoSize = true };
+            Label lblVRel = new Label { Text = AppL10n.T("so với", "relative to"), Location = new Point(275, 23), AutoSize = true };
             ComboBox cboVRel = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 20), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboVRel.Items.AddRange(new object[] { "Trang (Page)", "Lề (Margin)", "Đoạn (Paragraph)" });
+            cboVRel.Items.AddRange(new object[] { AppL10n.T("Trang (Page)", "Page"), AppL10n.T("Lề (Margin)", "Margin"), AppL10n.T("Đoạn (Paragraph)", "Paragraph") });
             cboVRel.SelectedIndex = 0;
 
-            RadioButton rdoVAbs = new RadioButton { Text = "Vị trí tuyệt đối (Absolute)", Location = new Point(15, 54), Size = new Size(150, 22) };
+            RadioButton rdoVAbs = new RadioButton { Text = AppL10n.T("Vị trí tuyệt đối (Absolute)", "Absolute position"), Location = new Point(15, 54), Size = new Size(150, 22) };
             NumericUpDown numVAbs = new NumericUpDown { Location = new Point(170, 52), Size = new Size(95, 24), DecimalPlaces = 2, Increment = 0.1m, Minimum = -5m, Maximum = 20m, Value = 0m };
-            Label lblVAbsRel = new Label { Text = "bên dưới", Location = new Point(275, 55), AutoSize = true };
+            Label lblVAbsRel = new Label { Text = AppL10n.T("bên dưới", "below"), Location = new Point(275, 55), AutoSize = true };
             ComboBox cboVAbsRel = new ZenQOffice.UI.FluentComboBox { Location = new Point(320, 52), Size = new Size(95, 24), DropDownStyle = ComboBoxStyle.DropDownList };
-            cboVAbsRel.Items.AddRange(new object[] { "Đoạn (Paragraph)", "Lề (Margin)", "Trang (Page)" });
+            cboVAbsRel.Items.AddRange(new object[] { AppL10n.T("Đoạn (Paragraph)", "Paragraph"), AppL10n.T("Lề (Margin)", "Margin"), AppL10n.T("Trang (Page)", "Page") });
             cboVAbsRel.SelectedIndex = 0;
 
             grpVert.Controls.AddRange(new Control[] { rdoVAlign, cboVAlign, lblVRel, cboVRel, rdoVAbs, numVAbs, lblVAbsRel, cboVAbsRel });
             tabPos.Controls.Add(grpVert);
 
             // Options Group
-            GroupBox grpOpt = new GroupBox { Text = "Tùy chọn khác (Options)", Location = new Point(10, 250), Size = new Size(430, 75) };
-            CheckBox chkMoveText = new CheckBox { Text = "Di chuyển cùng văn bản (Move with text)", Location = new Point(15, 22), Size = new Size(200, 22), Checked = MoveWithText };
-            CheckBox chkLockAnchor = new CheckBox { Text = "Khóa mỏ neo (Lock anchor)", Location = new Point(15, 46), Size = new Size(200, 22) };
-            CheckBox chkOverlap = new CheckBox { Text = "Cho phép chồng lấn (Allow overlap)", Location = new Point(220, 22), Size = new Size(200, 22), Checked = AllowOverlap };
-            CheckBox chkTableCell = new CheckBox { Text = "Bố cục trong ô bảng", Location = new Point(220, 46), Size = new Size(200, 22), Checked = true };
+            GroupBox grpOpt = new GroupBox { Text = AppL10n.T("Tùy chọn khác (Options)", "Options"), Location = new Point(10, 250), Size = new Size(430, 75) };
+            CheckBox chkMoveText = new CheckBox { Text = AppL10n.T("Di chuyển cùng văn bản (Move with text)", "Move object with text"), Location = new Point(15, 22), Size = new Size(200, 22), Checked = MoveWithText };
+            CheckBox chkLockAnchor = new CheckBox { Text = AppL10n.T("Khóa mỏ neo (Lock anchor)", "Lock anchor"), Location = new Point(15, 46), Size = new Size(200, 22) };
+            CheckBox chkOverlap = new CheckBox { Text = AppL10n.T("Cho phép chồng lấn (Allow overlap)", "Allow overlap"), Location = new Point(220, 22), Size = new Size(200, 22), Checked = AllowOverlap };
+            CheckBox chkTableCell = new CheckBox { Text = AppL10n.T("Bố cục trong ô bảng", "Layout in table cell"), Location = new Point(220, 46), Size = new Size(200, 22), Checked = true };
             grpOpt.Controls.AddRange(new Control[] { chkMoveText, chkLockAnchor, chkOverlap, chkTableCell });
             tabPos.Controls.Add(grpOpt);
 
             tabControl.TabPages.Add(tabPos);
 
             // ==================== TAB 2: TEXT WRAPPING ====================
-            TabPage tabWrap = new TabPage("Ngắt dòng (Text Wrapping)");
+            TabPage tabWrap = new TabPage(AppL10n.T("Ngắt dòng (Text Wrapping)", "Text Wrapping"));
             tabWrap.BackColor = Color.White;
 
-            GroupBox grpWrapStyle = new GroupBox { Text = "Kiểu ngắt dòng (Wrapping style)", Location = new Point(10, 10), Size = new Size(430, 185) };
+            GroupBox grpWrapStyle = new GroupBox { Text = AppL10n.T("Kiểu ngắt dòng (Wrapping style)", "Wrapping style"), Location = new Point(10, 10), Size = new Size(430, 185) };
             wrapPanels = new Panel[7];
 
             int[] cardX = new int[] { 15, 100, 185, 270, 355, 15, 100 };
@@ -245,16 +246,16 @@ namespace ZenQOffice.UI
             tabWrap.Controls.Add(grpWrapStyle);
 
             // Distance from text Group
-            GroupBox grpDist = new GroupBox { Text = "Khoảng cách đến văn bản (Distance from text)", Location = new Point(10, 205), Size = new Size(430, 110) };
+            GroupBox grpDist = new GroupBox { Text = AppL10n.T("Khoảng cách đến văn bản (Distance from text)", "Distance from text"), Location = new Point(10, 205), Size = new Size(430, 110) };
 
-            Label lblDTop = new Label { Text = "Trên (Top):", Location = new Point(20, 28), AutoSize = true };
+            Label lblDTop = new Label { Text = AppL10n.T("Trên (Top):", "Top:"), Location = new Point(20, 28), AutoSize = true };
             numDistTop = new NumericUpDown { Location = new Point(90, 25), Size = new Size(70, 24), DecimalPlaces = 2, Increment = 0.05m, Minimum = 0m, Maximum = 5m, Value = (decimal)DistanceTop };
-            Label lblDBot = new Label { Text = "Dưới (Bottom):", Location = new Point(20, 65), AutoSize = true };
+            Label lblDBot = new Label { Text = AppL10n.T("Dưới (Bottom):", "Bottom:"), Location = new Point(20, 65), AutoSize = true };
             numDistBottom = new NumericUpDown { Location = new Point(90, 62), Size = new Size(70, 24), DecimalPlaces = 2, Increment = 0.05m, Minimum = 0m, Maximum = 5m, Value = (decimal)DistanceBottom };
 
-            Label lblDLeft = new Label { Text = "Trái (Left):", Location = new Point(220, 28), AutoSize = true };
+            Label lblDLeft = new Label { Text = AppL10n.T("Trái (Left):", "Left:"), Location = new Point(220, 28), AutoSize = true };
             numDistLeft = new NumericUpDown { Location = new Point(290, 25), Size = new Size(70, 24), DecimalPlaces = 2, Increment = 0.05m, Minimum = 0m, Maximum = 5m, Value = (decimal)DistanceLeft };
-            Label lblDRight = new Label { Text = "Phải (Right):", Location = new Point(220, 65), AutoSize = true };
+            Label lblDRight = new Label { Text = AppL10n.T("Phải (Right):", "Right:"), Location = new Point(220, 65), AutoSize = true };
             numDistRight = new NumericUpDown { Location = new Point(290, 62), Size = new Size(70, 24), DecimalPlaces = 2, Increment = 0.05m, Minimum = 0m, Maximum = 5m, Value = (decimal)DistanceRight };
 
             grpDist.Controls.AddRange(new Control[] { lblDTop, numDistTop, lblDBot, numDistBottom, lblDLeft, numDistLeft, lblDRight, numDistRight });
@@ -263,18 +264,18 @@ namespace ZenQOffice.UI
             tabControl.TabPages.Add(tabWrap);
 
             // ==================== TAB 3: SIZE ====================
-            TabPage tabSize = new TabPage("Kích thước (Size)");
+            TabPage tabSize = new TabPage(AppL10n.T("Kích thước (Size)", "Size"));
             tabSize.BackColor = Color.White;
 
-            GroupBox grpSize = new GroupBox { Text = "Kích thước và Xoay (Size and rotate)", Location = new Point(10, 10), Size = new Size(430, 130) };
+            GroupBox grpSize = new GroupBox { Text = AppL10n.T("Kích thước và Xoay (Size and rotate)", "Size and rotate"), Location = new Point(10, 10), Size = new Size(430, 130) };
 
-            Label lblH = new Label { Text = "Chiều cao (Height):", Location = new Point(20, 30), AutoSize = true };
+            Label lblH = new Label { Text = AppL10n.T("Chiều cao (Height):", "Height:"), Location = new Point(20, 30), AutoSize = true };
             numShapeHeight = new NumericUpDown { Location = new Point(150, 27), Size = new Size(80, 24), DecimalPlaces = 2, Increment = 0.1m, Minimum = 0.2m, Maximum = 50m, Value = (decimal)ShapeHeightInches };
 
-            Label lblW = new Label { Text = "Chiều rộng (Width):", Location = new Point(20, 65), AutoSize = true };
+            Label lblW = new Label { Text = AppL10n.T("Chiều rộng (Width):", "Width:"), Location = new Point(20, 65), AutoSize = true };
             numShapeWidth = new NumericUpDown { Location = new Point(150, 62), Size = new Size(80, 24), DecimalPlaces = 2, Increment = 0.1m, Minimum = 0.2m, Maximum = 50m, Value = (decimal)ShapeWidthInches };
 
-            Label lblRot = new Label { Text = "Góc xoay (Rotation):", Location = new Point(20, 98), AutoSize = true };
+            Label lblRot = new Label { Text = AppL10n.T("Góc xoay (Rotation):", "Rotation:"), Location = new Point(20, 98), AutoSize = true };
             numRotation = new NumericUpDown { Location = new Point(150, 95), Size = new Size(80, 24), Minimum = 0, Maximum = 360, Value = (decimal)RotationAngle };
 
             grpSize.Controls.AddRange(new Control[] { lblH, numShapeHeight, lblW, numShapeWidth, lblRot, numRotation });
@@ -292,7 +293,7 @@ namespace ZenQOffice.UI
             // Bottom Buttons: OK & Cancel
             Button btnOK = new Button
             {
-                Text = "Đồng ý (OK)",
+                Text = AppL10n.T("Đồng ý (OK)", "OK"),
                 DialogResult = DialogResult.OK,
                 Location = new Point(300, 398),
                 Size = new Size(85, 28),
@@ -316,7 +317,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ (Cancel)",
+                Text = AppL10n.T("Hủy bỏ (Cancel)", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(392, 398),
                 Size = new Size(80, 28),

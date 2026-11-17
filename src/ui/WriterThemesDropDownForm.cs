@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -84,7 +85,7 @@ namespace ZenQOffice.UI
 
             Label lblHeader = new Label
             {
-                Text = "Chủ đề tài liệu Word & Office (Themes)",
+                Text = AppL10n.Tr("Chủ đề tài liệu Word & Office (Themes)"),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(12, 10),
@@ -153,7 +154,7 @@ namespace ZenQOffice.UI
                     using (Font titleFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
                     using (SolidBrush titleBrush = new SolidBrush(isSel ? Color.FromArgb(29, 78, 216) : Color.FromArgb(30, 41, 59)))
                     {
-                        g.DrawString(theme.Name, titleFont, titleBrush, 54, 8);
+                        g.DrawString(AppL10n.Tr(theme.Name), titleFont, titleBrush, 54, 8);
                     }
 
                     // Font Pairing preview
@@ -188,7 +189,7 @@ namespace ZenQOffice.UI
 
             Button btnReset = new Button
             {
-                Text = "🔄  Đặt lại về chủ đề từ mẫu (Reset to Template Theme)",
+                Text = AppL10n.Tr("🔄  Đặt lại về chủ đề từ mẫu (Reset to Template Theme)"),
                 Location = new Point(12, bottomY),
                 Size = new Size(cardW * 2 + gapX, 28),
                 FlatStyle = FlatStyle.Flat,
@@ -211,7 +212,7 @@ namespace ZenQOffice.UI
 
             Button btnBrowse = new Button
             {
-                Text = "📂  Duyệt tìm chủ đề / Nhập chủ đề từ tệp... (Browse for Themes)",
+                Text = AppL10n.Tr("📂  Duyệt tìm chủ đề / Nhập chủ đề từ tệp... (Browse for Themes)"),
                 Location = new Point(12, bottomY),
                 Size = new Size(cardW * 2 + gapX, 28),
                 FlatStyle = FlatStyle.Flat,
@@ -225,8 +226,8 @@ namespace ZenQOffice.UI
             {
                 using (OpenFileDialog ofd = new OpenFileDialog())
                 {
-                    ofd.Title = "Duyệt tìm tệp chủ đề Office (Nhập chủ đề)";
-                    ofd.Filter = "Tệp chủ đề Office (*.json;*.thmx)|*.json;*.thmx|Tất cả tệp (*.*)|*.*";
+                    ofd.Title = AppL10n.Tr("Duyệt tìm tệp chủ đề Office (Nhập chủ đề)");
+                    ofd.Filter = AppL10n.Tr("Tệp chủ đề Office (*.json;*.thmx)|*.json;*.thmx|Tất cả tệp (*.*)|*.*");
                     if (ofd.ShowDialog() == DialogResult.OK)
                     {
                         try
@@ -254,11 +255,11 @@ namespace ZenQOffice.UI
 
                             var importedTheme = new WriterThemeItem(tName, hf, bf, cols);
                             if (OnThemeSelected != null) OnThemeSelected(importedTheme);
-                            ZenQOffice.UI.FluentMessageBox.Show("Đã nhập và áp dụng chủ đề '" + tName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã nhập và áp dụng chủ đề '" + tName + "' thành công!", "Imported and applied theme '" + tName + "'!"), "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         catch (Exception ex)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi nhập tệp chủ đề: " + ex.Message, "Lỗi nhập chủ đề", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Lỗi khi nhập tệp chủ đề: ", "Error importing theme file: ") + ex.Message, AppL10n.Tr("Lỗi nhập chủ đề"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }
@@ -269,7 +270,7 @@ namespace ZenQOffice.UI
 
             Button btnSave = new Button
             {
-                Text = "💾  Lưu chủ đề hiện tại / Xuất chủ đề... (Save Current Theme)",
+                Text = AppL10n.Tr("💾  Lưu chủ đề hiện tại / Xuất chủ đề... (Save Current Theme)"),
                 Location = new Point(12, bottomY),
                 Size = new Size(cardW * 2 + gapX, 28),
                 FlatStyle = FlatStyle.Flat,
@@ -283,8 +284,8 @@ namespace ZenQOffice.UI
             {
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Title = "Lưu chủ đề tài liệu hiện tại (Xuất chủ đề)";
-                    sfd.Filter = "Tệp chủ đề Office (*.json)|*.json|Tệp Office Theme (*.thmx)|*.thmx";
+                    sfd.Title = AppL10n.Tr("Lưu chủ đề tài liệu hiện tại (Xuất chủ đề)");
+                    sfd.Filter = AppL10n.Tr("Tệp chủ đề Office (*.json)|*.json|Tệp Office Theme (*.thmx)|*.thmx");
                     sfd.FileName = (_activeThemeName ?? "CustomTheme") + ".json";
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
@@ -292,11 +293,11 @@ namespace ZenQOffice.UI
                         {
                             string json = string.Format("{{\n  \"Name\": \"{0}\",\n  \"HeadingFont\": \"Calibri Light\",\n  \"BodyFont\": \"Calibri\",\n  \"Colors\": [\"#4472C4\", \"#ED7D31\", \"#A5A5A5\", \"#FFC000\"]\n}}", _activeThemeName ?? "Office");
                             System.IO.File.WriteAllText(sfd.FileName, json, System.Text.Encoding.UTF8);
-                            ZenQOffice.UI.FluentMessageBox.Show("Đã lưu và xuất chủ đề ra tệp '" + sfd.FileName + "' thành công!", "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã lưu và xuất chủ đề ra tệp '" + sfd.FileName + "' thành công!", "Saved and exported theme to '" + sfd.FileName + "'!"), "ZenQ Writer", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         catch (Exception ex)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Lỗi khi xuất tệp chủ đề: " + ex.Message, "Lỗi xuất chủ đề", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Lỗi khi xuất tệp chủ đề: ", "Error exporting theme file: ") + ex.Message, AppL10n.Tr("Lỗi xuất chủ đề"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }

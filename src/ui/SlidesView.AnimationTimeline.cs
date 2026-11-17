@@ -9,13 +9,13 @@ namespace ZenQOffice.UI
   private SlideNode _automaticAnimationSlide;
   private static string GetAnimationDisplayName(AnimationType type)=>type switch
   {
-   AnimationType.Appear=>"Xuất hiện",AnimationType.Disappear=>"Biến mất",AnimationType.FadeIn or AnimationType.FadeOut=>"Mờ dần",
-   AnimationType.FlyIn or AnimationType.FlyOut=>"Bay",AnimationType.FloatIn or AnimationType.FloatOut=>"Trôi",
-   AnimationType.SplitIn or AnimationType.SplitOut=>"Tách đôi",AnimationType.WipeIn or AnimationType.WipeOut=>"Quét",
-   AnimationType.ShapeIn or AnimationType.ShapeOut=>"Hình dạng",AnimationType.WheelIn or AnimationType.WheelOut=>"Bánh xe",
-   AnimationType.RandomBarsIn or AnimationType.RandomBarsOut=>"Thanh ngẫu nhiên",AnimationType.ZoomIn or AnimationType.ZoomOut=>"Thu phóng",
-   AnimationType.Swivel or AnimationType.SwivelOut=>"Xoay",AnimationType.Bounce or AnimationType.BounceOut=>"Nảy",
-   AnimationType.Spin=>"Quay tròn",AnimationType.GrowShrink=>"Phóng / thu nhỏ",AnimationType.Pulse=>"Nhịp",_=>type.ToString()
+   AnimationType.Appear=>AppL10n.T("Xuất hiện","Appear"),AnimationType.Disappear=>AppL10n.T("Biến mất","Disappear"),AnimationType.FadeIn or AnimationType.FadeOut=>AppL10n.T("Mờ dần","Fade"),
+   AnimationType.FlyIn or AnimationType.FlyOut=>AppL10n.T("Bay","Fly"),AnimationType.FloatIn or AnimationType.FloatOut=>AppL10n.T("Trôi","Float"),
+   AnimationType.SplitIn or AnimationType.SplitOut=>AppL10n.T("Tách đôi","Split"),AnimationType.WipeIn or AnimationType.WipeOut=>AppL10n.T("Quét","Wipe"),
+   AnimationType.ShapeIn or AnimationType.ShapeOut=>AppL10n.T("Hình dạng","Shape"),AnimationType.WheelIn or AnimationType.WheelOut=>AppL10n.T("Bánh xe","Wheel"),
+   AnimationType.RandomBarsIn or AnimationType.RandomBarsOut=>AppL10n.T("Thanh ngẫu nhiên","Random Bars"),AnimationType.ZoomIn or AnimationType.ZoomOut=>AppL10n.T("Thu phóng","Zoom"),
+   AnimationType.Swivel or AnimationType.SwivelOut=>AppL10n.T("Xoay","Swivel"),AnimationType.Bounce or AnimationType.BounceOut=>AppL10n.T("Nảy","Bounce"),
+   AnimationType.Spin=>AppL10n.T("Quay tròn","Spin"),AnimationType.GrowShrink=>AppL10n.T("Phóng / thu nhỏ","Grow/Shrink"),AnimationType.Pulse=>AppL10n.T("Nhịp","Pulse"),_=>type.ToString()
   };
   private static GraphicsPath CreateObjectAnimationMask(ShapeAnimation anim,float progress,float w,float h)
   {

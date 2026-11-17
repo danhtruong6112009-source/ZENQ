@@ -29,7 +29,7 @@ namespace ZenQOffice.UI
 
         public PdfCompressDialog(PdfDocument doc)
         {
-            this.Text = "Nén & Tối ưu hóa Dung lượng PDF - Compress & Optimize PDF";
+            this.Text = AppL10n.T("Nén & Tối ưu hóa Dung lượng PDF - Compress & Optimize PDF", "Compress & Optimize PDF");
             this.Size = new Size(530, 520);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -61,9 +61,9 @@ namespace ZenQOffice.UI
                 using (Font titleF = new Font("Segoe UI", 12f, FontStyle.Bold))
                 using (Font subF = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("Nén & Tối ưu hóa Dung lượng PDF", titleF, Brushes.White, 44, 12);
+                    e.Graphics.DrawString(AppL10n.T("Nén & Tối ưu hóa Dung lượng PDF", "Compress & Optimize PDF"), titleF, Brushes.White, 44, 12);
                     int pCount = (doc != null && doc.Pages != null) ? doc.Pages.Count : 1;
-                    e.Graphics.DrawString($"Tài liệu gồm {pCount} trang. Giảm dung lượng tệp thông minh mà vẫn giữ độ sắc nét.", subF, Brushes.WhiteSmoke, 44, 38);
+                    e.Graphics.DrawString(string.Format(AppL10n.T("Tài liệu gồm {0} trang. Giảm dung lượng tệp thông minh mà vẫn giữ độ sắc nét.", "Document has {0} page(s). Smart compression reduces size while preserving clarity."), pCount), subF, Brushes.WhiteSmoke, 44, 38);
                 }
             };
             this.Controls.Add(pnlHeader);
@@ -78,7 +78,7 @@ namespace ZenQOffice.UI
             // Group 1: Mức độ nén
             GroupBox grpPreset = new GroupBox
             {
-                Text = "Cấp độ Nén (Compression Presets)",
+                Text = AppL10n.T("Cấp độ Nén (Compression Presets)", "Compression Presets"),
                 Location = new Point(4, 4),
                 Size = new Size(474, 190),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -87,7 +87,7 @@ namespace ZenQOffice.UI
 
             rdoStandard = new RadioButton
             {
-                Text = "Tiêu chuẩn (150 DPI, Chất lượng 70%) - Khuyên dùng cho chia sẻ & lưu trữ",
+                Text = AppL10n.T("Tiêu chuẩn (150 DPI, Chất lượng 70%) - Khuyên dùng cho chia sẻ & lưu trữ", "Standard (150 DPI, 70% quality) - Recommended for sharing & archive"),
                 Location = new Point(16, 26),
                 AutoSize = true,
                 Checked = true
@@ -96,7 +96,7 @@ namespace ZenQOffice.UI
 
             rdoMax = new RadioButton
             {
-                Text = "Tối đa (72 DPI, Chất lượng 50%) - Dung lượng nhỏ nhất, phù hợp email/web",
+                Text = AppL10n.T("Tối đa (72 DPI, Chất lượng 50%) - Dung lượng nhỏ nhất, phù hợp email/web", "Maximum (72 DPI, 50% quality) - Smallest size for email/web"),
                 Location = new Point(16, 56),
                 AutoSize = true
             };
@@ -104,7 +104,7 @@ namespace ZenQOffice.UI
 
             rdoHigh = new RadioButton
             {
-                Text = "Chất lượng cao (300 DPI, Chất lượng 85%) - Giữ độ nét cao phục vụ in ấn",
+                Text = AppL10n.T("Chất lượng cao (300 DPI, Chất lượng 85%) - Giữ độ nét cao phục vụ in ấn", "High Quality (300 DPI, 85% quality) - Print-ready sharpness"),
                 Location = new Point(16, 86),
                 AutoSize = true
             };
@@ -112,13 +112,13 @@ namespace ZenQOffice.UI
 
             rdoCustom = new RadioButton
             {
-                Text = "Tùy biến tham số DPI và tỷ lệ nén ảnh:",
+                Text = AppL10n.T("Tùy biến tham số DPI và tỷ lệ nén ảnh:", "Custom DPI and image quality:"),
                 Location = new Point(16, 116),
                 AutoSize = true
             };
             grpPreset.Controls.Add(rdoCustom);
 
-            Label lblDpi = new Label { Text = "DPI tối đa:", Location = new Point(40, 148), AutoSize = true };
+            Label lblDpi = new Label { Text = AppL10n.T("DPI tối đa:", "Max DPI:"), Location = new Point(40, 148), AutoSize = true };
             grpPreset.Controls.Add(lblDpi);
 
             numDpi = new NumericUpDown
@@ -132,7 +132,7 @@ namespace ZenQOffice.UI
             };
             grpPreset.Controls.Add(numDpi);
 
-            Label lblQuality = new Label { Text = "Chất lượng ảnh (%):", Location = new Point(200, 148), AutoSize = true };
+            Label lblQuality = new Label { Text = AppL10n.T("Chất lượng ảnh (%):", "Image quality (%):"), Location = new Point(200, 148), AutoSize = true };
             grpPreset.Controls.Add(lblQuality);
 
             numQuality = new NumericUpDown
@@ -155,7 +155,7 @@ namespace ZenQOffice.UI
             // Group 2: Tùy chọn & Tệp đầu ra
             GroupBox grpOut = new GroupBox
             {
-                Text = "Tùy chọn Bổ sung & Đường dẫn Lưu",
+                Text = AppL10n.T("Tùy chọn Bổ sung & Đường dẫn Lưu", "Additional Options & Output"),
                 Location = new Point(4, 200),
                 Size = new Size(474, 140),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -164,14 +164,14 @@ namespace ZenQOffice.UI
 
             chkStripMetadata = new CheckBox
             {
-                Text = "Lược bỏ Siêu dữ liệu dư thừa & Cache bản dựng",
+                Text = AppL10n.T("Lược bỏ Siêu dữ liệu dư thừa & Cache bản dựng", "Strip redundant metadata & build cache"),
                 Location = new Point(16, 24),
                 AutoSize = true,
                 Checked = true
             };
             grpOut.Controls.Add(chkStripMetadata);
 
-            Label lblSave = new Label { Text = "Lưu tệp nén tại:", Location = new Point(16, 56), AutoSize = true };
+            Label lblSave = new Label { Text = AppL10n.T("Lưu tệp nén tại:", "Save compressed file to:"), Location = new Point(16, 56), AutoSize = true };
             grpOut.Controls.Add(lblSave);
 
             string defaultSavePath = (doc != null && !string.IsNullOrEmpty(doc.FilePath))
@@ -188,7 +188,7 @@ namespace ZenQOffice.UI
 
             btnBrowse = new Button
             {
-                Text = "Duyệt...",
+                Text = AppL10n.T("Duyệt...", "Browse..."),
                 Location = new Point(374, 78),
                 Size = new Size(90, 28),
                 BackColor = Color.White,
@@ -202,7 +202,7 @@ namespace ZenQOffice.UI
             btnBrowse.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
             btnBrowse.Click += (s, e) =>
             {
-                using (var sfd = new SaveFileDialog { Filter = "Tệp PDF (*.pdf)|*.pdf", Title = "Chọn vị trí lưu tệp PDF đã nén", FileName = Path.GetFileName(txtOutput.Text) })
+                using (var sfd = new SaveFileDialog { Filter = AppL10n.T("Tệp PDF (*.pdf)|*.pdf", "PDF Files (*.pdf)|*.pdf"), Title = AppL10n.T("Chọn vị trí lưu tệp PDF đã nén", "Save Compressed PDF"), FileName = Path.GetFileName(txtOutput.Text) })
                 {
                     if (sfd.ShowDialog(this) == DialogResult.OK)
                     {
@@ -223,7 +223,7 @@ namespace ZenQOffice.UI
 
             btnCompress = new Button
             {
-                Text = "Bắt đầu Nén",
+                Text = AppL10n.T("Bắt đầu Nén", "Compress"),
                 Size = new Size(130, 34),
                 Location = new Point(245, 10),
                 BackColor = Color.FromArgb(14, 165, 233),
@@ -242,7 +242,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Size = new Size(95, 34),
                 Location = new Point(385, 10),
                 BackColor = Color.White,
@@ -263,7 +263,7 @@ namespace ZenQOffice.UI
         {
             if (string.IsNullOrWhiteSpace(txtOutput.Text))
             {
-                ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn đường dẫn để lưu tệp PDF đã nén!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Vui lòng chọn đường dẫn để lưu tệp PDF đã nén!", "Please select a destination path to save the compressed PDF!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 btnBrowse.PerformClick();
                 return;
             }

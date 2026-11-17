@@ -193,9 +193,9 @@ namespace ZenQOffice.UI
             g.FillRectangle(background,0,0,width,height);
             using var title=new Font("Segoe UI",16f,FontStyle.Bold);
             using var label=new Font("Segoe UI",10f);
-            g.DrawString("Tất cả slide",title,Brushes.White,40,20);
-            g.DrawString("Cuộn để xem thêm • Nhấp vào slide để chuyển đến",label,Brushes.LightGray,40,50);
-            g.DrawString("Đóng (Esc)",label,Brushes.White,width-140,28);
+            g.DrawString(ZenQOffice.Core.AppL10n.T("Tất cả slide","All Slides"),title,Brushes.White,40,20);
+            g.DrawString(ZenQOffice.Core.AppL10n.T("Cuộn để xem thêm • Nhấp vào slide để chuyển đến","Scroll to browse • Click a slide to jump to it"),label,Brushes.LightGray,40,50);
+            g.DrawString(ZenQOffice.Core.AppL10n.T("Đóng (Esc)","Close (Esc)"),label,Brushes.White,width-140,28);
             var state=g.Save();
             try
             {

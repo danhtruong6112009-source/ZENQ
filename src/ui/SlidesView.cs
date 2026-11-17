@@ -1101,6 +1101,7 @@ namespace ZenQOffice.UI
         public int LastViewedSlideIndex { get; set; }
         // Speaker Notes (Ghi chú người thuyết trình) Interactive State
         public bool IsNotesPaneOpen { get; set; } = false;
+        public List<CollabPresenceInfo> RemoteCollabPresences { get; set; } = new List<CollabPresenceInfo>();
         public int NotesPaneHeight { get; set; } = 68;
         public bool IsDraggingNotesSplitter { get; set; } = false;
         public bool IsHoverNotesSplitter { get; set; } = false;
@@ -1168,6 +1169,10 @@ namespace ZenQOffice.UI
                 if (!_isElementsDrawerOpen) HideSearchBox();
             }
         }
+        private float _leftSidebarAnimW = 210f;
+        private float _bottomThumbAnimH = 0f;
+        private float _rightSidebarAnimW = 0f;
+        private float _elementsDrawerBlend = 0f;
         private bool _isElementsDrawerCollapsed = false;
         public bool IsElementsDrawerCollapsed
         {
@@ -2596,8 +2601,8 @@ namespace ZenQOffice.UI
                         }
                         catch (Exception ex)
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show("Không thể mở liên kết hoặc tệp:\n" + targetUrl + "\n\nChi tiết: " + ex.Message,
-                                "Lỗi Liên kết", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể mở liên kết hoặc tệp:\n", "Could not open link or file:\n") + targetUrl + AppL10n.T("\n\nChi tiết: ", "\n\nDetails: ") + ex.Message,
+                                AppL10n.T("Lỗi Liên kết", "Link Error"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         }
                     }
                     break;
@@ -3046,14 +3051,14 @@ namespace ZenQOffice.UI
         {
             if (Presentation == null || Presentation.Slides == null || Presentation.Slides.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Không có trang chiếu nào để xuất video!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không có trang chiếu nào để xuất video!", "There are no slides to export as video!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             if (string.IsNullOrEmpty(targetPath))
             {
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Title = "Xuất bài trình chiếu sang Video (Export to Video)";
+                    sfd.Title = AppL10n.T("Xuất bài trình chiếu sang Video (Export to Video)", "Export Presentation to Video");
                     sfd.Filter = "Video File (*.avi)|*.avi|All Files (*.*)|*.*";
                     sfd.FileName = System.IO.Path.GetFileNameWithoutExtension(Presentation.Title ?? "Presentation") + ".avi";
                     if (sfd.ShowDialog(owner) != DialogResult.OK) return;
@@ -3498,7 +3503,7 @@ namespace ZenQOffice.UI
             if (shape == null && SelectedShape != null) shape = SelectedShape;
             if (shape == null)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn đối tượng trước khi vẽ đường chuyển động.", "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng chọn đối tượng trước khi vẽ đường chuyển động.", "Please select an object before drawing a motion path."), "ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             IsDrawingMotionPathMode = true;
@@ -3533,7 +3538,7 @@ namespace ZenQOffice.UI
             }
             if (targetShapeIds.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn một hoặc nhiều hình vẽ / hộp văn bản trên trang chiếu để áp dụng hoạt họa.", "ZenQ Hoạt họa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng chọn một hoặc nhiều hình vẽ / hộp văn bản trên trang chiếu để áp dụng hoạt họa.", "Please select one or more shapes or text boxes to apply an animation."), AppL10n.T("ZenQ Hoạt họa", "ZenQ Animations"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             // Xóa hiệu ứng nếu chọn None
@@ -3866,7 +3871,9 @@ namespace ZenQOffice.UI
                     }
                 }
                 bool preloadThumb = PreloadNextPendingThumbnail();
-                return hasPlayingVideo || hasPlayingGif || scrollAnim || preloadThumb;
+                bool needPendingThumbs = _hasPendingEditorThumbnails && !DeferThumbnailWork();
+                bool thumbRingAnim = _thumbActiveInit && (FluentMotion.NowMs - _thumbActiveGlideStartMs) >= 0 && (FluentMotion.NowMs - _thumbActiveGlideStartMs) < ThumbActiveGlideDurationMs;
+                return hasPlayingVideo || hasPlayingGif || scrollAnim || preloadThumb || needPendingThumbs || thumbRingAnim;
             }
             bool needRedraw = false;
             // 1. Update Slide Transition Progress (High Precision Stopwatch Timing)
@@ -5873,7 +5880,7 @@ namespace ZenQOffice.UI
             }
             if (shape == null)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn một hình vẽ hoặc hộp văn bản trước khi vẽ đường chuyển động.", "Đường chuyển động tự vẽ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng chọn một hình vẽ hoặc hộp văn bản trước khi vẽ đường chuyển động.", "Please select a shape or text box before drawing a custom path."), AppL10n.T("Đường chuyển động tự vẽ", "Custom Motion Path"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             IsDrawingMotionPathMode = true;
@@ -6744,7 +6751,7 @@ namespace ZenQOffice.UI
             ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
             menu.Font = new Font("Segoe UI", 9.0f);
             // 1. Tô màu nền ô (Cell Fill Color)
-            ToolStripMenuItem miFill = new ToolStripMenuItem("🎨 Tô màu nền ô (Cell Fill)");
+            ToolStripMenuItem miFill = new ToolStripMenuItem(AppL10n.T("🎨 Tô màu nền ô (Cell Fill)", "🎨 Cell Shading"));
             int[] fillPalette = new int[] {
                 0x00FFFFFF, // Không màu
                 0x2563EB, // Xanh dương
@@ -6777,7 +6784,7 @@ namespace ZenQOffice.UI
             }
             menu.Items.Add(miFill);
             // 2. Màu chữ (Text Color)
-            ToolStripMenuItem miTextCol = new ToolStripMenuItem("🔤 Màu chữ (Text Color)");
+            ToolStripMenuItem miTextCol = new ToolStripMenuItem(AppL10n.T("🔤 Màu chữ (Text Color)", "🔤 Font Color"));
             int[] textPalette = new int[] {
                 0x0F172A, // Đen
                 0xFFFFFF, // Trắng
@@ -6805,32 +6812,32 @@ namespace ZenQOffice.UI
             menu.Items.Add(miTextCol);
             menu.Items.Add(new ToolStripSeparator());
             // 3. Hàng & Cột (Rows & Columns)
-            menu.Items.Add(new ToolStripMenuItem("➕ Chèn hàng phía trên (Insert Row Above)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("➕ Chèn hàng phía trên (Insert Row Above)", "➕ Insert Row Above"), null, (s, e) => {
                 InsertTableRow(true);
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            menu.Items.Add(new ToolStripMenuItem("➕ Chèn hàng phía dưới (Insert Row Below)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("➕ Chèn hàng phía dưới (Insert Row Below)", "➕ Insert Row Below"), null, (s, e) => {
                 InsertTableRow(false);
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            menu.Items.Add(new ToolStripMenuItem("➕ Chèn cột bên trái (Insert Column Left)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("➕ Chèn cột bên trái (Insert Column Left)", "➕ Insert Column Left"), null, (s, e) => {
                 InsertTableColumn(true);
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            menu.Items.Add(new ToolStripMenuItem("➕ Chèn cột bên phải (Insert Column Right)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("➕ Chèn cột bên phải (Insert Column Right)", "➕ Insert Column Right"), null, (s, e) => {
                 InsertTableColumn(false);
                 if (parentControl != null) parentControl.Invalidate();
             }));
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(new ToolStripMenuItem("❌ Xóa hàng này (Delete Row)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("❌ Xóa hàng này (Delete Row)", "❌ Delete Row"), null, (s, e) => {
                 DeleteTableRow();
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            menu.Items.Add(new ToolStripMenuItem("❌ Xóa cột này (Delete Column)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("❌ Xóa cột này (Delete Column)", "❌ Delete Column"), null, (s, e) => {
                 DeleteTableColumn();
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            menu.Items.Add(new ToolStripMenuItem("🗑️ Xóa toàn bộ bảng (Delete Table)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("🗑️ Xóa toàn bộ bảng (Delete Table)", "🗑️ Delete Table"), null, (s, e) => {
                 ActiveSlide.Shapes.Remove(shape);
                 SelectedShapeIndex = -1;
                 EndTableInlineEditing();
@@ -7220,7 +7227,7 @@ namespace ZenQOffice.UI
                 string totalStr = string.Format("{0:D2}:{1:D2}:{2:D2}", (int)totalTime.TotalHours, totalTime.Minutes, totalTime.Seconds);
                 DialogResult res = ZenQOffice.UI.FluentMessageBox.Show(
                     "Tổng thời gian cho bài thuyết trình là " + totalStr + ".\n\nBạn có muốn lưu các mốc thời gian trình chiếu mới này để tự động chuyển tiếp slide không?",
-                    "Tập dượt thời gian (Rehearse Timings)",
+                    AppL10n.T("Tập dượt thời gian (Rehearse Timings)", "Rehearse Timings"),
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Information);
                 if (res == DialogResult.Yes)
@@ -7287,7 +7294,7 @@ namespace ZenQOffice.UI
         public void ShowCustomSlideShowManager(Control parent)
         {
             ContextMenuStrip customMenu = new ZenQOffice.UI.FluentContextMenuStrip();
-            ToolStripMenuItem miNew = new ToolStripMenuItem("➕ Trình chiếu tùy chỉnh mới (New Custom Show)...");
+            ToolStripMenuItem miNew = new ToolStripMenuItem(AppL10n.T("➕ Trình chiếu tùy chỉnh mới (New Custom Show)...", "➕ New Custom Show..."));
             miNew.Click += (s, e) =>
             {
                 string showName = "Custom Show " + ((CustomShowNames != null ? CustomShowNames.Count : 0) + 1);
@@ -7300,7 +7307,7 @@ namespace ZenQOffice.UI
                 if (CustomShows == null) CustomShows = new Dictionary<string, List<int>>();
                 CustomShowNames.Add(showName);
                 CustomShows[showName] = slideList;
-                ZenQOffice.UI.FluentMessageBox.Show("Đã tạo trình chiếu tùy chỉnh: " + showName + "\nBao gồm tất cả " + slideList.Count + " slide.", "Trình chiếu tùy chỉnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(string.Format(AppL10n.T("Đã tạo trình chiếu tùy chỉnh: {0}\nBao gồm tất cả {1} slide.", "Created custom show: {0}\nIncludes all {1} slide(s)."), showName, slideList.Count), AppL10n.T("Trình chiếu tùy chỉnh", "Custom Show"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
             customMenu.Items.Add(miNew);
             if (CustomShowNames != null && CustomShowNames.Count > 0)
@@ -7405,24 +7412,14 @@ namespace ZenQOffice.UI
             int topBarY = 155;
             contentY = topBarY;
             bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
-            int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
-            if (IsElementsDrawerOpen)
-            {
-                int drawerW = IsElementsDrawerCollapsed ? 0 : 280;
-                leftSidebarW = drawerW;
-                bottomThumbH = 78;
-                canvasX = leftSidebarW;
-                canvasW = Math.Max(100, width - canvasX - rightSidebarW);
-                contentH = Math.Max(100, height - contentY - 26 - bottomThumbH);
-            }
-            else
-            {
-                leftSidebarW = (ViewMode == ImpressViewMode.SlideSorter || ViewMode == ImpressViewMode.ReadingView) ? 0 : 210;
-                bottomThumbH = 0;
-                canvasX = (isIsland && leftSidebarW > 0) ? (leftSidebarW + 10) : leftSidebarW;
-                canvasW = Math.Max(100, width - canvasX - rightSidebarW);
-                contentH = Math.Max(100, height - contentY - 26);
-            }
+            int rightSidebarW = IsPresenting ? 0 : Math.Max(0, (int)Math.Round(_rightSidebarAnimW));
+            leftSidebarW = IsPresenting ? 0 : Math.Max(0, (int)Math.Round(_leftSidebarAnimW));
+            bottomThumbH = IsPresenting ? 0 : Math.Max(0, (int)Math.Round(_bottomThumbAnimH));
+            float islandGapFactor = Math.Max(0f, 1f - _elementsDrawerBlend);
+            int islandPad = (isIsland && leftSidebarW > 0) ? (int)Math.Round(10f * islandGapFactor) : 0;
+            canvasX = leftSidebarW + islandPad;
+            canvasW = Math.Max(100, width - canvasX - rightSidebarW);
+            contentH = Math.Max(100, height - contentY - 26 - bottomThumbH);
         }
         public void OpenShapesDrawer()
         {
@@ -7521,6 +7518,7 @@ namespace ZenQOffice.UI
         }
         public void CloseElementsDrawer()
         {
+            if (IsImageBlenderActive) ExitImageBlender(false);
             IsElementsDrawerOpen = false;
             if (_shapeSearchBox != null)
             {
@@ -7686,15 +7684,16 @@ namespace ZenQOffice.UI
         }
         #endregion
         #region Elements Drawer & Bottom Filmstrip Layout Rendering
-                public void HideSearchBox()
+        public void HideSearchBox()
         {
-            if(catalogSearchBox!=null)catalogSearchBox.Visible=false;
-            if (_shapeSearchBox != null)
+            TextBox[] boxes = new TextBox[] { catalogSearchBox, _shapeSearchBox };
+            foreach (TextBox tb in boxes)
             {
-                _shapeSearchBox.Visible = false;
+                if (tb == null) continue;
+                tb.Visible = false;
                 try
                 {
-                    if (ParentControl is ContainerControl cc && cc.ActiveControl == _shapeSearchBox)
+                    if (ParentControl is ContainerControl cc && cc.ActiveControl == tb)
                     {
                         cc.ActiveControl = null;
                     }
@@ -7711,7 +7710,7 @@ namespace ZenQOffice.UI
                 if (af.BackstageView != null && af.BackstageView.IsOpen) isBackstageOpen = true;
                 if (af.Ribbon != null && af.Ribbon.CurrentMode != OfficeAppMode.Slides) isBackstageOpen = true;
             }
-            bool shouldBeVisible = IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && !IsElementsDrawerCollapsed && ShapeTaskPane != null && !IsPresenting && !isBackstageOpen;
+            bool shouldBeVisible = IsElementsDrawerOpen && ElementsDrawerSelectedTab == 1 && !IsElementsDrawerCollapsed && Math.Abs(_leftSidebarAnimW - 280f) <= 4f && ShapeTaskPane != null && !IsPresenting && !isBackstageOpen;
             if (!shouldBeVisible)
             {
                 if (_shapeSearchBox != null) _shapeSearchBox.Visible = false;
@@ -7762,8 +7761,8 @@ namespace ZenQOffice.UI
                 }
             }
             string cue = (ShapeTaskPane.Mode == ShapePaneMode.GraphicsOnly)
-                ? "Tìm kiếm trong kho đồ họa..."
-                : "Tìm kiếm hình dạng...";
+                ? AppL10n.T("Tìm kiếm trong kho đồ họa...", "Search graphics...")
+                : AppL10n.T("Tìm kiếm hình dạng...", "Search shapes...");
             try
             {
                 if (_shapeSearchBox.PlaceholderText != cue) _shapeSearchBox.PlaceholderText = cue;
@@ -7868,16 +7867,16 @@ namespace ZenQOffice.UI
                     g.DrawLine(hBorder, 0, contentY + 44, totalW, contentY + 44);
                 }
                 string[] titles = new string[] {
-                    "Mẫu trình chiếu",
-                    (ShapeTaskPane != null && ShapeTaskPane.Mode == ShapePaneMode.GraphicsOnly) ? "Đồ họa" : "Hình dạng",
-                    "Phông chữ",
-                    "Bảng màu thương hiệu",
-                    "Tải lên tệp ảnh",
-                    "Công cụ vẽ tự do",
-                    "Dự án gần đây",
-                    "Ứng dụng"
+                    AppL10n.T("Mẫu trình chiếu", "Presentation Templates"),
+                    (ShapeTaskPane != null && ShapeTaskPane.Mode == ShapePaneMode.GraphicsOnly) ? AppL10n.T("Đồ họa", "Graphics") : AppL10n.T("Hình dạng", "Shapes"),
+                    AppL10n.T("Phông chữ", "Fonts"),
+                    AppL10n.T("Bảng màu thương hiệu", "Brand Colors"),
+                    AppL10n.T("Tải lên tệp ảnh", "Upload Image"),
+                    AppL10n.T("Công cụ vẽ tự do", "Freehand Draw"),
+                    AppL10n.T("Dự án gần đây", "Recent Projects"),
+                    AppL10n.T("Ứng dụng", "Apps")
                 };
-                string curTitle = (ElementsDrawerSelectedTab >= 0 && ElementsDrawerSelectedTab < titles.Length) ? titles[ElementsDrawerSelectedTab] : "Mở rộng";
+                string curTitle = IsImageBlenderActive ? "Image Blender" : ((ElementsDrawerSelectedTab >= 0 && ElementsDrawerSelectedTab < titles.Length) ? titles[ElementsDrawerSelectedTab] : "Mở rộng");
                 using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 {
                     g.DrawString(curTitle, headFont, titleBrush, 14, contentY + 12);
@@ -7907,23 +7906,29 @@ namespace ZenQOffice.UI
                     g.DrawString("‹", chevFont, arrowBrush, new RectangleF(colBtn.X, colBtn.Y - 1, colBtn.Width, colBtn.Height), sfCenter);
                 }
                 // 3. Ô tìm kiếm (Không còn hàng pill dư thừa vì Ribbon đã chọn đúng danh mục)
-                Rectangle searchBox = new Rectangle(12, contentY + 52, totalW - 24, 30);
-                TxtSearchBoxBounds = searchBox;
-                using (SolidBrush sBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
-                using (Pen sPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+int contentTop = contentY + 90;
+                if (!IsImageBlenderActive)
                 {
-                    g.FillRoundedRectangle(sBg, searchBox, 7);
-                    g.DrawRoundedRectangle(sPen, searchBox, 7);
+                    Rectangle searchBox = new Rectangle(12, contentY + 52, totalW - 24, 30);
+                    TxtSearchBoxBounds = searchBox;
+                    using (SolidBrush sBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
+                    using (Pen sPen = new Pen(Color.FromArgb(203, 213, 225), 1f))
+                    {
+                        g.FillRoundedRectangle(sBg, searchBox, 7);
+                        g.DrawRoundedRectangle(sPen, searchBox, 7);
+                    }
+                    using (SolidBrush phBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
+                    using (Pen phPen = new Pen(Color.FromArgb(100, 116, 139), 1.4f))
+                    {
+                        g.DrawEllipse(phPen, searchBox.X + 8, searchBox.Y + 9, 8, 8);
+                        g.DrawLine(phPen, searchBox.X + 15, searchBox.Y + 16, searchBox.X + 19, searchBox.Y + 20);
+                    }
                 }
-                using (SolidBrush phBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
-                using (Pen phPen = new Pen(Color.FromArgb(100, 116, 139), 1.4f))
+                else
                 {
-                    g.DrawEllipse(phPen, searchBox.X + 8, searchBox.Y + 9, 8, 8);
-                    g.DrawLine(phPen, searchBox.X + 15, searchBox.Y + 16, searchBox.X + 19, searchBox.Y + 20);
-                    // The native editor owns its placeholder and matches the rounded field background.
+                    TxtSearchBoxBounds = Rectangle.Empty;
+                    contentTop = contentY + 46;
                 }
-                // 4. Nội dung chi tiết theo từng tab
-                int contentTop = contentY + 90;
                 catalogViewport=new Rectangle(0,contentTop,totalW,Math.Max(1,totalH-90));
                 var catalogState=g.Save();try{g.IntersectClip(catalogViewport);DrawDrawerTabContent(g,0,contentTop,totalW,totalH-90,secFont,itemFont,sfCenter);}finally{g.Restore(catalogState);}
                 PaintCatalogScrollbar(g);UpdateCatalogSearch();
@@ -7940,7 +7945,7 @@ namespace ZenQOffice.UI
                 using (Pen itemBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
                 using (SolidBrush labelBrush = new SolidBrush(Color.FromArgb(51, 65, 85)))
                 {
-                    g.DrawString("Đề xuất nổi bật", secFont, secBrush, leftX + 14, curY);
+                    g.DrawString(AppL10n.Tr("Đề xuất nổi bật"), secFont, secBrush, leftX + 14, curY);
                     curY += 22;
                     string[] icons = new string[] {
                         "Target", "Rocket", "Lightbulb", "Chart",
@@ -7983,7 +7988,7 @@ namespace ZenQOffice.UI
                         }
                         // Nhãn tên
                         string lbl = (i < iconLabels.Length) ? iconLabels[i] : icons[i];
-                        g.DrawString(lbl, itemFont, labelBrush, new RectangleF(bRect.X - 4, bRect.Bottom + 2, bRect.Width + 8, 14), sfCenter);
+                        g.DrawString(AppL10n.Tr(lbl), itemFont, labelBrush, new RectangleF(bRect.X - 4, bRect.Bottom + 2, bRect.Width + 8, 14), sfCenter);
                     }
                 }
             }
@@ -7994,7 +7999,7 @@ namespace ZenQOffice.UI
                 using (Pen cardBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
                 using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 {
-                    g.DrawString("Bảng phối màu 1-chạm", secFont, secBrush, leftX + 14, curY);
+                    g.DrawString(AppL10n.Tr("Bảng phối màu 1-chạm"), secFont, secBrush, leftX + 14, curY);
                     curY += 22;
                     string[] palettes = new string[] {
                         "Hiện đại (Xanh dương)",
@@ -8019,7 +8024,7 @@ namespace ZenQOffice.UI
                             g.FillPath(cardBg, cPath);
                             g.DrawPath(cardBorder, cPath);
                         }
-                        g.DrawString(palettes[i], itemFont, titleB, pCard.X + 12, pCard.Y + 16);
+                        g.DrawString(AppL10n.Tr(palettes[i]), itemFont, titleB, pCard.X + 12, pCard.Y + 16);
                         // Color swatches preview
                         int swX = pCard.Right - 70;
                         for (int s = 0; s < 3; s++)
@@ -8040,7 +8045,7 @@ namespace ZenQOffice.UI
                 using (Pen cardBorder = new Pen(Color.FromArgb(226, 232, 240), 1f))
                 using (SolidBrush titleB = new SolidBrush(Color.FromArgb(15, 23, 42)))
                 {
-                    g.DrawString("Bố cục trang chiếu sẵn có", secFont, secBrush, leftX + 14, curY);
+                    g.DrawString(AppL10n.Tr("Bố cục trang chiếu sẵn có"), secFont, secBrush, leftX + 14, curY);
                     curY += 22;
                     string[] tNames = new string[] {
                         "Giới thiệu & Tiêu đề",
@@ -8059,7 +8064,7 @@ namespace ZenQOffice.UI
                             g.FillPath(cardBg, cPath);
                             g.DrawPath(cardBorder, cPath);
                         }
-                        g.DrawString(tNames[i], itemFont, titleB, tCard.X + 14, tCard.Y + 16);
+                        g.DrawString(AppL10n.Tr(tNames[i]), itemFont, titleB, tCard.X + 14, tCard.Y + 16);
                         curY += 56;
                     }
                 }
@@ -8188,7 +8193,7 @@ namespace ZenQOffice.UI
                 s.ThumbnailCache = bmp;
                 s.IsThumbnailDirty = false;
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[EnsureSlideThumbnail] " + ex); }
             finally
             {
                 _thumbnailGeneratingSlides.Remove(s);
@@ -8242,7 +8247,12 @@ namespace ZenQOffice.UI
         private void DrawBottomSlideThumbnailStrip(D2DGraphics g, int canvasX, int bottomY, int canvasW, int bottomH)
         {
             BottomSlideThumbBounds.Clear();
+            if (bottomH <= 0 || canvasW <= 0) return;
             Rectangle stripRect = new Rectangle(canvasX, bottomY, canvasW, bottomH);
+            GraphicsState bottomClipState = g.Save();
+            g.IntersectClip(stripRect);
+            try
+            {
             // 100% Light Office Theme Background for Thumbnail Strip
             using (SolidBrush stripBg = new SolidBrush(Color.FromArgb(248, 250, 252)))
             {
@@ -8253,13 +8263,14 @@ namespace ZenQOffice.UI
                 g.DrawLine(topPen, canvasX, bottomY, canvasX + canvasW, bottomY);
             }
             if (Presentation == null || Presentation.Slides == null) return;
+            int layoutH = 78;
             int cardH = 48;
             float slideAspect = (Presentation != null && Presentation.CanvasHeight > 0)
                 ? ((float)Presentation.CanvasWidth / (float)Presentation.CanvasHeight)
                 : (16.0f / 9.0f);
             if (slideAspect <= 0.01f) slideAspect = 16.0f / 9.0f;
             int cardW = Math.Max(24, Math.Min(96, (int)Math.Round(cardH * slideAspect)));
-            int cardY = bottomY + (bottomH - cardH) / 2;
+            int cardY = bottomY + (layoutH - cardH) / 2;
             ClampBottomThumbnailScroll(canvasW);
             int curX = canvasX + 16 - BottomThumbScrollX;
             int rightReservedW = 120;
@@ -8355,7 +8366,7 @@ namespace ZenQOffice.UI
                         g.FillRectangle(addBg, addRect);
                         g.DrawRectangle(addPen, addRect);
                         g.DrawString("+", plusFont, addTxt, new RectangleF(addRect.X, addRect.Y + 2, addRect.Width, 20), sfCenter);
-                        g.DrawString("Thêm", addFont, addTxt, new RectangleF(addRect.X, addRect.Bottom - 18, addRect.Width, 14), sfCenter);
+                        g.DrawString(AppL10n.Tr("Thêm"), addFont, addTxt, new RectangleF(addRect.X, addRect.Bottom - 18, addRect.Width, 14), sfCenter);
                     }
                 }
                 if (IsDraggingSlideThumbnail && IsDraggingBottomSlideThumbnail && PotentialDragSlideIndex >= 0 && PotentialDragSlideIndex < Presentation.Slides.Count)
@@ -8396,7 +8407,7 @@ namespace ZenQOffice.UI
                 int totalBottomWidth = (Presentation.Slides.Count * (cardW + 10)) + 46 + 20;
                 int trackX = viewportX;
                 int trackW = viewportW;
-                int trackY = bottomY + bottomH - 7;
+                int trackY = bottomY + layoutH - 7;
                 int trackH = 4;
                 BottomThumbScrollBarTrackRect = new Rectangle(trackX, trackY, trackW, trackH);
                 if (totalBottomWidth > trackW && trackW > 40)
@@ -8424,6 +8435,11 @@ namespace ZenQOffice.UI
                 {
                     BottomThumbScrollBarThumbRect = Rectangle.Empty;
                 }
+            }
+            }
+            finally
+            {
+                g.Restore(bottomClipState);
             }
         }
         public bool HandleElementsDrawerClick(Point mousePos, int leftSidebarW, int contentY, int totalH, Control parentControl, MouseButtons buttons = MouseButtons.Left)
@@ -8527,6 +8543,17 @@ namespace ZenQOffice.UI
         }
         public void SyncShapeTaskPaneRecommendation(ShapeNode shape)
         {
+            if (IsImageBlenderActive)
+            {
+                if (shape != null && (shape.Type == ShapeType.Image || shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath)))
+                {
+                    SetBlenderActiveShape(shape);
+                }
+                else
+                {
+                    ClearBlenderActiveShape();
+                }
+            }
             if (ShapeTaskPane == null) return;
             if (shape == null)
             {
@@ -8827,8 +8854,8 @@ namespace ZenQOffice.UI
             {
                 using (OpenFileDialog ofd = new OpenFileDialog())
                 {
-                    ofd.Filter = "Tệp phông chữ (*.ttf;*.otf)|*.ttf;*.otf|Tất cả tệp (*.*)|*.*";
-                    ofd.Title = "Nhập phông chữ nội bộ vào ZenQOffice";
+                    ofd.Filter = AppL10n.Tr("Tệp phông chữ (*.ttf;*.otf)|*.ttf;*.otf|Tất cả tệp (*.*)|*.*");
+                    ofd.Title = AppL10n.Tr("Nhập phông chữ nội bộ vào ZenQOffice");
                     if (ofd.ShowDialog(parentControl) == DialogResult.OK)
                     {
                         string importedFont;
@@ -8839,11 +8866,11 @@ namespace ZenQOffice.UI
                             {
                                 SetSelectionFontName(importedFont);
                             }
-                            ZenQOffice.UI.FluentMessageBox.Show(parentControl, $"Đã nhập và kích hoạt thành công phông chữ '{importedFont}' vào ứng dụng!", "Nhập Font Thành Công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(parentControl, AppL10n.T($"Đã nhập và kích hoạt thành công phông chữ '{importedFont}' vào ứng dụng!", $"Imported and activated font '{importedFont}'!"), AppL10n.T("Nhập Font Thành Công", "Font Imported"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         else
                         {
-                            ZenQOffice.UI.FluentMessageBox.Show(parentControl, "Không thể nhập phông chữ: " + (errMsg ?? "Lỗi không xác định"), "Lỗi nhập font", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            ZenQOffice.UI.FluentMessageBox.Show(parentControl, AppL10n.T("Không thể nhập phông chữ: ", "Could not import font: ") + (errMsg ?? AppL10n.T("Lỗi không xác định", "Unknown error")), AppL10n.T("Lỗi nhập font", "Font Import Error"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         }
                     }
                 }
@@ -9267,24 +9294,29 @@ namespace ZenQOffice.UI
         private long lastEditorScrollTick;
         private bool DeferThumbnailWork()
         {
-            bool moving = IsDraggingBottomThumbScrollBar || Math.Abs(TargetBottomThumbScrollX-SmoothBottomThumbScrollX)>.5f || catalogDragging || Math.Abs(TargetElementsScrollY-SmoothElementsScrollY)>.5f || _isDraggingThumbScrollBar || IsDraggingHScrollBar || IsDraggingVScrollBar || IsPanningCanvas ||
-                Math.Abs(TargetThumbScrollY-SmoothThumbScrollY)>.5f || Math.Abs(TargetCanvasScrollX-SmoothCanvasScrollX)>.5f || Math.Abs(TargetCanvasScrollY-SmoothCanvasScrollY)>.5f;
-            long now=Environment.TickCount64;if(moving)lastEditorScrollTick=now;
-            return moving || (lastEditorScrollTick!=0&&now-lastEditorScrollTick<200);
+            bool drawerMoving = IsElementsDrawerOpen && (IsDraggingBottomThumbScrollBar || Math.Abs(TargetBottomThumbScrollX - SmoothBottomThumbScrollX) > .5f || catalogDragging || Math.Abs(TargetElementsScrollY - SmoothElementsScrollY) > .5f);
+            bool leftMoving = !IsElementsDrawerOpen && (_isDraggingThumbScrollBar || Math.Abs(TargetThumbScrollY - SmoothThumbScrollY) > .5f);
+            bool canvasMoving = IsDraggingHScrollBar || IsDraggingVScrollBar || IsPanningCanvas || Math.Abs(TargetCanvasScrollX - SmoothCanvasScrollX) > .5f || Math.Abs(TargetCanvasScrollY - SmoothCanvasScrollY) > .5f;
+            bool moving = drawerMoving || leftMoving || canvasMoving;
+            long now = Environment.TickCount64;
+            if (moving) lastEditorScrollTick = now;
+            return moving || (lastEditorScrollTick != 0 && now - lastEditorScrollTick < 200);
         }
         private int thumbnailPaintBudget;
+        private bool _hasPendingEditorThumbnails;
         private void EnsureVisibleSlideThumbnail(SlideNode slide)
         {
-            if(slide.ThumbnailCache != null && !slide.IsThumbnailDirty) return;
-            if(thumbnailPaintBudget <= 0) return;
+            if(slide == null || (slide.ThumbnailCache != null && !slide.IsThumbnailDirty)) return;
+            if(thumbnailPaintBudget <= 0) { _hasPendingEditorThumbnails = true; return; }
             thumbnailPaintBudget--;
             EnsureSlideThumbnail(slide);
-            InvalidateCallback?.Invoke();
         }
         public void Draw(D2DGraphics g, int width, int height)
         {
             editorUsesGpuThumbnails = g?.IsWindowGpuSurface == true;
-            thumbnailPaintBudget = IsTransitioning || IsPlayingAnimationPreview || DeferThumbnailWork() ? 0 : 1;
+            _thumbnailPaintPass++;
+            _hasPendingEditorThumbnails = false;
+            thumbnailPaintBudget = IsTransitioning || IsPlayingAnimationPreview || DeferThumbnailWork() ? 0 : 4;
             if (g != null && g.RenderTarget != null)
             {
                 _activeRenderTarget = g.RenderTarget;
@@ -9295,7 +9327,7 @@ namespace ZenQOffice.UI
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             if (IsPresenting)
             {
                 DrawFullscreenPresenter(g, width, height);
@@ -9329,7 +9361,7 @@ namespace ZenQOffice.UI
                         DrawNotesView(g, canvasX, contentY, canvasW, contentH);
                         break;
                     case ImpressViewMode.SlideSorter:
-                        DrawSlideSorterView(g, 0, contentY, width - ((IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0), contentH);
+                        DrawSlideSorterView(g, 0, contentY, Math.Max(100, width - Math.Max(0, (int)Math.Round(_rightSidebarAnimW))), contentH);
                         break;
                     case ImpressViewMode.SlideMaster:
                         DrawSlideMasterView(g, canvasX, contentY, canvasW, contentH);
@@ -9344,27 +9376,63 @@ namespace ZenQOffice.UI
             {
                 g.Restore(origState);
             }
-            // 2. Draw Left Pane OR Elements Drawer ON TOP
+            // 2. Draw Left Pane OR Elements Drawer ON TOP (with smooth slide transitions)
             try
             {
-                if (IsElementsDrawerOpen && !IsElementsDrawerCollapsed && ElementsDrawerSelectedTab == 1)
+                int leftFullH = height - contentY - 26;
+                if (!IsElementsDrawerOpen) HideSearchBox();
+                else if (_shapeSearchBox != null && ElementsDrawerSelectedTab != 1) _shapeSearchBox.Visible = false;
+
+                if (_elementsDrawerBlend < 0.995f && leftSidebarW > 0 && ViewMode != ImpressViewMode.SlideSorter && ViewMode != ImpressViewMode.ReadingView)
                 {
-                    DrawElementsDrawerPanel(g, leftSidebarW, contentY, height - contentY - 26);
-                    DrawBottomSlideThumbnailStrip(g, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH);
-                }
-                else
-                {
-                    if (!IsElementsDrawerOpen) HideSearchBox();
-                    else if (_shapeSearchBox != null) _shapeSearchBox.Visible = false;
-                    if (IsElementsDrawerOpen)
+                    int slidePaneClipW = Math.Min(210, leftSidebarW);
+                    int slidePaneOffsetX = Math.Min(slidePaneClipW - 210, -(int)Math.Round(210f * _elementsDrawerBlend));
+                    if (slidePaneOffsetX > -210)
                     {
-                        DrawElementsDrawerPanel(g, leftSidebarW, contentY, height - contentY - 26);
-                        DrawBottomSlideThumbnailStrip(g, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH);
+                        GraphicsState lpSt = g.Save();
+                        g.IntersectClip(new Rectangle(0, contentY, slidePaneClipW, Math.Max(1, contentH)));
+                        if (slidePaneOffsetX != 0) g.TranslateTransform(slidePaneOffsetX, 0);
+                        try
+                        {
+                            DrawLeftSlidePane(g, 210, contentY, contentH);
+                        }
+                        finally
+                        {
+                            g.Restore(lpSt);
+                        }
+                    }
+                }
+
+                if (_elementsDrawerBlend > 0.005f || IsElementsDrawerOpen)
+                {
+                    if (IsElementsDrawerOpen && IsElementsDrawerCollapsed && leftSidebarW <= 10)
+                    {
+                        DrawElementsDrawerPanel(g, 0, contentY, leftFullH);
                     }
                     else if (leftSidebarW > 0)
                     {
-                        DrawLeftSlidePane(g, leftSidebarW, contentY, contentH);
+                        int drawerClipW = Math.Min(280, leftSidebarW);
+                        int drawerOffsetX = Math.Min((int)Math.Round((_elementsDrawerBlend - 1f) * 280f), Math.Min(0, drawerClipW - 280));
+                        if (drawerOffsetX > -280)
+                        {
+                            GraphicsState drSt = g.Save();
+                            g.IntersectClip(new Rectangle(0, contentY, drawerClipW, Math.Max(1, leftFullH)));
+                            if (drawerOffsetX != 0) g.TranslateTransform(drawerOffsetX, 0);
+                            try
+                            {
+                                DrawElementsDrawerPanel(g, 280, contentY, leftFullH);
+                            }
+                            finally
+                            {
+                                g.Restore(drSt);
+                            }
+                        }
                     }
+                }
+
+                if (bottomThumbH > 0)
+                {
+                    DrawBottomSlideThumbnailStrip(g, canvasX, height - 26 - bottomThumbH, canvasW, bottomThumbH);
                 }
             }
             catch (Exception ex)
@@ -9374,10 +9442,19 @@ namespace ZenQOffice.UI
             // 3. Draw Right Sidebar Task Pane (Animation Pane / Properties) ON TOP
             try
             {
-                int rightSidebarW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280 : 0;
-                if (rightSidebarW > 0)
+                int rightSidebarW = IsPresenting ? 0 : Math.Max(0, (int)Math.Round(_rightSidebarAnimW));
+                if (rightSidebarW > 0 && SidebarPanel != SidebarPanelType.None)
                 {
-                    DrawRightSidebarPanel(g, width - rightSidebarW, contentY, rightSidebarW, height - contentY - 26);
+                    GraphicsState rsSt = g.Save();
+                    g.IntersectClip(new Rectangle(width - rightSidebarW, contentY, rightSidebarW, Math.Max(1, height - contentY - 26)));
+                    try
+                    {
+                        DrawRightSidebarPanel(g, width - rightSidebarW, contentY, 280, height - contentY - 26);
+                    }
+                    finally
+                    {
+                        g.Restore(rsSt);
+                    }
                 }
             }
             catch (Exception ex)
@@ -9385,12 +9462,149 @@ namespace ZenQOffice.UI
                 System.Diagnostics.Debug.WriteLine("[SlidesView] Right pane render error: " + ex);
             }
         }
+        public bool TryScreenToSlideLogical(Point screenPt, out float lx, out float ly)
+        {
+            lx = 0f; ly = 0f;
+            if (LastRenderWindowWidth <= 0 || LastRenderWindowHeight <= 0) return false;
+            int lsbW, cx, cw, cy, ch, btmH;
+            GetEffectiveLayoutMetrics(LastRenderWindowWidth, LastRenderWindowHeight, out lsbW, out cx, out cw, out cy, out ch, out btmH);
+            int sx, sy, sw, sh;
+            float sc;
+            GetSlideCanvasBounds(cx, cy, cw, ch, out sx, out sy, out sw, out sh, out sc);
+            if (sc <= 0.001f) return false;
+            lx = (screenPt.X - sx) / sc;
+            ly = (screenPt.Y - sy) / sc;
+            return true;
+        }
+
+        private static Color ParseCollabPeerColor(string hex)
+        {
+            if (!string.IsNullOrEmpty(hex))
+            {
+                try { return ColorTranslator.FromHtml(hex); } catch { }
+            }
+            return Color.FromArgb(37, 99, 235);
+        }
+
+        private void DrawRemoteCollabThumbBadges(D2DGraphics g, int slideIdx, Rectangle frameRect)
+        {
+            if (RemoteCollabPresences == null || RemoteCollabPresences.Count == 0) return;
+            var peersOnSlide = new List<CollabPresenceInfo>();
+            foreach (var p in RemoteCollabPresences)
+            {
+                if (p != null && !p.IsStale && p.SlideIndex == slideIdx)
+                    peersOnSlide.Add(p);
+            }
+            if (peersOnSlide.Count == 0) return;
+
+            using Font initFont = new Font("Segoe UI", 7.2f, FontStyle.Bold);
+            int bx = frameRect.Right - 18;
+            int by = frameRect.Top + 4;
+            for (int k = 0; k < Math.Min(3, peersOnSlide.Count); k++)
+            {
+                var p = peersOnSlide[k];
+                Color col = ParseCollabPeerColor(p.ColorHex);
+                Rectangle dot = new Rectangle(bx - k * 14, by, 16, 16);
+                using (SolidBrush br = new SolidBrush(col))
+                using (Pen border = new Pen(Color.White, 1.4f))
+                {
+                    g.FillEllipse(br, dot);
+                    g.DrawEllipse(border, dot);
+                }
+                string init = string.IsNullOrEmpty(p.Username) ? "?" : p.Username.Substring(0, 1).ToUpperInvariant();
+                using StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(init, initFont, Brushes.White, dot, sf);
+            }
+        }
+
+        private void DrawRemoteCollabCanvasOverlays(D2DGraphics g, int slideX, int slideY, float scale)
+        {
+            if (RemoteCollabPresences == null || RemoteCollabPresences.Count == 0 || ActiveSlide == null) return;
+            using Font tagFont = new Font("Segoe UI", 8.0f, FontStyle.Bold);
+            foreach (var p in RemoteCollabPresences)
+            {
+                if (p == null || p.IsStale || p.SlideIndex != ActiveSlideIndex) continue;
+                Color peerCol = ParseCollabPeerColor(p.ColorHex);
+
+                // 1. Highlight selected shape owned/edited by remote peer
+                if (!string.IsNullOrEmpty(p.SelectedId) && ActiveSlide.Shapes != null)
+                {
+                    ShapeNode target = null;
+                    foreach (var sh in ActiveSlide.Shapes)
+                    {
+                        if (sh != null && sh.Id == p.SelectedId) { target = sh; break; }
+                    }
+                    if (target != null && target.Transform != null)
+                    {
+                        float rx = slideX + target.Transform.X * scale;
+                        float ry = slideY + target.Transform.Y * scale;
+                        float rw = target.Transform.Width * scale;
+                        float rh = target.Transform.Height * scale;
+
+                        GraphicsState st = g.Save();
+                        if (Math.Abs(target.Transform.Rotation) > 0.01f)
+                        {
+                            float cx = rx + rw / 2f;
+                            float cy = ry + rh / 2f;
+                            g.TranslateTransform(cx, cy);
+                            g.RotateTransform(target.Transform.Rotation);
+                            g.TranslateTransform(-cx, -cy);
+                        }
+                        using (Pen pPen = new Pen(peerCol, 2.2f))
+                        {
+                            g.DrawRectangle(pPen, rx - 1f, ry - 1f, rw + 2f, rh + 2f);
+                        }
+                        string lbl = "@" + (p.Username ?? "peer");
+                        SizeF sz = g.MeasureString(lbl, tagFont);
+                        RectangleF pill = new RectangleF(rx - 1f, Math.Max(160f, ry - 20f), sz.Width + 12f, 18f);
+                        using (GraphicsPath gp = CreateRoundedRectPath(pill, 5f))
+                        using (SolidBrush br = new SolidBrush(peerCol))
+                        {
+                            g.FillPath(br, gp);
+                        }
+                        g.DrawString(lbl, tagFont, Brushes.White, pill.X + 6f, pill.Y + 2f);
+                        g.Restore(st);
+                    }
+                }
+
+                // 2. Draw remote canvas pointer cursor + @name pill
+                if (p.CursorX > -300 && p.CursorY > -300)
+                {
+                    float px = slideX + p.CursorX * scale;
+                    float py = slideY + p.CursorY * scale;
+                    PointF[] arrow = new PointF[]
+                    {
+                        new PointF(px, py),
+                        new PointF(px, py + 15f),
+                        new PointF(px + 4.5f, py + 11.5f),
+                        new PointF(px + 10.5f, py + 11.5f)
+                    };
+                    using (SolidBrush br = new SolidBrush(peerCol))
+                    using (Pen wp = new Pen(Color.White, 1.3f))
+                    {
+                        g.FillPolygon(br, arrow);
+                        g.DrawPolygon(wp, arrow);
+                    }
+                    if (string.IsNullOrEmpty(p.SelectedId))
+                    {
+                        string lbl = "@" + (p.Username ?? "peer");
+                        SizeF sz = g.MeasureString(lbl, tagFont);
+                        RectangleF cPill = new RectangleF(px + 11f, py + 10f, sz.Width + 10f, 17f);
+                        using (GraphicsPath gp = CreateRoundedRectPath(cPill, 5f))
+                        using (SolidBrush br = new SolidBrush(peerCol))
+                            g.FillPath(br, gp);
+                        g.DrawString(lbl, tagFont, Brushes.White, cPill.X + 5f, cPill.Y + 1.5f);
+                    }
+                }
+            }
+        }
+
         private void DrawNormalCanvasView(D2DGraphics g, int x, int y, int w, int h)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.Half;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             Color stageBgColor = (ViewMode == ImpressViewMode.ReadingView) ? Color.FromArgb(32, 32, 32) : Color.FromArgb(240, 240, 240);
             using (SolidBrush stageBg = new SolidBrush(stageBgColor))
             {
@@ -9522,6 +9736,10 @@ namespace ZenQOffice.UI
                 }
                 // Render Smart Snap Guides & Equidistant Spacing Indicators
                 DrawSmartGuidesAndSpacingIndicators(g, slideX, slideY, scale);
+                if (IsImageBlenderActive)
+                {
+                    DrawImageBlenderCanvasOverlay(g, slideX, slideY, scale);
+                }
                 // Render Rubberband / Marquee Selection Box (Quét khối chọn đối tượng)
                 if (IsRubberbandSelecting)
                 {
@@ -9540,6 +9758,7 @@ namespace ZenQOffice.UI
                         }
                     }
                 }
+                DrawRemoteCollabCanvasOverlays(g, slideX, slideY, scale);
             }
             int notesPaneH = GetEffectiveNotesPaneHeight();
             int stageH = Math.Max(80, h - notesPaneH);
@@ -9657,7 +9876,7 @@ namespace ZenQOffice.UI
                     Color.FromArgb(30, 41, 59),
                     Color.FromArgb(148, 163, 184),
                     Color.FromArgb(210, 71, 38),
-                    "Nhấp để thêm ghi chú");
+                    AppL10n.T("Nhấp để thêm ghi chú", "Click to add notes"));
             }
             else if (IsHoverNotesSplitter || IsDraggingNotesSplitter)
             {
@@ -9689,7 +9908,7 @@ namespace ZenQOffice.UI
                     Color.FromArgb(241, 245, 249),
                     Color.FromArgb(148, 163, 184),
                     Color.FromArgb(249, 115, 22),
-                    "(Nhấp vào đây để nhập ghi chú cho người thuyết trình...)");
+                    AppL10n.T("(Nhấp vào đây để nhập ghi chú cho người thuyết trình...)", "(Click here to type presenter notes...)"));
             }
             else
             {
@@ -9700,7 +9919,7 @@ namespace ZenQOffice.UI
                     Color.FromArgb(30, 41, 59),
                     Color.FromArgb(148, 163, 184),
                     Color.FromArgb(210, 71, 38),
-                    "(Nhấp vào đây để thêm ghi chú diễn giả...)");
+                    AppL10n.T("(Nhấp vào đây để thêm ghi chú diễn giả...)", "(Click here to add speaker notes...)"));
             }
         }
         public void DrawInteractiveSpeakerNotesContent(D2DGraphics g, Rectangle textAreaRect, float fontSize, Color textColor, Color placeholderColor, Color caretColor, string placeholderText)
@@ -10032,7 +10251,8 @@ namespace ZenQOffice.UI
             long scrollNow=System.Diagnostics.Stopwatch.GetTimestamp();
             double scrollDt=lastCanvasScrollUpdate==0?.016:Math.Clamp((scrollNow-lastCanvasScrollUpdate)/(double)System.Diagnostics.Stopwatch.Frequency,0,.05);
             lastCanvasScrollUpdate=scrollNow;
-            float canvasScrollBlend=(float)(1-Math.Exp(-scrollDt/.030));
+            float canvasScrollBlend = FluentMotion.DampFactor(scrollDt, 0.030);
+            float paneScrollBlend = FluentMotion.DampFactor(scrollDt, 0.024);
             bool animating = false;
             if (IsDraggingSlideThumbnail && PotentialDragSlideIndex >= 0)
             {
@@ -10099,8 +10319,8 @@ namespace ZenQOffice.UI
             }
             else
             {
-                float step = diffThumb * 0.45f;
-                if (Math.Abs(step) < 2.0f) step = Math.Sign(diffThumb) * Math.Min(Math.Abs(diffThumb), 2.0f);
+                float step = diffThumb * paneScrollBlend;
+                if (Math.Abs(step) < 1.2f) step = Math.Sign(diffThumb) * Math.Min(Math.Abs(diffThumb), 1.2f);
                 float nextSmooth = SmoothThumbScrollY + step;
                 if (Math.Abs(TargetThumbScrollY - nextSmooth) <= 1.5f)
                 {
@@ -10223,8 +10443,8 @@ namespace ZenQOffice.UI
             }
             else
             {
-                float step = diffElem * 0.45f;
-                if (Math.Abs(step) < 2.0f) step = Math.Sign(diffElem) * Math.Min(Math.Abs(diffElem), 2.0f);
+                float step = diffElem * paneScrollBlend;
+                if (Math.Abs(step) < 1.2f) step = Math.Sign(diffElem) * Math.Min(Math.Abs(diffElem), 1.2f);
                 float nextSmooth = SmoothElementsScrollY + step;
                 if (Math.Abs(TargetElementsScrollY - nextSmooth) <= 1.5f)
                 {
@@ -10243,8 +10463,37 @@ namespace ZenQOffice.UI
             {
                 animating = true;
             }
+            // 7. Smooth Left Drawer, Bottom Thumbnail Strip & Right Task Pane transitions
+            float paneLayoutBlend = FluentMotion.DampFactor(scrollDt, 0.052);
+            bool hasDrawerTarget = IsElementsDrawerOpen && !IsPresenting && ViewMode != ImpressViewMode.SlideSorter && ViewMode != ImpressViewMode.ReadingView;
+            float targetLeftW = hasDrawerTarget
+                ? (IsElementsDrawerCollapsed ? 0f : 280f)
+                : ((ViewMode == ImpressViewMode.SlideSorter || ViewMode == ImpressViewMode.ReadingView || IsPresenting) ? 0f : 210f);
+            float targetBottomH = (hasDrawerTarget && !IsPresenting) ? 78f : 0f;
+            float targetRightW = (IsSidebarOpen && SidebarPanel != SidebarPanelType.None && !IsPresenting) ? 280f : 0f;
+            float targetDrawerBlend = hasDrawerTarget ? 1f : 0f;
+
+            if (FluentMotion.StepAxis(ref _leftSidebarAnimW, targetLeftW, paneLayoutBlend, 0.4f)) animating = true;
+            if (FluentMotion.StepAxis(ref _bottomThumbAnimH, targetBottomH, paneLayoutBlend, 0.4f)) animating = true;
+            if (FluentMotion.StepAxis(ref _rightSidebarAnimW, targetRightW, paneLayoutBlend, 0.4f)) animating = true;
+            if (FluentMotion.StepAxis(ref _elementsDrawerBlend, targetDrawerBlend, paneLayoutBlend, 0.008f)) animating = true;
+
+            if (_leftSidebarAnimW < 276f)
+            {
+                HideSearchBox();
+                if (catalogSearchBox != null) catalogSearchBox.Visible = false;
+            }
             return animating;
         }
+        private bool _thumbActiveInit = false;
+        private int _thumbActiveLastIdx = -1;
+        private int _thumbActiveLastScrollY = 0;
+        private float _thumbActiveStartY = 0f;
+        private float _thumbActiveCurY = 0f;
+        private float _thumbActiveTargetY = 0f;
+        private double _thumbActiveGlideStartMs = -10000.0;
+        private const double ThumbActiveGlideDurationMs = 140.0;
+
         private void DrawLeftSlidePane(D2DGraphics g, int sidebarW, int y, int h)
         {
             bool isIsland = (AppSettings.Instance.RibbonStyle == RibbonStyle.Island);
@@ -10310,6 +10559,7 @@ namespace ZenQOffice.UI
             GetThumbnailMetrics(paneRect.Width, out thumbX, out thumbW, out thumbH);
             int actualThumbX = paneRect.X + thumbX;
             int thumbY = viewTop + 10 - ThumbScrollY;
+            Rectangle activeTargetFrame = Rectangle.Empty;
             bool currentSectionCollapsed = false;
             using (Font numFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
             using (Font secFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
@@ -10359,6 +10609,10 @@ namespace ZenQOffice.UI
                         }
                     }
                     Rectangle frameRect = new Rectangle(actualThumbX, thumbY, thumbW, thumbH);
+                    if (i == ActiveSlideIndex && EmptyGapInsertAfterSlideIndex == -1)
+                    {
+                        activeTargetFrame = frameRect;
+                    }
                     if (thumbY + thumbH >= viewTop - 10 && thumbY <= viewTop + viewH + 20)
                     {
                         // Slide number badge
@@ -10390,13 +10644,12 @@ namespace ZenQOffice.UI
                                 g.FillRectangle(dragDim, frameRect);
                             }
                         }
-                        // Active PowerPoint Orange Border (drawn ON TOP to frame content cleanly)
-                        bool isActiveBorder = (i == ActiveSlideIndex && EmptyGapInsertAfterSlideIndex == -1);
-                        Color frameCol = isActiveBorder ? Color.FromArgb(210, 71, 38) : Color.FromArgb(220, 220, 220);
-                        using (Pen framePen = new Pen(frameCol, isActiveBorder ? 2.5f : 1.0f))
+                        // Neutral border for cards; active orange selection frame glides smoothly on top
+                        using (Pen framePen = new Pen(Color.FromArgb(220, 220, 220), 1.0f))
                         {
                             g.DrawRectangle(framePen, frameRect);
                         }
+                        DrawRemoteCollabThumbBadges(g, i, frameRect);
                         // Hidden Slide Badge & Dimming
                         if (s.IsHidden)
                         {
@@ -10419,6 +10672,53 @@ namespace ZenQOffice.UI
                         }
                     }
                     thumbY += thumbH + 14;
+                }
+                if (!activeTargetFrame.IsEmpty)
+                {
+                    double ringNow = FluentMotion.NowMs;
+                    int scrollDeltaY = ThumbScrollY - _thumbActiveLastScrollY;
+                    if (scrollDeltaY != 0 && _thumbActiveInit)
+                    {
+                        _thumbActiveStartY -= scrollDeltaY;
+                        _thumbActiveCurY -= scrollDeltaY;
+                        _thumbActiveTargetY -= scrollDeltaY;
+                    }
+                    _thumbActiveLastScrollY = ThumbScrollY;
+
+                    if (!_thumbActiveInit || Math.Abs(activeTargetFrame.Y - _thumbActiveCurY) > 650f)
+                    {
+                        _thumbActiveInit = true;
+                        _thumbActiveLastIdx = ActiveSlideIndex;
+                        _thumbActiveStartY = _thumbActiveCurY = _thumbActiveTargetY = activeTargetFrame.Y;
+                        _thumbActiveGlideStartMs = -10000.0;
+                    }
+                    else if (_thumbActiveLastIdx != ActiveSlideIndex)
+                    {
+                        _thumbActiveLastIdx = ActiveSlideIndex;
+                        _thumbActiveStartY = _thumbActiveCurY;
+                        _thumbActiveTargetY = activeTargetFrame.Y;
+                        _thumbActiveGlideStartMs = ringNow;
+                    }
+                    else
+                    {
+                        _thumbActiveTargetY = activeTargetFrame.Y;
+                    }
+
+                    double ringElapsed = ringNow - _thumbActiveGlideStartMs;
+                    if (ringElapsed >= 0 && ringElapsed < ThumbActiveGlideDurationMs)
+                    {
+                        float e = FluentMotion.EaseOutQuint((float)(ringElapsed / ThumbActiveGlideDurationMs));
+                        _thumbActiveCurY = FluentMotion.Lerp(_thumbActiveStartY, _thumbActiveTargetY, e);
+                    }
+                    else
+                    {
+                        _thumbActiveCurY = _thumbActiveTargetY;
+                    }
+
+                    using (Pen activePen = new Pen(Color.FromArgb(210, 71, 38), 2.5f))
+                    {
+                        g.DrawRectangle(activePen, activeTargetFrame.X, _thumbActiveCurY, activeTargetFrame.Width, activeTargetFrame.Height);
+                    }
                 }
                 if (IsDraggingSlideThumbnail && !IsDraggingBottomSlideThumbnail && DragTargetSlideInsertIndex >= Presentation.Slides.Count)
                 {
@@ -10487,7 +10787,7 @@ namespace ZenQOffice.UI
             using (Font btnFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
             {
                 StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                g.DrawString("➕ Slide Mới", btnFont, Brushes.White, BtnAddSlideBounds, sfCenter);
+                g.DrawString(AppL10n.Tr("➕ Slide Mới"), btnFont, Brushes.White, BtnAddSlideBounds, sfCenter);
             }
             using (GraphicsPath dp = CreateRoundedRectPath(new RectangleF(BtnDupSlideBounds.X, BtnDupSlideBounds.Y, BtnDupSlideBounds.Width, BtnDupSlideBounds.Height), 4f))
             using (SolidBrush dupBg = new SolidBrush(Color.White))
@@ -10501,7 +10801,7 @@ namespace ZenQOffice.UI
                 StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                 using (SolidBrush dupTxt = new SolidBrush(Color.FromArgb(51, 65, 85)))
                 {
-                    g.DrawString("📋 Nhân Bản", btnFont, dupTxt, BtnDupSlideBounds, sfCenter);
+                    g.DrawString(AppL10n.Tr("📋 Nhân Bản"), btnFont, dupTxt, BtnDupSlideBounds, sfCenter);
                 }
             }
             // 3. Fast Vertical Scrollbar (Thanh cuộn nhanh)
@@ -10609,7 +10909,7 @@ namespace ZenQOffice.UI
         }
         private void DrawRightSidebarPanel(D2DGraphics g, int x, int y, int w, int h)
         {
-            if (!IsSidebarOpen) return;
+            if (_rightSidebarAnimW <= 0.5f && !IsSidebarOpen) return;
             // Task pane background
             using (SolidBrush sbBg = new SolidBrush(Color.FromArgb(250, 250, 250)))
             {
@@ -10629,24 +10929,24 @@ namespace ZenQOffice.UI
                 }
             }
             // Microsoft PowerPoint Task Pane Header:
-            string paneTitle = "Khung Hoạt Họa";
-            if (SidebarPanel == SidebarPanelType.Properties) paneTitle = "Định Dạng Hình Dạng";
-            else if (SidebarPanel == SidebarPanelType.SlideTransitions) paneTitle = "Chuyển Tiếp Trang Chiếu";
-            else if (SidebarPanel == SidebarPanelType.Navigator) paneTitle = "Bộ Chọn Đối Tượng";
+            string paneTitle = AppL10n.T("Khung Hoạt Họa", "Animation Pane");
+            if (SidebarPanel == SidebarPanelType.Properties) paneTitle = AppL10n.T("Định Dạng Hình Dạng", "Format Shape");
+            else if (SidebarPanel == SidebarPanelType.SlideTransitions) paneTitle = AppL10n.T("Chuyển Tiếp Trang Chiếu", "Slide Transitions");
+            else if (SidebarPanel == SidebarPanelType.Navigator) paneTitle = AppL10n.T("Bộ Chọn Đối Tượng", "Object Navigator");
             else if (SidebarPanel == SidebarPanelType.FormatBackground) paneTitle = "Format Background";
-            else if (SidebarPanel == SidebarPanelType.SelectionPane) paneTitle = "Lựa chọn (Selection)";
-            else if (SidebarPanel == SidebarPanelType.Designer) paneTitle = "✨ Ý Tưởng Thiết Kế (Designer)";
-            else if (SidebarPanel == SidebarPanelType.GraphicEditor) paneTitle = "Chỉnh sửa";
+            else if (SidebarPanel == SidebarPanelType.SelectionPane) paneTitle = AppL10n.T("Lựa chọn (Selection)", "Selection Pane");
+            else if (SidebarPanel == SidebarPanelType.Designer) paneTitle = AppL10n.T("✨ Ý Tưởng Thiết Kế (Designer)", "✨ Design Ideas");
+            else if (SidebarPanel == SidebarPanelType.GraphicEditor) paneTitle = AppL10n.T("Chỉnh sửa", "Edit Graphic");
             else if (SidebarPanel == SidebarPanelType.ColorPalettePicker)
             {
                 ShapeNode sel = SelectedShape;
                 bool isGraphic = IsRasterOrSvgGraphic(sel);
-                if (ActiveColorPickerTarget == ColorPickerTarget.GraphicColor) paneTitle = isGraphic ? "Màu đồ họa" : "Màu hình dạng";
-                else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill) paneTitle = "Màu hình dạng";
-                else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeStroke) paneTitle = "Màu viền";
-                else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor) paneTitle = "Màu chữ";
-                else if (ActiveColorPickerTarget == ColorPickerTarget.TextStroke) paneTitle = "Màu viền chữ";
-                else paneTitle = "Màu sắc";
+                if (ActiveColorPickerTarget == ColorPickerTarget.GraphicColor) paneTitle = isGraphic ? AppL10n.T("Màu đồ họa", "Graphic Color") : AppL10n.T("Màu hình dạng", "Shape Color");
+                else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeFill) paneTitle = AppL10n.T("Màu hình dạng", "Shape Fill");
+                else if (ActiveColorPickerTarget == ColorPickerTarget.ShapeStroke) paneTitle = AppL10n.T("Màu viền", "Outline Color");
+                else if (ActiveColorPickerTarget == ColorPickerTarget.TextColor) paneTitle = AppL10n.T("Màu chữ", "Text Color");
+                else if (ActiveColorPickerTarget == ColorPickerTarget.TextStroke) paneTitle = AppL10n.T("Màu viền chữ", "Text Outline");
+                else paneTitle = AppL10n.T("Màu sắc", "Colors");
             }
             Rectangle headerRect = new Rectangle(x, y, w, 36);
             using (SolidBrush headerBg = new SolidBrush(Color.FromArgb(243, 243, 243)))
@@ -10740,7 +11040,7 @@ namespace ZenQOffice.UI
             ShapeNode shape = SelectedShape;
             if (shape == null)
             {
-                g.DrawString("Chọn một đối tượng trên slide để đổi màu hoặc gradient.", labelFont, Brushes.Gray, new RectangleF(x + 12, panelY + 10, w - 24, 50));
+                g.DrawString(AppL10n.Tr("Chọn một đối tượng trên slide để đổi màu hoặc gradient."), labelFont, Brushes.Gray, new RectangleF(x + 12, panelY + 10, w - 24, 50));
                 return;
             }
             Color fluentPurple = Color.FromArgb(124, 58, 237);
@@ -10765,8 +11065,8 @@ namespace ZenQOffice.UI
             int subTabW = (w - 24) / 2;
             Rectangle stSolid = new Rectangle(x + 12, curY, subTabW, 26);
             Rectangle stGrad = new Rectangle(x + 12 + subTabW, curY, subTabW, 26);
-            g.DrawString("Màu đồng nhất", GraphicColorSubTab == 0 ? secFont : labelFont, GraphicColorSubTab == 0 ? purpleB : mutedB, stSolid, sfCenter);
-            g.DrawString("Màu gradient", GraphicColorSubTab == 1 ? secFont : labelFont, GraphicColorSubTab == 1 ? purpleB : mutedB, stGrad, sfCenter);
+            g.DrawString(AppL10n.Tr("Màu đồng nhất"), GraphicColorSubTab == 0 ? secFont : labelFont, GraphicColorSubTab == 0 ? purpleB : mutedB, stSolid, sfCenter);
+            g.DrawString(AppL10n.Tr("Màu gradient"), GraphicColorSubTab == 1 ? secFont : labelFont, GraphicColorSubTab == 1 ? purpleB : mutedB, stGrad, sfCenter);
             using (Pen baseLine = new Pen(borderGray, 1.5f))
                 g.DrawLine(baseLine, x + 12, curY + 26, x + w - 12, curY + 26);
             using (Pen actLine = new Pen(fluentPurple, 2.5f))
@@ -10874,7 +11174,7 @@ namespace ZenQOffice.UI
             curY += 34;
             if (GraphicColorSubTab == 1)
             {
-                g.DrawString("Màu chuyển sắc (Kéo điểm màu để chỉnh vị trí)", secFont, darkB, x + 12, curY);
+                g.DrawString(AppL10n.Tr("Màu chuyển sắc (Kéo điểm màu để chỉnh vị trí)"), secFont, darkB, x + 12, curY);
                 curY += 20;
                 List<int> stops = GetActiveGradientStops(shape);
                 List<float> positions = GetActiveGradientPositions(shape, stops.Count);
@@ -10966,7 +11266,7 @@ namespace ZenQOffice.UI
                     }
                 }
                 curY += stopSize + 14;
-                g.DrawString("Kiểu dáng", secFont, darkB, x + 12, curY);
+                g.DrawString(AppL10n.Tr("Kiểu dáng"), secFont, darkB, x + 12, curY);
                 curY += 20;
                 string[] gStyles = new string[] { "Linear90", "Linear180", "Linear135", "Radial", "RadialCorner", "Conic" };
                 int gsCols = 6;
@@ -10994,7 +11294,7 @@ namespace ZenQOffice.UI
                     }
                 }
                 curY += gsH + 14;
-                g.DrawString("Màu gradient mặc định", secFont, darkB, x + 12, curY);
+                g.DrawString(AppL10n.Tr("Màu gradient mặc định"), secFont, darkB, x + 12, curY);
                 curY += 20;
                 int gpCols = 6;
                 int gpGap = 8;
@@ -11034,7 +11334,7 @@ namespace ZenQOffice.UI
                 bool isGraphic = IsRasterOrSvgGraphic(shape);
                 if (detectedColors.Count > 0)
                 {
-                    string secTitle = isGraphic ? "🎨 Màu trong đồ họa" : "🎨 Màu trong hình";
+                    string secTitle = isGraphic ? AppL10n.T("🎨 Màu trong đồ họa", "🎨 Graphic Colors") : AppL10n.T("🎨 Màu trong hình", "🎨 Picture Colors");
                     g.DrawString(secTitle, secFont, darkB, x + 12, curY);
                     Rectangle resetBtn = new Rectangle(x + w - 66, curY - 2, 54, 20);
                     using (GraphicsPath rp = CreateRoundedRectPath(resetBtn, 4))
@@ -11043,7 +11343,7 @@ namespace ZenQOffice.UI
                     {
                         g.FillPath(rBg, rp);
                         g.DrawPath(rPen, rp);
-                        g.DrawString("Đặt lại", subFont, mutedB, resetBtn, sfCenter);
+                        g.DrawString(AppL10n.Tr("Đặt lại"), subFont, mutedB, resetBtn, sfCenter);
                     }
                     curY += 22;
                     int swSize = 28;
@@ -11060,7 +11360,7 @@ namespace ZenQOffice.UI
                     }
                     curY += 36;
                 }
-                g.DrawString("Màu đồng nhất mặc định", secFont, darkB, x + 12, curY);
+                g.DrawString(AppL10n.Tr("Màu đồng nhất mặc định"), secFont, darkB, x + 12, curY);
                 curY += 20;
                 int scCols = 6;
                 int scGap = 8;
@@ -11084,7 +11384,7 @@ namespace ZenQOffice.UI
             ShapeNode shape = SelectedShape;
             if (shape == null)
             {
-                g.DrawString("Chọn một đồ họa hoặc hình ảnh trên slide để chỉnh sửa.", labelFont, Brushes.Gray, new RectangleF(x + 12, panelY + 10, w - 24, 50));
+                g.DrawString(AppL10n.Tr("Chọn một đồ họa hoặc hình ảnh trên slide để chỉnh sửa."), labelFont, Brushes.Gray, new RectangleF(x + 12, panelY + 10, w - 24, 50));
                 return;
             }
             Color fluentPurple = Color.FromArgb(124, 58, 237);
@@ -11105,7 +11405,7 @@ namespace ZenQOffice.UI
                     return;
                 }
                 // ==================== 1. MÀU TRONG ĐỒ HỌA (Detected Colors) ====================
-                g.DrawString("Khớp định dạng", secFont, darkB, x + 12, curY);
+                g.DrawString(AppL10n.Tr("Khớp định dạng"), secFont, darkB, x + 12, curY);
                 Rectangle resetBtn = new Rectangle(x + w - 66, curY - 2, 54, 20);
                 using (GraphicsPath rp = CreateRoundedRectPath(resetBtn, 4))
                 using (SolidBrush rBg = new SolidBrush(Color.FromArgb(241, 245, 249)))
@@ -11113,7 +11413,7 @@ namespace ZenQOffice.UI
                 {
                     g.FillPath(rBg, rp);
                     g.DrawPath(rPen, rp);
-                    g.DrawString("Đặt lại", subFont, mutedB, resetBtn, sfCenter);
+                    g.DrawString(AppL10n.Tr("Đặt lại"), subFont, mutedB, resetBtn, sfCenter);
                 }
                 curY += 24;
                 var detectedColors = SvgRasterizer.GetDetectedColorsForShape(shape, 6);
@@ -11150,7 +11450,7 @@ namespace ZenQOffice.UI
                 curY += swatchSize + 16;
                 }
                 // ==================== 2. KHỚP ĐỊNH DẠNG (Graphic Style Match) ====================
-                g.DrawString("Khớp định dạng", secFont, darkB, x + 12, curY);
+                g.DrawString(AppL10n.Tr("Khớp định dạng"), secFont, darkB, x + 12, curY);
                 curY += 22;
                 string[] styleIds = new string[] { "None", "Sticker", "Engraving", "Sketch" };
                 string[] styleNames = new string[] { "Không có", "Sổ dán", "Khắc", "Nghệ thuật" };
@@ -11212,11 +11512,11 @@ namespace ZenQOffice.UI
                         using (Pen op = new Pen(Color.FromArgb(49, 46, 129), 1.5f))
                             g.DrawEllipse(op, icX - 11, icY - 11, 22, 22);
                     }
-                    g.DrawString(styleNames[i], subFont, isSel ? purpleB : darkB, new RectangleF(cardRect.X - 4, cardRect.Bottom + 3, cardRect.Width + 8, 16), sfCenter);
+                    g.DrawString(AppL10n.Tr(styleNames[i]), subFont, isSel ? purpleB : darkB, new RectangleF(cardRect.X - 4, cardRect.Bottom + 3, cardRect.Width + 8, 16), sfCenter);
                 }
                 curY += smCardH + 26;
                 // ==================== 3. BỘ LỌC (Graphic Filters) ====================
-                g.DrawString("Bộ lọc", secFont, darkB, x + 12, curY);
+                g.DrawString(AppL10n.Tr("Bộ lọc"), secFont, darkB, x + 12, curY);
                 curY += 22;
                 string[] filterIds = new string[] { "None", "Soft", "Vintage", "Mono", "Vivid", "Cool" };
                 string[] filterNames = new string[] { "Không có", "Dịu nhẹ", "Vintage", "Mono", "Nổi bật", "Lạnh" };
@@ -11280,15 +11580,15 @@ namespace ZenQOffice.UI
                             g.DrawPath(fPen, fp);
                         }
                     }
-                    g.DrawString(filterNames[i], subFont, isSel ? purpleB : darkB, new RectangleF(fRect.X - 4, fRect.Bottom + 3, fRect.Width + 8, 16), sfCenter);
+                    g.DrawString(AppL10n.Tr(filterNames[i]), subFont, isSel ? purpleB : darkB, new RectangleF(fRect.X - 4, fRect.Bottom + 3, fRect.Width + 8, 16), sfCenter);
                 }
                 curY += 2 * (fCardH + 22) + 8;
                 // ==================== 4. ĐỘ TRONG SUỐT & BO GÓC (Transparency & Rounding) ====================
-                g.DrawString("Độ trong suốt & Bo góc", secFont, darkB, x + 12, curY);
+                g.DrawString(AppL10n.Tr("Độ trong suốt & Bo góc"), secFont, darkB, x + 12, curY);
                 curY += 22;
                 // Opacity Row
                 int opPct = (int)Math.Round(Math.Max(0f, Math.Min(1f, shape.FillOpacity)) * 100f);
-                g.DrawString("Độ hiển thị:", labelFont, darkB, x + 12, curY + 2);
+                g.DrawString(AppL10n.Tr("Độ hiển thị:"), labelFont, darkB, x + 12, curY + 2);
                 int sliderX = x + 90;
                 int sliderW = w - 148;
                 Rectangle trackRect = new Rectangle(sliderX, curY + 8, sliderW, 6);
@@ -11307,7 +11607,7 @@ namespace ZenQOffice.UI
                 g.DrawString(opPct + "%", boldFont, darkB, x + w - 50, curY + 2);
                 curY += 28;
                 // Corner Rounding Pills (0px, 8px, 16px, 32px, Tròn)
-                g.DrawString("Bo góc:", labelFont, darkB, x + 12, curY + 4);
+                g.DrawString(AppL10n.Tr("Bo góc:"), labelFont, darkB, x + 12, curY + 4);
                 float[] radii = new float[] { 0f, 8f, 16f, 32f, 200f };
                 string[] rLabels = new string[] { "0", "8", "16", "32", "Tròn" };
                 int rBtnX = x + 70;
@@ -11323,7 +11623,7 @@ namespace ZenQOffice.UI
                     {
                         g.FillPath(rBg, rp);
                         g.DrawPath(rPen, rp);
-                        g.DrawString(rLabels[i], subFont, rSel ? purpleB : darkB, rb, sfCenter);
+                        g.DrawString(AppL10n.Tr(rLabels[i]), subFont, rSel ? purpleB : darkB, rb, sfCenter);
                     }
                 }
                 curY += 34;
@@ -11335,7 +11635,7 @@ namespace ZenQOffice.UI
                 {
                     g.FillPath(cBg, cp);
                     g.DrawPath(cPen, cp);
-                    g.DrawString("✨ Rã đồ họa thành các Hình khối Vector", boldFont, darkB, convBtn, sfCenter);
+                    g.DrawString(AppL10n.Tr("✨ Rã đồ họa thành các Hình khối Vector"), boldFont, darkB, convBtn, sfCenter);
                 }
             }
         }
@@ -11346,7 +11646,7 @@ namespace ZenQOffice.UI
             using (SolidBrush subBrush = new SolidBrush(Color.FromArgb(100, 116, 139)))
             using (Font subFont = new Font("Segoe UI", 8.0f, FontStyle.Regular))
             {
-                g.DrawString("Chọn một bố cục để áp dụng ngay vào slide:", subFont, subBrush, x + 12, panelY);
+                g.DrawString(AppL10n.Tr("Chọn một bố cục để áp dụng ngay vào slide:"), subFont, subBrush, x + 12, panelY);
             }
             int cardStartY = panelY + 22;
             int cardW = w - 24;
@@ -11399,9 +11699,9 @@ namespace ZenQOffice.UI
             Rectangle btnMoveUp = new Rectangle(x + w - 58, panelY, 22, 25);
             Rectangle btnMoveDown = new Rectangle(x + w - 32, panelY, 22, 25);
             DrawInteractiveButton(g, btnShowAll, false, 3);
-            g.DrawString("Hiện tất cả", labelFont, Brushes.Black, btnShowAll.X + 10, btnShowAll.Y + 5);
+            g.DrawString(AppL10n.Tr("Hiện tất cả"), labelFont, Brushes.Black, btnShowAll.X + 10, btnShowAll.Y + 5);
             DrawInteractiveButton(g, btnHideAll, false, 3);
-            g.DrawString("Ẩn tất cả", labelFont, Brushes.Black, btnHideAll.X + 12, btnHideAll.Y + 5);
+            g.DrawString(AppL10n.Tr("Ẩn tất cả"), labelFont, Brushes.Black, btnHideAll.X + 12, btnHideAll.Y + 5);
             DrawInteractiveButton(g, btnMoveUp, false, 3);
             g.DrawString("▲", labelFont, Brushes.DimGray, btnMoveUp.X + 4, btnMoveUp.Y + 5);
             DrawInteractiveButton(g, btnMoveDown, false, 3);
@@ -11474,15 +11774,15 @@ namespace ZenQOffice.UI
             Rectangle btnPlay = new Rectangle(x + 10, panelY, w - 20, 26);
             g.FillRectangle(IsPlayingAnimationPreview ? Brushes.MistyRose : Brushes.AliceBlue, btnPlay);
             g.DrawRectangle(IsPlayingAnimationPreview ? Pens.Crimson : Pens.DodgerBlue, btnPlay);
-            g.DrawString(IsPlayingAnimationPreview ? "⏹ Dừng phát xem trước" : "▶ Phát tất cả (Play All)", boldFont, IsPlayingAnimationPreview ? Brushes.Crimson : Brushes.Navy, btnPlay.X + 24, btnPlay.Y + 5);
+            g.DrawString(AppL10n.Tr(IsPlayingAnimationPreview ? "⏹ Dừng phát xem trước" : "▶ Phát tất cả (Play All)"), boldFont, IsPlayingAnimationPreview ? Brushes.Crimson : Brushes.Navy, btnPlay.X + 24, btnPlay.Y + 5);
             panelY += 34;
             _animationPaneListOriginY = panelY;
             SlideNode slide = ActiveSlide;
             if (slide == null || slide.Animations.Count == 0)
             {
-                g.DrawString("Chưa có hiệu ứng hoạt họa trên slide này.", labelFont, Brushes.Gray, x + 12, panelY);
+                g.DrawString(AppL10n.Tr("Chưa có hiệu ứng hoạt họa trên slide này."), labelFont, Brushes.Gray, x + 12, panelY);
                 panelY += 20;
-                g.DrawString("Chọn một hình trên slide và bấm hiệu ứng trong Tab Hoạt họa (Animations).", labelFont, Brushes.DimGray, new RectangleF(x + 12, panelY, w - 24, 60));
+                g.DrawString(AppL10n.Tr("Chọn một hình trên slide và bấm hiệu ứng trong Tab Hoạt họa (Animations)."), labelFont, Brushes.DimGray, new RectangleF(x + 12, panelY, w - 24, 60));
                 return;
             }
             GetAnimationTimeline(slide, out var starts, out var durations, out var steps);
@@ -11576,8 +11876,8 @@ namespace ZenQOffice.UI
                 string triggerText = isShapeTriggered ? "Bấm vào đối tượng" : anim.Trigger == AnimationTrigger.OnClick ? "Khi bấm chuột" : anim.Trigger == AnimationTrigger.WithPrevious ? "Cùng hiệu ứng trước" : "Sau hiệu ứng trước";
                 using (var detailFont = new Font("Segoe UI", 7.5f))
                 {
-                    g.DrawString(triggerText, detailFont, Brushes.DimGray, animBox.X + 44, animBox.Y + 23);
-                    g.DrawString($"{anim.Duration:0.##}s · Trễ {anim.Delay:0.##}s", detailFont, Brushes.DimGray, animBox.X + 44, animBox.Y + 36);
+                    g.DrawString(AppL10n.Tr(triggerText), detailFont, Brushes.DimGray, animBox.X + 44, animBox.Y + 23);
+                    g.DrawString(AppL10n.T($"{anim.Duration:0.##}s · Trễ {anim.Delay:0.##}s", $"{anim.Duration:0.##}s · Delay {anim.Delay:0.##}s"), detailFont, Brushes.DimGray, animBox.X + 44, animBox.Y + 36);
                 }
                 float maxTime = Math.Max(.001f, GetCurrentStepMaxDuration(slide, Math.Max(0,steps[i])));
                 float trackWidth = Math.Max(20, animBox.Width - 58);
@@ -11593,12 +11893,12 @@ namespace ZenQOffice.UI
             Rectangle btnDown = new Rectangle(x + 85, panelY, 70, 24);
             Rectangle btnDel = new Rectangle(x + 160, panelY, w - 170, 24);
             DrawInteractiveButton(g, btnUp, false, 3);
-            g.DrawString("▲ Sớm hơn", labelFont, Brushes.Black, btnUp.X + 4, btnUp.Y + 4);
+            g.DrawString(AppL10n.Tr("▲ Sớm hơn"), labelFont, Brushes.Black, btnUp.X + 4, btnUp.Y + 4);
             DrawInteractiveButton(g, btnDown, false, 3);
-            g.DrawString("▼ Muộn hơn", labelFont, Brushes.Black, btnDown.X + 3, btnDown.Y + 4);
+            g.DrawString(AppL10n.Tr("▼ Muộn hơn"), labelFont, Brushes.Black, btnDown.X + 3, btnDown.Y + 4);
             DrawInteractiveButton(g, btnDel, false, 3);
             FluentIconRenderer.DrawGlyph(g, '\uE74D', new RectangleF(btnDel.X+7,btnDel.Y+4,14,14),Color.Crimson,11f);
-            g.DrawString("Xóa", labelFont, Brushes.Crimson, btnDel.X + 26, btnDel.Y + 4);
+            g.DrawString(AppL10n.Tr("Xóa"), labelFont, Brushes.Crimson, btnDel.X + 26, btnDel.Y + 4);
         }
         public void ShowAnimationItemContextMenu(Control parentControl, Point screenPos, int animIndex)
         {
@@ -11608,15 +11908,15 @@ namespace ZenQOffice.UI
             ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
             menu.Font = new Font("Segoe UI", 9.0f);
             // 1. Triggers
-            ToolStripMenuItem miClick = new ToolStripMenuItem("🖱️ Bắt đầu khi nhấp chuột (Start On Click)", null, (s, e) => {
+            ToolStripMenuItem miClick = new ToolStripMenuItem(AppL10n.T("🖱️ Bắt đầu khi nhấp chuột (Start On Click)", "🖱️ Start On Click"), null, (s, e) => {
                 anim.Trigger = AnimationTrigger.OnClick;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = (anim.Trigger == AnimationTrigger.OnClick) };
-            ToolStripMenuItem miWith = new ToolStripMenuItem("⏱️ Bắt đầu cùng với trước đó (Start With Previous)", null, (s, e) => {
+            ToolStripMenuItem miWith = new ToolStripMenuItem(AppL10n.T("⏱️ Bắt đầu cùng với trước đó (Start With Previous)", "⏱️ Start With Previous"), null, (s, e) => {
                 anim.Trigger = AnimationTrigger.WithPrevious;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = (anim.Trigger == AnimationTrigger.WithPrevious) };
-            ToolStripMenuItem miAfter = new ToolStripMenuItem("⏳ Bắt đầu sau trước đó (Start After Previous)", null, (s, e) => {
+            ToolStripMenuItem miAfter = new ToolStripMenuItem(AppL10n.T("⏳ Bắt đầu sau trước đó (Start After Previous)", "⏳ Start After Previous"), null, (s, e) => {
                 anim.Trigger = AnimationTrigger.AfterPrevious;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = (anim.Trigger == AnimationTrigger.AfterPrevious) };
@@ -11624,8 +11924,8 @@ namespace ZenQOffice.UI
             menu.Items.Add(miWith);
             menu.Items.Add(miAfter);
             // 1b. Trigger On Click Of Specific Shape (Kích hoạt khi nhấp vào vật thể)
-            ToolStripMenuItem miTrigShape = new ToolStripMenuItem("⚡ Kích hoạt khi nhấp vào (Trigger On Click of) ▸");
-            ToolStripMenuItem miNoTrigShape = new ToolStripMenuItem("Không dùng Trigger riêng (Theo trình tự Slide)", null, (s, e) => {
+            ToolStripMenuItem miTrigShape = new ToolStripMenuItem(AppL10n.T("⚡ Kích hoạt khi nhấp vào (Trigger On Click of) ▸", "⚡ Trigger On Click of ▸"));
+            ToolStripMenuItem miNoTrigShape = new ToolStripMenuItem(AppL10n.T("Không dùng Trigger riêng (Theo trình tự Slide)", "No Trigger (Play in Sequence)"), null, (s, e) => {
                 anim.TriggerShapeId = "";
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = string.IsNullOrEmpty(anim.TriggerShapeId) };
@@ -11649,12 +11949,12 @@ namespace ZenQOffice.UI
             menu.Items.Add(miTrigShape);
             menu.Items.Add(new ToolStripSeparator());
             // 2. Duration Presets
-            ToolStripMenuItem miDur = new ToolStripMenuItem("⏱️ Thời lượng (Duration)");
+            ToolStripMenuItem miDur = new ToolStripMenuItem(AppL10n.T("⏱️ Thời lượng (Duration)", "⏱️ Duration"));
             float[] durPresets = new float[] { 0.25f, 0.50f, 0.75f, 1.00f, 1.50f, 2.00f, 3.00f, 5.00f };
             foreach (float d in durPresets)
             {
                 float targetD = d;
-                ToolStripMenuItem dItem = new ToolStripMenuItem(string.Format("{0:0.00} giây", targetD), null, (s, e) => {
+                ToolStripMenuItem dItem = new ToolStripMenuItem(string.Format(AppL10n.T("{0:0.00} giây", "{0:0.00} sec"), targetD), null, (s, e) => {
                     anim.Duration = targetD;
                     if (parentControl != null) parentControl.Invalidate();
                 }) { Checked = Math.Abs(anim.Duration - targetD) < 0.05f };
@@ -11662,12 +11962,12 @@ namespace ZenQOffice.UI
             }
             menu.Items.Add(miDur);
             // 3. Delay Presets
-            ToolStripMenuItem miDel = new ToolStripMenuItem("⏳ Độ trễ (Delay)");
+            ToolStripMenuItem miDel = new ToolStripMenuItem(AppL10n.T("⏳ Độ trễ (Delay)", "⏳ Delay"));
             float[] delPresets = new float[] { 0.00f, 0.25f, 0.50f, 0.75f, 1.00f, 1.50f, 2.00f };
             foreach (float del in delPresets)
             {
                 float targetDel = del;
-                ToolStripMenuItem delItem = new ToolStripMenuItem(string.Format("{0:0.00} giây", targetDel), null, (s, e) => {
+                ToolStripMenuItem delItem = new ToolStripMenuItem(string.Format(AppL10n.T("{0:0.00} giây", "{0:0.00} sec"), targetDel), null, (s, e) => {
                     anim.Delay = targetDel;
                     if (parentControl != null) parentControl.Invalidate();
                 }) { Checked = Math.Abs(anim.Delay - targetDel) < 0.05f };
@@ -11676,15 +11976,15 @@ namespace ZenQOffice.UI
             menu.Items.Add(miDel);
             menu.Items.Add(new ToolStripSeparator());
             // 4. Move earlier / later
-            ToolStripMenuItem miUp = new ToolStripMenuItem("▲ Di chuyển sớm hơn (Move Earlier)", null, (s, e) => {
+            ToolStripMenuItem miUp = new ToolStripMenuItem(AppL10n.T("▲ Di chuyển sớm hơn (Move Earlier)", "▲ Move Earlier"), null, (s, e) => {
                 MoveAnimationEarlier(animIndex);
                 if (parentControl != null) parentControl.Invalidate();
             }) { Enabled = (animIndex > 0) };
-            ToolStripMenuItem miDown = new ToolStripMenuItem("▼ Di chuyển muộn hơn (Move Later)", null, (s, e) => {
+            ToolStripMenuItem miDown = new ToolStripMenuItem(AppL10n.T("▼ Di chuyển muộn hơn (Move Later)", "▼ Move Later"), null, (s, e) => {
                 MoveAnimationLater(animIndex);
                 if (parentControl != null) parentControl.Invalidate();
             }) { Enabled = (animIndex < slide.Animations.Count - 1) };
-            ToolStripMenuItem miRemove = new ToolStripMenuItem("🗑 Xóa hoạt họa này (Remove)", null, (s, e) => {
+            ToolStripMenuItem miRemove = new ToolStripMenuItem(AppL10n.T("🗑 Xóa hoạt họa này (Remove)", "🗑 Remove Animation"), null, (s, e) => {
                 RemoveAnimation(animIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -11695,12 +11995,12 @@ namespace ZenQOffice.UI
         }
         private void DrawTransitionsPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
-            g.DrawString("✨ HIỆU ỨNG CHUYỂN TRANG", titleFont, Brushes.DarkOrange, x + 10, panelY);
+            g.DrawString(AppL10n.Tr("✨ HIỆU ỨNG CHUYỂN TRANG"), titleFont, Brushes.DarkOrange, x + 10, panelY);
             panelY += 26;
             Rectangle btnPreview = new Rectangle(x + 10, panelY, w - 20, 26);
             g.FillRectangle(Brushes.AliceBlue, btnPreview);
             g.DrawRectangle(Pens.DodgerBlue, btnPreview);
-            g.DrawString("⭐ Xem trước hiệu ứng", boldFont, Brushes.Navy, btnPreview.X + 16, btnPreview.Y + 5);
+            g.DrawString(AppL10n.Tr("⭐ Xem trước hiệu ứng"), boldFont, Brushes.Navy, btnPreview.X + 16, btnPreview.Y + 5);
             panelY += 34;
             string[] topTransitions = new string[] {
                 "Morph (Biến hình) ⭐",
@@ -11727,9 +12027,9 @@ namespace ZenQOffice.UI
         }
         private void DrawFormatPropertiesPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
-            g.DrawString("🎨 ĐỊNH DẠNG NỀN & HÌNH VẼ", titleFont, Brushes.DarkOrange, x + 10, panelY);
+            g.DrawString(AppL10n.Tr("🎨 ĐỊNH DẠNG NỀN & HÌNH VẼ"), titleFont, Brushes.DarkOrange, x + 10, panelY);
             panelY += 26;
-            g.DrawString("Màu nền Slide hiện tại:", labelFont, Brushes.Black, x + 12, panelY);
+            g.DrawString(AppL10n.Tr("Màu nền Slide hiện tại:"), labelFont, Brushes.Black, x + 12, panelY);
             panelY += 20;
             int[] bgColors = new int[] { 0xFFFFFF, 0xF8F9FA, 0xF0FDFA, 0x0F172A, 0xFEFCE8, 0xFDF4FF };
             for (int c = 0; c < bgColors.Length; c++)
@@ -11743,40 +12043,40 @@ namespace ZenQOffice.UI
                 g.DrawRectangle(Pens.Gray, cBox);
             }
             panelY += 34;
-            g.DrawString("Tỷ lệ khung hình Slide:", labelFont, Brushes.Black, x + 12, panelY);
+            g.DrawString(AppL10n.Tr("Tỷ lệ khung hình Slide:"), labelFont, Brushes.Black, x + 12, panelY);
             panelY += 20;
             Rectangle btn169 = new Rectangle(x + 12, panelY, 115, 24);
             Rectangle btn43 = new Rectangle(x + 135, panelY, 115, 24);
             g.FillRectangle(Presentation.IsWidescreen ? Brushes.Moccasin : Brushes.White, btn169);
             g.DrawRectangle(Presentation.IsWidescreen ? Pens.OrangeRed : Pens.LightGray, btn169);
-            g.DrawString("16:9 Màn rộng", labelFont, Brushes.Black, btn169.X + 12, btn169.Y + 4);
+            g.DrawString(AppL10n.Tr("16:9 Màn rộng"), labelFont, Brushes.Black, btn169.X + 12, btn169.Y + 4);
             g.FillRectangle(!Presentation.IsWidescreen ? Brushes.Moccasin : Brushes.White, btn43);
             g.DrawRectangle(!Presentation.IsWidescreen ? Pens.OrangeRed : Pens.LightGray, btn43);
-            g.DrawString("4:3 Tiêu chuẩn", labelFont, Brushes.Black, btn43.X + 12, btn43.Y + 4);
+            g.DrawString(AppL10n.Tr("4:3 Tiêu chuẩn"), labelFont, Brushes.Black, btn43.X + 12, btn43.Y + 4);
             panelY += 34;
             g.DrawLine(Pens.LightGray, x + 10, panelY, x + w - 10, panelY);
             panelY += 12;
             ShapeNode shape = SelectedShape;
             if (shape != null)
             {
-                g.DrawString("ĐỐI TƯỢNG ĐANG CHỌN:", boldFont, Brushes.Navy, x + 12, panelY);
+                g.DrawString(AppL10n.Tr("ĐỐI TƯỢNG ĐANG CHỌN:"), boldFont, Brushes.Navy, x + 12, panelY);
                 panelY += 22;
-                g.DrawString("Loại: " + shape.Type.ToString(), labelFont, Brushes.DimGray, x + 12, panelY);
+                g.DrawString(AppL10n.T("Loại: ", "Type: ") + shape.Type.ToString(), labelFont, Brushes.DimGray, x + 12, panelY);
                 panelY += 18;
-                g.DrawString("Tên Morph: " + (string.IsNullOrEmpty(shape.MorphName) ? "(Tự động)" : shape.MorphName), labelFont, Brushes.DimGray, x + 12, panelY);
+                g.DrawString(AppL10n.T("Tên Morph: ", "Morph Name: ") + (string.IsNullOrEmpty(shape.MorphName) ? AppL10n.T("(Tự động)", "(Auto)") : shape.MorphName), labelFont, Brushes.DimGray, x + 12, panelY);
                 panelY += 18;
-                g.DrawString("Màu tô: #" + (shape.FillColor & 0xFFFFFF).ToString("X6"), labelFont, Brushes.Black, x + 12, panelY);
+                g.DrawString(AppL10n.T("Màu tô: #", "Fill: #") + (shape.FillColor & 0xFFFFFF).ToString("X6"), labelFont, Brushes.Black, x + 12, panelY);
                 panelY += 18;
-                g.DrawString("Phông chữ: " + shape.FontName + " (" + (int)shape.FontSize + "pt)", labelFont, Brushes.Black, x + 12, panelY);
+                g.DrawString(AppL10n.T("Phông chữ: ", "Font: ") + shape.FontName + " (" + (int)shape.FontSize + "pt)", labelFont, Brushes.Black, x + 12, panelY);
             }
             else
             {
-                g.DrawString("(Nhấp chọn hình để chỉnh sửa)", labelFont, Brushes.Gray, x + 12, panelY);
+                g.DrawString(AppL10n.Tr("(Nhấp chọn hình để chỉnh sửa)"), labelFont, Brushes.Gray, x + 12, panelY);
             }
         }
         private void DrawNavigatorPaneContent(D2DGraphics g, int x, int panelY, int w, int h, Font titleFont, Font labelFont, Font boldFont)
         {
-            g.DrawString("🌳 CÂY ĐỐI TƯỢNG SLIDE", titleFont, Brushes.DarkOrange, x + 10, panelY);
+            g.DrawString(AppL10n.Tr("🌳 CÂY ĐỐI TƯỢNG SLIDE"), titleFont, Brushes.DarkOrange, x + 10, panelY);
             panelY += 26;
             SlideNode slide = ActiveSlide;
             if (slide != null)
@@ -11819,7 +12119,7 @@ namespace ZenQOffice.UI
             }
             using (Font secFont = new Font("Segoe UI", 9f, FontStyle.Bold))
             {
-                g.DrawString("▲  Fill (Tô nền)", secFont, Brushes.Black, fillHeader.X + 6, fillHeader.Y + 2);
+                g.DrawString(AppL10n.Tr("▲  Fill (Tô nền)"), secFont, Brushes.Black, fillHeader.X + 6, fillHeader.Y + 2);
             }
             int curY = fillHeaderY + 28;
             // 4 Radio Buttons (Matching PowerPoint 365)
@@ -11854,7 +12154,7 @@ namespace ZenQOffice.UI
                 g.DrawString("▾", labelFont, Brushes.Gray, presetBtn.X + 48, presetBtn.Y + 4);
                 curY += 30;
                 // 2. Type (Linear, Radial, Rectangular, Path)
-                g.DrawString("Type (Loại):", labelFont, Brushes.Black, x + 24, curY + 4);
+                g.DrawString(AppL10n.Tr("Type (Loại):"), labelFont, Brushes.Black, x + 24, curY + 4);
                 Rectangle typeBox = new Rectangle(x + 115, curY, w - 135, 24);
                 DrawInteractiveButton(g, typeBox, false, 3);
                 string typeName = (slide.BgGradientType == GradientType.Radial) ? "Radial (Tỏa tròn)" :
@@ -11864,7 +12164,7 @@ namespace ZenQOffice.UI
                 g.DrawString("▾", labelFont, Brushes.Gray, typeBox.Right - 16, typeBox.Y + 4);
                 curY += 30;
                 // 3. Direction
-                g.DrawString("Direction (Hướng):", labelFont, Brushes.Black, x + 24, curY + 4);
+                g.DrawString(AppL10n.Tr("Direction (Hướng):"), labelFont, Brushes.Black, x + 24, curY + 4);
                 Rectangle dirBtn = new Rectangle(x + w - 85, curY, 65, 24);
                 DrawInteractiveButton(g, dirBtn, false, 3);
                 using (LinearGradientBrush dirLgb = new LinearGradientBrush(new Rectangle(dirBtn.X + 4, dirBtn.Y + 4, 38, 14), Color.FromArgb(240, 240, 240), Color.FromArgb(80, 80, 80), slide.BgGradientAngle))
@@ -11875,7 +12175,7 @@ namespace ZenQOffice.UI
                 g.DrawString("▾", labelFont, Brushes.Gray, dirBtn.X + 48, dirBtn.Y + 4);
                 curY += 30;
                 // 4. Angle
-                g.DrawString("Angle (Góc):", labelFont, Brushes.Black, x + 24, curY + 4);
+                g.DrawString(AppL10n.Tr("Angle (Góc):"), labelFont, Brushes.Black, x + 24, curY + 4);
                 Rectangle angleBox = new Rectangle(x + w - 85, curY, 65, 24);
                 DrawInteractiveButton(g, angleBox, false, 3);
                 g.DrawString(string.Format("{0:0}°", slide.BgGradientAngle), labelFont, Brushes.Black, angleBox.X + 6, angleBox.Y + 4);
@@ -11952,7 +12252,7 @@ namespace ZenQOffice.UI
                     ? slide.BgGradientStops[slide.SelectedGradientStopIndex]
                     : null;
                 // Color (Màu)
-                g.DrawString("Color (Màu):", labelFont, Brushes.Black, x + 24, curY + 4);
+                g.DrawString(AppL10n.Tr("Color (Màu):"), labelFont, Brushes.Black, x + 24, curY + 4);
                 Rectangle stopColBtn = new Rectangle(x + w - 85, curY, 65, 24);
                 DrawInteractiveButton(g, stopColBtn, false, 3);
                 Color activeStopCol = (activeStop != null) ? Color.FromArgb((activeStop.Color >> 16) & 0xFF, (activeStop.Color >> 8) & 0xFF, activeStop.Color & 0xFF) : Color.White;
@@ -11965,7 +12265,7 @@ namespace ZenQOffice.UI
                 g.DrawString("▾", labelFont, Brushes.Gray, stopColBtn.X + 48, stopColBtn.Y + 4);
                 curY += 28;
                 // Position (Vị trí)
-                g.DrawString("Position (Vị trí):", labelFont, Brushes.Black, x + 24, curY + 4);
+                g.DrawString(AppL10n.Tr("Position (Vị trí):"), labelFont, Brushes.Black, x + 24, curY + 4);
                 int posTrackX = x + 115;
                 int posTrackW = 65;
                 int posTrackY = curY + 10;
@@ -12005,7 +12305,7 @@ namespace ZenQOffice.UI
                 g.DrawString("⇅", labelFont, Brushes.DimGray, transValBox.Right - 12, transValBox.Y + 2);
                 curY += 28;
                 // Brightness (Độ sáng)
-                g.DrawString("Brightness (Sáng):", labelFont, Brushes.Black, x + 24, curY + 4);
+                g.DrawString(AppL10n.Tr("Brightness (Sáng):"), labelFont, Brushes.Black, x + 24, curY + 4);
                 int brTrackX = x + 115;
                 int brTrackW = 65;
                 int brTrackY = curY + 10;
@@ -12029,7 +12329,7 @@ namespace ZenQOffice.UI
             else if (slide.BgFillType == BackgroundFillType.Solid)
             {
                 // Solid fill controls
-                g.DrawString("Color (Màu sắc):", labelFont, Brushes.Black, x + 24, curY + 4);
+                g.DrawString(AppL10n.Tr("Color (Màu sắc):"), labelFont, Brushes.Black, x + 24, curY + 4);
                 Rectangle colBtn = new Rectangle(x + w - 85, curY, 65, 24);
                 DrawInteractiveButton(g, colBtn, false, 3);
                 Color currentBg = Color.FromArgb(slide.BgColor | unchecked((int)0xFF000000));
@@ -12065,7 +12365,7 @@ namespace ZenQOffice.UI
             {
                 Rectangle picBtn = new Rectangle(x + 24, curY, w - 48, 28);
                 DrawInteractiveButton(g, picBtn, false, 4);
-                g.DrawString("📁 Chèn ảnh từ tệp...", boldFont, Brushes.Navy, picBtn.X + 20, picBtn.Y + 6);
+                g.DrawString(AppL10n.Tr("📁 Chèn ảnh từ tệp..."), boldFont, Brushes.Navy, picBtn.X + 20, picBtn.Y + 6);
                 curY += 36;
                 g.DrawString("Transparency:", labelFont, Brushes.Black, x + 24, curY + 4);
                 int trackX = x + 115;
@@ -12089,7 +12389,7 @@ namespace ZenQOffice.UI
             }
             else if (slide.BgFillType == BackgroundFillType.Pattern)
             {
-                g.DrawString("Pattern swatches (Mẫu hoa văn):", labelFont, Brushes.Black, x + 24, curY);
+                g.DrawString(AppL10n.Tr("Pattern swatches (Mẫu hoa văn):"), labelFont, Brushes.Black, x + 24, curY);
                 curY += 20;
                 // 12 Pattern swatches (3 rows x 4 columns)
                 PatternFillStyle[] pStyles = new PatternFillStyle[] {
@@ -12200,19 +12500,19 @@ namespace ZenQOffice.UI
             if (slide == null) return;
             ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
             menu.Font = new Font("Segoe UI", 9.0f);
-            menu.Items.Add(new ToolStripMenuItem("Tuyến tính (Linear)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("Tuyến tính (Linear)", "Linear"), null, (s, e) => {
                 slide.BgGradientType = GradientType.Linear;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = slide.BgGradientType == GradientType.Linear });
-            menu.Items.Add(new ToolStripMenuItem("Tỏa tròn (Radial)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("Tỏa tròn (Radial)", "Radial"), null, (s, e) => {
                 slide.BgGradientType = GradientType.Radial;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = slide.BgGradientType == GradientType.Radial });
-            menu.Items.Add(new ToolStripMenuItem("Hình chữ nhật (Rectangular)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("Hình chữ nhật (Rectangular)", "Rectangular"), null, (s, e) => {
                 slide.BgGradientType = GradientType.Rectangular;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = slide.BgGradientType == GradientType.Rectangular });
-            menu.Items.Add(new ToolStripMenuItem("Đường dẫn (Path)", null, (s, e) => {
+            menu.Items.Add(new ToolStripMenuItem(AppL10n.T("Đường dẫn (Path)", "Path"), null, (s, e) => {
                 slide.BgGradientType = GradientType.Path;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = slide.BgGradientType == GradientType.Path });
@@ -15190,7 +15490,7 @@ namespace ZenQOffice.UI
             if (SelectedShape == null) return;
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                ofd.Title = "Chọn hình ảnh để Lồng vào Hình dạng (Picture Fill)";
+                ofd.Title = AppL10n.T("Chọn hình ảnh để Lồng vào Hình dạng (Picture Fill)", "Select Picture for Shape Fill");
                 ofd.Filter = "Tất cả định dạng ảnh (*.jpg;*.jpeg;*.png;*.bmp;*.webp;*.gif)|*.jpg;*.jpeg;*.png;*.bmp;*.webp;*.gif|JPEG (*.jpg;*.jpeg)|*.jpg;*.jpeg|PNG (*.png)|*.png|Tất cả tệp (*.*)|*.*";
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
@@ -15202,7 +15502,7 @@ namespace ZenQOffice.UI
                     }
                     catch (Exception ex)
                     {
-                        ZenQOffice.UI.FluentMessageBox.Show("Không thể tải hình ảnh: " + ex.Message, "Lỗi nạp ảnh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể tải hình ảnh: ", "Could not load image: ") + ex.Message, AppL10n.T("Lỗi nạp ảnh", "Image Load Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }
@@ -18816,7 +19116,7 @@ namespace ZenQOffice.UI
             if (string.IsNullOrEmpty(formula)) formula = "A = πr²";
             if (SelectedShape != null && (SelectedShape.Type == ShapeType.TextBox || SelectedShape.Type == ShapeType.Rectangle))
             {
-                if (string.IsNullOrEmpty(SelectedShape.Text) || SelectedShape.Text == "Nhấp để thêm văn bản")
+                if (string.IsNullOrEmpty(SelectedShape.Text) || SelectedShape.Text == "Nhấp để thêm văn bản" || SelectedShape.Text == "Click to add text")
                 {
                     SelectedShape.Text = formula;
                 }
@@ -18857,7 +19157,7 @@ namespace ZenQOffice.UI
             if (ActiveSlide == null || string.IsNullOrEmpty(symbol)) return;
             if (SelectedShape != null && (SelectedShape.Type == ShapeType.TextBox || SelectedShape.Type == ShapeType.Rectangle))
             {
-                if (string.IsNullOrEmpty(SelectedShape.Text) || SelectedShape.Text == "Nhấp để thêm văn bản")
+                if (string.IsNullOrEmpty(SelectedShape.Text) || SelectedShape.Text == "Nhấp để thêm văn bản" || SelectedShape.Text == "Click to add text")
                 {
                     SelectedShape.Text = symbol;
                 }
@@ -18976,7 +19276,7 @@ namespace ZenQOffice.UI
             SaveUndoState();
             shape.VideoBookmarks.Add(newMark);
             if (parent != null) parent.Invalidate();
-            ZenQOffice.UI.FluentMessageBox.Show(string.Format("Đã thêm Dấu trang tại thời điểm {0:0.0}s vào video.", newMark), "Thêm Dấu trang (Add Bookmark)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T(string.Format("Đã thêm Dấu trang tại thời điểm {0:0.0}s vào video.", newMark), string.Format("Added bookmark at {0:0.0}s.", newMark)), AppL10n.T("Thêm Dấu trang (Add Bookmark)", "Add Bookmark"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         public void RemoveVideoBookmark(ShapeNode shape = null, Control parent = null)
         {
@@ -18984,14 +19284,14 @@ namespace ZenQOffice.UI
             if (shape == null) return;
             if (shape.VideoBookmarks == null || shape.VideoBookmarks.Count == 0)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Video này hiện chưa có dấu trang nào để xóa.", "Xóa Dấu trang (Remove Bookmark)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Video này hiện chưa có dấu trang nào để xóa.", "This video has no bookmarks to remove."), AppL10n.T("Xóa Dấu trang (Remove Bookmark)", "Remove Bookmark"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             SaveUndoState();
             float rem = shape.VideoBookmarks[shape.VideoBookmarks.Count - 1];
             shape.VideoBookmarks.RemoveAt(shape.VideoBookmarks.Count - 1);
             if (parent != null) parent.Invalidate();
-            ZenQOffice.UI.FluentMessageBox.Show(string.Format("Đã xóa Dấu trang tại thời điểm {0:0.0}s.", rem), "Xóa Dấu trang (Remove Bookmark)", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T(string.Format("Đã xóa Dấu trang tại thời điểm {0:0.0}s.", rem), string.Format("Removed bookmark at {0:0.0}s.", rem)), AppL10n.T("Xóa Dấu trang (Remove Bookmark)", "Remove Bookmark"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         public void InsertAudio(string audioPath = "")
         {
@@ -20195,7 +20495,7 @@ namespace ZenQOffice.UI
             }
             if (validIndices.Count < 2)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng giữ phím Ctrl và chọn từ 2 hình vẽ trở lên để thực hiện tính năng Hợp nhất Hình dạng (Merge Shapes)!", "Hợp nhất Hình dạng", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng giữ phím Ctrl và chọn từ 2 hình vẽ trở lên để thực hiện tính năng Hợp nhất Hình dạng (Merge Shapes)!", "Hold Ctrl and select at least 2 shapes to use Merge Shapes!"), AppL10n.T("Hợp nhất Hình dạng", "Merge Shapes"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             List<ShapeNode> selectedShapes = new List<ShapeNode>();
@@ -20980,14 +21280,14 @@ namespace ZenQOffice.UI
             menu.Font = new Font("Segoe UI", 9f);
             menu.ShowImageMargin = true;
             // 1. Paste Options:
-            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem("Tùy chọn Dán (Paste Options):");
+            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem(AppL10n.T("Tùy chọn Dán (Paste Options):", "Paste Options:"));
             miPasteHeader.Enabled = false;
             menu.Items.Add(miPasteHeader);
-            ToolStripMenuItem miPasteTheme = new ToolStripMenuItem("Dán theo Giao diện Đích", CreatePasteOptionIcon(0), (s, e) => {
+            ToolStripMenuItem miPasteTheme = new ToolStripMenuItem(AppL10n.T("Dán theo Giao diện Đích", "Use Destination Theme"), CreatePasteOptionIcon(0), (s, e) => {
                 Paste();
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miPastePic = new ToolStripMenuItem("Dán dạng Hình ảnh", CreatePasteOptionIcon(1), (s, e) => {
+            ToolStripMenuItem miPastePic = new ToolStripMenuItem(AppL10n.T("Dán dạng Hình ảnh", "Picture"), CreatePasteOptionIcon(1), (s, e) => {
                 Paste();
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -20995,7 +21295,7 @@ namespace ZenQOffice.UI
             menu.Items.Add(miPastePic);
             menu.Items.Add(new ToolStripSeparator());
             // 2. Layout ▾ (Bố cục ▾)
-            ToolStripMenuItem miLayout = new ToolStripMenuItem("Bố cục (Layout)", CreateLayoutMenuIcon());
+            ToolStripMenuItem miLayout = new ToolStripMenuItem(AppL10n.T("Bố cục (Layout)", "Layout"), CreateLayoutMenuIcon());
             SlideLayoutType[] layouts = new SlideLayoutType[] {
                 SlideLayoutType.TitleSlide, SlideLayoutType.TitleAndContent, SlideLayoutType.SectionHeader,
                 SlideLayoutType.TwoContent, SlideLayoutType.Comparison, SlideLayoutType.TitleOnly,
@@ -21022,7 +21322,7 @@ namespace ZenQOffice.UI
             }
             menu.Items.Add(miLayout);
             // 3. Reset Slide (Đặt lại Trang chiếu)
-            ToolStripMenuItem miReset = new ToolStripMenuItem("Đặt lại Trang chiếu (Reset Slide)", CreateResetSlideIcon(), (s, e) => {
+            ToolStripMenuItem miReset = new ToolStripMenuItem(AppL10n.T("Đặt lại Trang chiếu (Reset Slide)", "Reset Slide"), CreateResetSlideIcon(), (s, e) => {
                 if (ActiveSlide != null)
                 {
                     ApplySlideLayoutTemplate(ActiveSlide, ActiveSlide.Layout);
@@ -21032,34 +21332,34 @@ namespace ZenQOffice.UI
             menu.Items.Add(miReset);
             menu.Items.Add(new ToolStripSeparator());
             // 4. Grid and Guides... ▾ (Lưới và Đường căn... ▾)
-            ToolStripMenuItem miGridGuides = new ToolStripMenuItem("Lưới và Đường căn (Grid and Guides)...", CreateGridIcon());
-            ToolStripMenuItem miGuides = new ToolStripMenuItem("Đường định tuyến chuột X, Y (Guides)", null, (s, e) => {
+            ToolStripMenuItem miGridGuides = new ToolStripMenuItem(AppL10n.T("Lưới và Đường căn (Grid and Guides)...", "Grid and Guides..."), CreateGridIcon());
+            ToolStripMenuItem miGuides = new ToolStripMenuItem(AppL10n.T("Đường định tuyến chuột X, Y (Guides)", "Guides"), null, (s, e) => {
                 ShowMouseGuides = !ShowMouseGuides;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = ShowMouseGuides };
-            ToolStripMenuItem miSnap = new ToolStripMenuItem("Bắt dính vào lưới (Snap to Grid)", null, (s, e) => {
+            ToolStripMenuItem miSnap = new ToolStripMenuItem(AppL10n.T("Bắt dính vào lưới (Snap to Grid)", "Snap to Grid"), null, (s, e) => {
                 SnapToGrid = !SnapToGrid;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = SnapToGrid };
-            ToolStripMenuItem miShowGrid = new ToolStripMenuItem("Hiện lưới trên màn hình (Display Grid on Screen)", null, (s, e) => {
+            ToolStripMenuItem miShowGrid = new ToolStripMenuItem(AppL10n.T("Hiện lưới trên màn hình (Display Grid on Screen)", "Display Grid on Screen"), null, (s, e) => {
                 ShowGrid = !ShowGrid;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = ShowGrid };
-            ToolStripMenuItem miSmartGuides = new ToolStripMenuItem("Hiện đường căn thông minh (Display Smart Guides)", null, (s, e) => {
+            ToolStripMenuItem miSmartGuides = new ToolStripMenuItem(AppL10n.T("Hiện đường căn thông minh (Display Smart Guides)", "Display Smart Guides"), null, (s, e) => {
                 ShowSmartGuides = !ShowSmartGuides;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = ShowSmartGuides };
             miGridGuides.DropDownItems.AddRange(new ToolStripItem[] { miGuides, miSnap, miShowGrid, miSmartGuides });
             menu.Items.Add(miGridGuides);
             // 5. Ruler (Thước kẻ)
-            ToolStripMenuItem miRuler = new ToolStripMenuItem("Thước kẻ (Ruler)", null, (s, e) => {
+            ToolStripMenuItem miRuler = new ToolStripMenuItem(AppL10n.T("Thước kẻ (Ruler)", "Ruler"), null, (s, e) => {
                 ShowRuler = !ShowRuler;
                 if (parentControl != null) parentControl.Invalidate();
             }) { Checked = ShowRuler };
             menu.Items.Add(miRuler);
             menu.Items.Add(new ToolStripSeparator());
             // 6. Format Background... (Định dạng Nền...) - Lưu ý bỏ New Comment theo yêu cầu người dùng
-            ToolStripMenuItem miFmtBg = new ToolStripMenuItem("Định dạng Nền (Format Background)...", CreateFormatBgIcon(), (s, e) => {
+            ToolStripMenuItem miFmtBg = new ToolStripMenuItem(AppL10n.T("Định dạng Nền (Format Background)...", "Format Background..."), CreateFormatBgIcon(), (s, e) => {
                 SidebarPanel = SidebarPanelType.FormatBackground;
                 IsSidebarOpen = true;
                 if (parentControl != null) parentControl.Invalidate();
@@ -21104,23 +21404,23 @@ namespace ZenQOffice.UI
             menu.ShowImageMargin = true;
             if (!string.IsNullOrEmpty(shape.SmartArtType) || (shape.Name != null && shape.Name.StartsWith("SmartArt")))
             {
-                menu.Items.Add("✏️ Chỉnh sửa nội dung chữ SmartArt...", null, (s, e) =>
+                menu.Items.Add(AppL10n.T("✏️ Chỉnh sửa nội dung chữ SmartArt...", "✏️ Edit SmartArt Text..."), null, (s, e) =>
                 {
                     OpenSmartArtEditor(shape);
                     if (parentControl != null) parentControl.Invalidate();
                 });
-                ToolStripMenuItem colorMenu = new ToolStripMenuItem("🎨 Đổi màu sắc SmartArt (Color Palette)");
-                colorMenu.DropDownItems.Add("🟠 Cam & Vàng (Office Warm)", null, (s, e) => { shape.PictureStyleIndex = 0; if (parentControl != null) parentControl.Invalidate(); });
-                colorMenu.DropDownItems.Add("🔵 Xanh Lam Chuẩn (Office Blue)", null, (s, e) => { shape.PictureStyleIndex = 1; if (parentControl != null) parentControl.Invalidate(); });
-                colorMenu.DropDownItems.Add("🌈 Đa sắc màu (Colorful Accent)", null, (s, e) => { shape.PictureStyleIndex = 2; if (parentControl != null) parentControl.Invalidate(); });
-                colorMenu.DropDownItems.Add("🟢 Xanh Lục (Emerald Green)", null, (s, e) => { shape.PictureStyleIndex = 3; if (parentControl != null) parentControl.Invalidate(); });
-                colorMenu.DropDownItems.Add("🟣 Tím & Hồng (Purple & Magenta)", null, (s, e) => { shape.PictureStyleIndex = 4; if (parentControl != null) parentControl.Invalidate(); });
-                colorMenu.DropDownItems.Add("⚫ Đơn sắc (Monochrome Gray)", null, (s, e) => { shape.PictureStyleIndex = 5; if (parentControl != null) parentControl.Invalidate(); });
+                ToolStripMenuItem colorMenu = new ToolStripMenuItem(AppL10n.T("🎨 Đổi màu sắc SmartArt (Color Palette)", "🎨 Change SmartArt Colors"));
+                colorMenu.DropDownItems.Add(AppL10n.T("🟠 Cam & Vàng (Office Warm)", "🟠 Office Warm (Orange & Gold)"), null, (s, e) => { shape.PictureStyleIndex = 0; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add(AppL10n.T("🔵 Xanh Lam Chuẩn (Office Blue)", "🔵 Office Blue"), null, (s, e) => { shape.PictureStyleIndex = 1; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add(AppL10n.T("🌈 Đa sắc màu (Colorful Accent)", "🌈 Colorful Accent"), null, (s, e) => { shape.PictureStyleIndex = 2; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add(AppL10n.T("🟢 Xanh Lục (Emerald Green)", "🟢 Emerald Green"), null, (s, e) => { shape.PictureStyleIndex = 3; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add(AppL10n.T("🟣 Tím & Hồng (Purple & Magenta)", "🟣 Purple & Magenta"), null, (s, e) => { shape.PictureStyleIndex = 4; if (parentControl != null) parentControl.Invalidate(); });
+                colorMenu.DropDownItems.Add(AppL10n.T("⚫ Đơn sắc (Monochrome Gray)", "⚫ Monochrome Gray"), null, (s, e) => { shape.PictureStyleIndex = 5; if (parentControl != null) parentControl.Invalidate(); });
                 menu.Items.Add(colorMenu);
                 menu.Items.Add(new ToolStripSeparator());
             }
             // Mini Quick-Formatting Toolbar Header
-            ToolStripMenuItem miQuickFill = new ToolStripMenuItem("Tô màu", CreateQuickFillIcon(shape.FillColor), (s, e) => {
+            ToolStripMenuItem miQuickFill = new ToolStripMenuItem(AppL10n.T("Tô màu", "Fill"), CreateQuickFillIcon(shape.FillColor), (s, e) => {
                 Point pt = (parentControl != null) ? parentControl.PointToScreen(new Point(screenPos.X, screenPos.Y)) : screenPos;
                 Color curC = Color.FromArgb((shape.FillColor >> 16) & 0xFF, (shape.FillColor >> 8) & 0xFF, shape.FillColor & 0xFF);
                 ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, true);
@@ -21139,7 +21439,7 @@ namespace ZenQOffice.UI
                 };
                 colDlg.Show();
             });
-            ToolStripMenuItem miQuickStroke = new ToolStripMenuItem("Viền", CreateQuickStrokeIcon(shape.StrokeColor), (s, e) => {
+            ToolStripMenuItem miQuickStroke = new ToolStripMenuItem(AppL10n.T("Viền", "Outline"), CreateQuickStrokeIcon(shape.StrokeColor), (s, e) => {
                 Point pt = (parentControl != null) ? parentControl.PointToScreen(new Point(screenPos.X, screenPos.Y)) : screenPos;
                 Color curC = Color.FromArgb((shape.StrokeColor >> 16) & 0xFF, (shape.StrokeColor >> 8) & 0xFF, shape.StrokeColor & 0xFF);
                 ColorPaletteForm colDlg = new ColorPaletteForm(pt, curC, true);
@@ -21162,24 +21462,24 @@ namespace ZenQOffice.UI
             menu.Items.Add(miQuickStroke);
             menu.Items.Add(new ToolStripSeparator());
             // 1. Cut / Copy / Paste Options
-            ToolStripMenuItem miCut = new ToolStripMenuItem("Cắt", GetContextMenuIcon("Cut",CreateCutIcon), (s, e) => {
+            ToolStripMenuItem miCut = new ToolStripMenuItem(AppL10n.T("Cắt", "Cut"), GetContextMenuIcon("Cut",CreateCutIcon), (s, e) => {
                 Cut();
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miCopy = new ToolStripMenuItem("Sao chép", GetContextMenuIcon("Copy",CreateCopyIcon), (s, e) => {
+            ToolStripMenuItem miCopy = new ToolStripMenuItem(AppL10n.T("Sao chép", "Copy"), GetContextMenuIcon("Copy",CreateCopyIcon), (s, e) => {
                 Copy();
                 if (parentControl != null) parentControl.Invalidate();
             });
             menu.Items.Add(miCut);
             menu.Items.Add(miCopy);
-            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem("Tùy chọn Dán (Paste Options):");
+            ToolStripMenuItem miPasteHeader = new ToolStripMenuItem(AppL10n.T("Tùy chọn Dán (Paste Options):", "Paste Options:"));
             miPasteHeader.Enabled = false;
             menu.Items.Add(miPasteHeader);
-            ToolStripMenuItem miPasteTheme = new ToolStripMenuItem("Dán theo Giao diện Đích", GetContextMenuIcon("Paste0",()=>CreatePasteOptionIcon(0)), (s, e) => {
+            ToolStripMenuItem miPasteTheme = new ToolStripMenuItem(AppL10n.T("Dán theo Giao diện Đích", "Use Destination Theme"), GetContextMenuIcon("Paste0",()=>CreatePasteOptionIcon(0)), (s, e) => {
                 Paste();
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miPastePic = new ToolStripMenuItem("Dán dạng Hình ảnh", GetContextMenuIcon("Paste1",()=>CreatePasteOptionIcon(1)), (s, e) => {
+            ToolStripMenuItem miPastePic = new ToolStripMenuItem(AppL10n.T("Dán dạng Hình ảnh", "Picture"), GetContextMenuIcon("Paste1",()=>CreatePasteOptionIcon(1)), (s, e) => {
                 Paste();
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -21187,11 +21487,11 @@ namespace ZenQOffice.UI
             menu.Items.Remove(miPasteHeader);
             menu.Items.Add(new ToolStripSeparator());
             // 2. Edit Text & Edit Points
-            ToolStripMenuItem miEditText = new ToolStripMenuItem("Sửa văn bản", GetContextMenuIcon("EditText",CreateEditTextIcon), (s, e) => {
+            ToolStripMenuItem miEditText = new ToolStripMenuItem(AppL10n.T("Sửa văn bản", "Edit Text"), GetContextMenuIcon("EditText",CreateEditTextIcon), (s, e) => {
                 StartInlineEditing(shape);
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miEditPoints = new ToolStripMenuItem("Sửa điểm", GetContextMenuIcon("EditPoints",CreateEditPointsIcon), (s, e) => {
+            ToolStripMenuItem miEditPoints = new ToolStripMenuItem(AppL10n.T("Sửa điểm", "Edit Points"), GetContextMenuIcon("EditPoints",CreateEditPointsIcon), (s, e) => {
                 StartEditShapePoints(shape);
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -21199,67 +21499,67 @@ namespace ZenQOffice.UI
             menu.Items.Add(miEditText);
             menu.Items.Add(miEditPoints);
             // 3. Group / Ungroup
-            ToolStripMenuItem miGroup = new ToolStripMenuItem("Nhóm", GetContextMenuIcon("Group",CreateGroupIcon));
-            miGroup.DropDownItems.Add(new ToolStripMenuItem("Nhóm (Group)", null, (s, e) => { MergeShapes(MergeShapeOperation.Union); if (parentControl != null) parentControl.Invalidate(); }));
-            miGroup.DropDownItems.Add(new ToolStripMenuItem("Rã nhóm (Ungroup)", null, (s, e) => { if (parentControl != null) parentControl.Invalidate(); }));
-            miGroup.DropDownItems.Add(new ToolStripMenuItem("Gom nhóm lại (Regroup)", null, (s, e) => { if (parentControl != null) parentControl.Invalidate(); }));
+            ToolStripMenuItem miGroup = new ToolStripMenuItem(AppL10n.T("Nhóm", "Group"), GetContextMenuIcon("Group",CreateGroupIcon));
+            miGroup.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Nhóm (Group)", "Group"), null, (s, e) => { MergeShapes(MergeShapeOperation.Union); if (parentControl != null) parentControl.Invalidate(); }));
+            miGroup.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Rã nhóm (Ungroup)", "Ungroup"), null, (s, e) => { if (parentControl != null) parentControl.Invalidate(); }));
+            miGroup.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Gom nhóm lại (Regroup)", "Regroup"), null, (s, e) => { if (parentControl != null) parentControl.Invalidate(); }));
             menu.Items.Add(miGroup);
             // 4. Bring to Front Submenu
-            ToolStripMenuItem miFront = new ToolStripMenuItem("Đưa ra trước", GetContextMenuIcon("BringFront",CreateBringFrontIcon));
-            miFront.DropDownItems.Add(new ToolStripMenuItem("Đưa lên trên cùng (Bring to Front)", null, (s, e) => {
+            ToolStripMenuItem miFront = new ToolStripMenuItem(AppL10n.T("Đưa ra trước", "Bring to Front"), GetContextMenuIcon("BringFront",CreateBringFrontIcon));
+            miFront.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Đưa lên trên cùng (Bring to Front)", "Bring to Front"), null, (s, e) => {
                 BringShapeToFront();
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miFront.DropDownItems.Add(new ToolStripMenuItem("Lên trên một lớp (Bring Forward)", null, (s, e) => {
+            miFront.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Lên trên một lớp (Bring Forward)", "Bring Forward"), null, (s, e) => {
                 BringShapeForward();
                 if (parentControl != null) parentControl.Invalidate();
             }));
             menu.Items.Add(miFront);
             // 5. Send to Back Submenu
-            ToolStripMenuItem miBack = new ToolStripMenuItem("Đưa ra sau", GetContextMenuIcon("SendBack",CreateSendBackIcon));
-            miBack.DropDownItems.Add(new ToolStripMenuItem("Đưa về sau cùng (Send to Back)", null, (s, e) => {
+            ToolStripMenuItem miBack = new ToolStripMenuItem(AppL10n.T("Đưa ra sau", "Send to Back"), GetContextMenuIcon("SendBack",CreateSendBackIcon));
+            miBack.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Đưa về sau cùng (Send to Back)", "Send to Back"), null, (s, e) => {
                 SendShapeToBack();
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miBack.DropDownItems.Add(new ToolStripMenuItem("Xuống dưới một lớp (Send Backward)", null, (s, e) => {
+            miBack.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Xuống dưới một lớp (Send Backward)", "Send Backward"), null, (s, e) => {
                 SendShapeBackward();
                 if (parentControl != null) parentControl.Invalidate();
             }));
             menu.Items.Add(miBack);
             // Menu Lật Hình (Gương)
-            ToolStripMenuItem miFlip = new ToolStripMenuItem("Xoay và lật", GetContextMenuIcon("FlipMenu",CreateFlipMenuIcon));
-            miFlip.DropDownItems.Add(new ToolStripMenuItem("Lật Ngang ⇄ (Flip Horizontal)", null, (s, e) => {
+            ToolStripMenuItem miFlip = new ToolStripMenuItem(AppL10n.T("Xoay và lật", "Rotate & Flip"), GetContextMenuIcon("FlipMenu",CreateFlipMenuIcon));
+            miFlip.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Lật Ngang ⇄ (Flip Horizontal)", "Flip Horizontal ⇄"), null, (s, e) => {
                 shape.Transform.FlipHorizontal = !shape.Transform.FlipHorizontal;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miFlip.DropDownItems.Add(new ToolStripMenuItem("Lật Dọc ⇅ (Flip Vertical)", null, (s, e) => {
+            miFlip.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Lật Dọc ⇅ (Flip Vertical)", "Flip Vertical ⇅"), null, (s, e) => {
                 shape.Transform.FlipVertical = !shape.Transform.FlipVertical;
                 if (parentControl != null) parentControl.Invalidate();
             }));
             menu.Items.Add(miFlip);
             // Menu Làm mờ / Độ trong suốt (Opacity)
-            ToolStripMenuItem miOpacity = new ToolStripMenuItem("Độ trong suốt", GetContextMenuIcon("OpacityMenu",CreateOpacityMenuIcon));
+            ToolStripMenuItem miOpacity = new ToolStripMenuItem(AppL10n.T("Độ trong suốt", "Opacity"), GetContextMenuIcon("OpacityMenu",CreateOpacityMenuIcon));
             FluentContextMenuStrip.PopulateOnDemand(miOpacity,()=>
             {
-            miOpacity.DropDownItems.Add(new ToolStripMenuItem("100% Đặc (Opaque)", null, (s, e) => { shape.FillOpacity = 1.0f; if (parentControl != null) parentControl.Invalidate(); }));
-            miOpacity.DropDownItems.Add(new ToolStripMenuItem("80% Hơi mờ", null, (s, e) => { shape.FillOpacity = 0.8f; if (parentControl != null) parentControl.Invalidate(); }));
-            miOpacity.DropDownItems.Add(new ToolStripMenuItem("60% Bán trong suốt", null, (s, e) => { shape.FillOpacity = 0.6f; if (parentControl != null) parentControl.Invalidate(); }));
-            miOpacity.DropDownItems.Add(new ToolStripMenuItem("40% Mờ (Translucent)", null, (s, e) => { shape.FillOpacity = 0.4f; if (parentControl != null) parentControl.Invalidate(); }));
-            miOpacity.DropDownItems.Add(new ToolStripMenuItem("20% Rất mờ", null, (s, e) => { shape.FillOpacity = 0.2f; if (parentControl != null) parentControl.Invalidate(); }));
-            miOpacity.DropDownItems.Add(new ToolStripMenuItem("0% Trong suốt (Transparent)", null, (s, e) => { shape.FillOpacity = 0.0f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("100% Đặc (Opaque)", "100% (Opaque)"), null, (s, e) => { shape.FillOpacity = 1.0f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("80% Hơi mờ", "80%"), null, (s, e) => { shape.FillOpacity = 0.8f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("60% Bán trong suốt", "60%"), null, (s, e) => { shape.FillOpacity = 0.6f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("40% Mờ (Translucent)", "40%"), null, (s, e) => { shape.FillOpacity = 0.4f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("20% Rất mờ", "20%"), null, (s, e) => { shape.FillOpacity = 0.2f; if (parentControl != null) parentControl.Invalidate(); }));
+            miOpacity.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("0% Trong suốt (Transparent)", "0% (Transparent)"), null, (s, e) => { shape.FillOpacity = 0.0f; if (parentControl != null) parentControl.Invalidate(); }));
             });
             menu.Items.Add(miOpacity);
             // Menu Đổ bóng mềm Gaussian (Soft Shadows)
-            ToolStripMenuItem miShadow = new ToolStripMenuItem("Bóng đổ");
+            ToolStripMenuItem miShadow = new ToolStripMenuItem(AppL10n.T("Bóng đổ", "Shadow"));
             FluentContextMenuStrip.PopulateOnDemand(miShadow,()=>
             {
-            miShadow.DropDownItems.Add(new ToolStripMenuItem("❌ Tắt đổ bóng", null, (s, e) => {
+            miShadow.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("❌ Tắt đổ bóng", "❌ No Shadow"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasShadow = false;
                 shape.InvalidateShadowCache();
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miShadow.DropDownItems.Add(new ToolStripMenuItem("☁️ Bóng đổ mềm nhẹ (Subtle Soft)", null, (s, e) => {
+            miShadow.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("☁️ Bóng đổ mềm nhẹ (Subtle Soft)", "☁️ Subtle Soft Shadow"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasShadow = true;
                 shape.ShadowOffsetX = 0f;
@@ -21270,7 +21570,7 @@ namespace ZenQOffice.UI
                 shape.InvalidateShadowCache();
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miShadow.DropDownItems.Add(new ToolStripMenuItem("🏢 Bóng nổi 3D (Elevated 3D)", null, (s, e) => {
+            miShadow.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("🏢 Bóng nổi 3D (Elevated 3D)", "🏢 Elevated 3D Shadow"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasShadow = true;
                 shape.ShadowOffsetX = 0f;
@@ -21281,7 +21581,7 @@ namespace ZenQOffice.UI
                 shape.InvalidateShadowCache();
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miShadow.DropDownItems.Add(new ToolStripMenuItem("✨ Hào quang phát sáng (Soft Glow)", null, (s, e) => {
+            miShadow.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("✨ Hào quang phát sáng (Soft Glow)", "✨ Soft Glow"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasShadow = true;
                 shape.ShadowOffsetX = 0f;
@@ -21292,7 +21592,7 @@ namespace ZenQOffice.UI
                 shape.InvalidateShadowCache();
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miShadow.DropDownItems.Add(new ToolStripMenuItem("🌑 Đổ bóng sâu cổ điển (Deep Drop)", null, (s, e) => {
+            miShadow.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("🌑 Đổ bóng sâu cổ điển (Deep Drop)", "🌑 Deep Drop Shadow"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasShadow = true;
                 shape.ShadowOffsetX = 6f;
@@ -21306,15 +21606,15 @@ namespace ZenQOffice.UI
             });
             menu.Items.Add(miShadow);
             // Menu Kính mờ Acrylic (Glassmorphism)
-            ToolStripMenuItem miGlass = new ToolStripMenuItem("Kính mờ");
+            ToolStripMenuItem miGlass = new ToolStripMenuItem(AppL10n.T("Kính mờ", "Glass Effect"));
             FluentContextMenuStrip.PopulateOnDemand(miGlass,()=>
             {
-            miGlass.DropDownItems.Add(new ToolStripMenuItem("❌ Tắt hiệu ứng kính", null, (s, e) => {
+            miGlass.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("❌ Tắt hiệu ứng kính", "❌ No Glass Effect"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasGlassmorphism = false;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miGlass.DropDownItems.Add(new ToolStripMenuItem("❄️ Kính mờ tuyết trắng (Frosted White)", null, (s, e) => {
+            miGlass.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("❄️ Kính mờ tuyết trắng (Frosted White)", "❄️ Frosted White Glass"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasGlassmorphism = true;
                 shape.GlassTintColor = 0xFFFFFF;
@@ -21323,7 +21623,7 @@ namespace ZenQOffice.UI
                 shape.GlassBlurRadius = 15f;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miGlass.DropDownItems.Add(new ToolStripMenuItem("🕶️ Kính mờ Acrylic tối (Dark Acrylic)", null, (s, e) => {
+            miGlass.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("🕶️ Kính mờ Acrylic tối (Dark Acrylic)", "🕶️ Dark Acrylic Glass"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasGlassmorphism = true;
                 shape.GlassTintColor = 0x1E293B;
@@ -21332,7 +21632,7 @@ namespace ZenQOffice.UI
                 shape.GlassBlurRadius = 18f;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miGlass.DropDownItems.Add(new ToolStripMenuItem("🎨 Kính mờ theo màu hình (Tinted Glass)", null, (s, e) => {
+            miGlass.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("🎨 Kính mờ theo màu hình (Tinted Glass)", "🎨 Tinted Glass"), null, (s, e) => {
                 SaveUndoState();
                 shape.HasGlassmorphism = true;
                 shape.GlassTintColor = shape.FillColor;
@@ -21344,15 +21644,15 @@ namespace ZenQOffice.UI
             });
             menu.Items.Add(miGlass);
             // Menu Kiểu màu Gradient (Radial Gradient)
-            ToolStripMenuItem miGrad = new ToolStripMenuItem("Dải màu");
+            ToolStripMenuItem miGrad = new ToolStripMenuItem(AppL10n.T("Dải màu", "Gradient Fill"));
             FluentContextMenuStrip.PopulateOnDemand(miGrad,()=>
             {
-            miGrad.DropDownItems.Add(new ToolStripMenuItem("➡️ Chuyển màu thẳng (Linear Gradient)", null, (s, e) => {
+            miGrad.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("➡️ Chuyển màu thẳng (Linear Gradient)", "➡️ Linear Gradient"), null, (s, e) => {
                 SaveUndoState();
                 shape.GradientType = GradientType.Linear;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miGrad.DropDownItems.Add(new ToolStripMenuItem("🎯 Chuyển màu tâm tỏa tròn (Radial Gradient)", null, (s, e) => {
+            miGrad.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("🎯 Chuyển màu tâm tỏa tròn (Radial Gradient)", "🎯 Radial Gradient"), null, (s, e) => {
                 SaveUndoState();
                 shape.GradientType = GradientType.Radial;
                 if (parentControl != null) parentControl.Invalidate();
@@ -21360,35 +21660,35 @@ namespace ZenQOffice.UI
             });
             menu.Items.Add(miGrad);
             // Menu Uốn cong chữ nghệ thuật (Text Warp & Typography)
-            ToolStripMenuItem miWarp = new ToolStripMenuItem("Uốn chữ");
+            ToolStripMenuItem miWarp = new ToolStripMenuItem(AppL10n.T("Uốn chữ", "Text Transform"));
             FluentContextMenuStrip.PopulateOnDemand(miWarp,()=>
             {
-            miWarp.DropDownItems.Add(new ToolStripMenuItem("Chữ thẳng bình thường (None)", null, (s, e) => {
+            miWarp.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Chữ thẳng bình thường (None)", "None (Straight)"), null, (s, e) => {
                 SaveUndoState();
                 shape.TextWarpType = TextWarpType.None;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miWarp.DropDownItems.Add(new ToolStripMenuItem("Uốn cong vòm lên (Arc Up ⏜)", null, (s, e) => {
+            miWarp.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Uốn cong vòm lên (Arc Up ⏜)", "Arc Up ⏜"), null, (s, e) => {
                 SaveUndoState();
                 shape.TextWarpType = TextWarpType.ArcUp;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miWarp.DropDownItems.Add(new ToolStripMenuItem("Uốn cong vòm xuống (Arc Down ⏝)", null, (s, e) => {
+            miWarp.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Uốn cong vòm xuống (Arc Down ⏝)", "Arc Down ⏝"), null, (s, e) => {
                 SaveUndoState();
                 shape.TextWarpType = TextWarpType.ArcDown;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miWarp.DropDownItems.Add(new ToolStripMenuItem("Uốn lượn sóng (Wave 〰)", null, (s, e) => {
+            miWarp.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Uốn lượn sóng (Wave 〰)", "Wave 〰"), null, (s, e) => {
                 SaveUndoState();
                 shape.TextWarpType = TextWarpType.Wave;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miWarp.DropDownItems.Add(new ToolStripMenuItem("Uốn tròn 360° (Circle ◯)", null, (s, e) => {
+            miWarp.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Uốn tròn 360° (Circle ◯)", "Circle ◯"), null, (s, e) => {
                 SaveUndoState();
                 shape.TextWarpType = TextWarpType.Circle;
                 if (parentControl != null) parentControl.Invalidate();
             }));
-            miWarp.DropDownItems.Add(new ToolStripMenuItem("Cổng vòm (Arch ⛩)", null, (s, e) => {
+            miWarp.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("Cổng vòm (Arch ⛩)", "Arch ⛩"), null, (s, e) => {
                 SaveUndoState();
                 shape.TextWarpType = TextWarpType.Arch;
                 if (parentControl != null) parentControl.Invalidate();
@@ -21397,11 +21697,11 @@ namespace ZenQOffice.UI
             menu.Items.Add(miWarp);
             menu.Items.Add(new ToolStripSeparator());
             // 6. Lồng Ảnh Vào Hình (Picture Fill) & Cắt xén (Crop to Shape)
-            ToolStripMenuItem miPicFill = new ToolStripMenuItem("Tô bằng hình ảnh");
-            miPicFill.DropDownItems.Add(new ToolStripMenuItem("🖼️ Chọn ảnh từ máy tính (Insert from Computer)...", null, (s, e) => {
+            ToolStripMenuItem miPicFill = new ToolStripMenuItem(AppL10n.T("Tô bằng hình ảnh", "Picture Fill"));
+            miPicFill.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("🖼️ Chọn ảnh từ máy tính (Insert from Computer)...", "🖼️ From File..."), null, (s, e) => {
                 InsertPictureFillDialog(parentControl);
             }));
-            miPicFill.DropDownItems.Add(new ToolStripMenuItem("📋 Dán ảnh từ Clipboard (Paste from Clipboard)", null, (s, e) => {
+            miPicFill.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("📋 Dán ảnh từ Clipboard (Paste from Clipboard)", "📋 From Clipboard"), null, (s, e) => {
                 if (Clipboard.ContainsImage())
                 {
                     Image clipImg = Clipboard.GetImage();
@@ -21413,27 +21713,27 @@ namespace ZenQOffice.UI
                 }
                 else
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show("Không tìm thấy dữ liệu hình ảnh trong Clipboard!", "Dán ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không tìm thấy dữ liệu hình ảnh trong Clipboard!", "No image found on the Clipboard!"), AppL10n.T("Dán ảnh", "Paste Picture"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }));
             if (shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
             {
                 miPicFill.DropDownItems.Add(new ToolStripSeparator());
-                miPicFill.DropDownItems.Add(new ToolStripMenuItem("🔄 Căn lấp đầy (Fill to Shape)", null, (s, e) => {
+                miPicFill.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("🔄 Căn lấp đầy (Fill to Shape)", "🔄 Fill to Shape"), null, (s, e) => {
                     FillCrop();
                     if (parentControl != null) parentControl.Invalidate();
                 }));
-                miPicFill.DropDownItems.Add(new ToolStripMenuItem("📐 Căn vừa vặn (Fit to Shape)", null, (s, e) => {
+                miPicFill.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("📐 Căn vừa vặn (Fit to Shape)", "📐 Fit to Shape"), null, (s, e) => {
                     FitCrop();
                     if (parentControl != null) parentControl.Invalidate();
                 }));
-                miPicFill.DropDownItems.Add(new ToolStripMenuItem("❌ Xóa ảnh lồng (Remove Picture Fill)", null, (s, e) => {
+                miPicFill.DropDownItems.Add(new ToolStripMenuItem(AppL10n.T("❌ Xóa ảnh lồng (Remove Picture Fill)", "❌ Remove Picture Fill"), null, (s, e) => {
                     RemovePictureFill(parentControl);
                 }));
             }
             menu.Items.Add(miPicFill);
             // Cắt xén ảnh theo hình dạng (Crop to Shape)
-            ToolStripMenuItem miCropToShape = new ToolStripMenuItem("Cắt theo hình");
+            ToolStripMenuItem miCropToShape = new ToolStripMenuItem(AppL10n.T("Cắt theo hình", "Crop to Shape"));
             FluentContextMenuStrip.PopulateOnDemand(miCropToShape,()=>
             {
             string[] shapeCropNames = new string[] {
@@ -21465,14 +21765,14 @@ namespace ZenQOffice.UI
             menu.Items.Add(miCropToShape);
             menu.Items.Add(new ToolStripSeparator());
             // 7. Hyperlink, Action Settings & Interactive Quiz Trigger
-            ToolStripMenuItem miLink = new ToolStripMenuItem("Liên kết…", GetContextMenuIcon("Link",CreateLinkIcon), (s, e) => {
+            ToolStripMenuItem miLink = new ToolStripMenuItem(AppL10n.T("Liên kết…", "Link..."), GetContextMenuIcon("Link",CreateLinkIcon), (s, e) => {
                 OpenHyperlinkDialog(parentControl);
             });
-            ToolStripMenuItem miActionSettings = new ToolStripMenuItem("Hành động và âm thanh…", null, (s, e) => {
+            ToolStripMenuItem miActionSettings = new ToolStripMenuItem(AppL10n.T("Hành động và âm thanh…", "Action Settings..."), null, (s, e) => {
                 OpenActionSettingsDialog(parentControl);
             });
-            ToolStripMenuItem miQuickQuiz = new ToolStripMenuItem("Trắc nghiệm và điều hướng");
-            miQuickQuiz.DropDownItems.Add("✅ Đặt làm Đáp án ĐÚNG (Hiệu ứng Xanh + Chuông Chime)", null, (s, e) => {
+            ToolStripMenuItem miQuickQuiz = new ToolStripMenuItem(AppL10n.T("Trắc nghiệm và điều hướng", "Quiz & Navigation"));
+            miQuickQuiz.DropDownItems.Add(AppL10n.T("✅ Đặt làm Đáp án ĐÚNG (Hiệu ứng Xanh + Chuông Chime)", "✅ Set as CORRECT Answer (Green + Chime)"), null, (s, e) => {
                 SaveUndoState();
                 shape.ClickActionType = SlideActionType.QuizCorrect;
                 shape.ClickSound = SlideActionSound.Chime;
@@ -21480,7 +21780,7 @@ namespace ZenQOffice.UI
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (parentControl != null) parentControl.Invalidate();
             });
-            miQuickQuiz.DropDownItems.Add("❌ Đặt làm Đáp án SAI (Hiệu ứng Rung Đỏ + Còi Buzzer)", null, (s, e) => {
+            miQuickQuiz.DropDownItems.Add(AppL10n.T("❌ Đặt làm Đáp án SAI (Hiệu ứng Rung Đỏ + Còi Buzzer)", "❌ Set as WRONG Answer (Red + Buzzer)"), null, (s, e) => {
                 SaveUndoState();
                 shape.ClickActionType = SlideActionType.QuizWrong;
                 shape.ClickSound = SlideActionSound.Buzzer;
@@ -21489,7 +21789,7 @@ namespace ZenQOffice.UI
                 if (parentControl != null) parentControl.Invalidate();
             });
             miQuickQuiz.DropDownItems.Add(new ToolStripSeparator());
-            miQuickQuiz.DropDownItems.Add("▶ Nút chuyển tới Trang chiếu tiếp theo (Next Slide)", null, (s, e) => {
+            miQuickQuiz.DropDownItems.Add(AppL10n.T("▶ Nút chuyển tới Trang chiếu tiếp theo (Next Slide)", "▶ Next Slide Button"), null, (s, e) => {
                 SaveUndoState();
                 shape.ClickActionType = SlideActionType.NextSlide;
                 shape.ClickSound = SlideActionSound.Click;
@@ -21497,7 +21797,7 @@ namespace ZenQOffice.UI
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (parentControl != null) parentControl.Invalidate();
             });
-            miQuickQuiz.DropDownItems.Add("◀ Nút quay lại Trang chiếu trước đó (Previous Slide)", null, (s, e) => {
+            miQuickQuiz.DropDownItems.Add(AppL10n.T("◀ Nút quay lại Trang chiếu trước đó (Previous Slide)", "◀ Previous Slide Button"), null, (s, e) => {
                 SaveUndoState();
                 shape.ClickActionType = SlideActionType.PreviousSlide;
                 shape.ClickSound = SlideActionSound.Click;
@@ -21505,7 +21805,7 @@ namespace ZenQOffice.UI
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (parentControl != null) parentControl.Invalidate();
             });
-            miQuickQuiz.DropDownItems.Add("🏠 Nút về Trang chiếu đầu tiên (First Slide)", null, (s, e) => {
+            miQuickQuiz.DropDownItems.Add(AppL10n.T("🏠 Nút về Trang chiếu đầu tiên (First Slide)", "🏠 First Slide Button"), null, (s, e) => {
                 SaveUndoState();
                 shape.ClickActionType = SlideActionType.FirstSlide;
                 shape.ClickSound = SlideActionSound.Click;
@@ -21513,7 +21813,7 @@ namespace ZenQOffice.UI
                 if (ActiveSlide != null) ActiveSlide.IsThumbnailDirty = true;
                 if (parentControl != null) parentControl.Invalidate();
             });
-            miQuickQuiz.DropDownItems.Add("⏹ Nút Kết thúc trình chiếu (End Show)", null, (s, e) => {
+            miQuickQuiz.DropDownItems.Add(AppL10n.T("⏹ Nút Kết thúc trình chiếu (End Show)", "⏹ End Show Button"), null, (s, e) => {
                 SaveUndoState();
                 shape.ClickActionType = SlideActionType.EndShow;
                 shape.ClickSound = SlideActionSound.Click;
@@ -21524,7 +21824,7 @@ namespace ZenQOffice.UI
             if (shape.HasInteractiveAction)
             {
                 miQuickQuiz.DropDownItems.Add(new ToolStripSeparator());
-                miQuickQuiz.DropDownItems.Add("🗑 Xóa Liên kết / Hành động trên hình này", null, (s, e) => {
+                miQuickQuiz.DropDownItems.Add(AppL10n.T("🗑 Xóa Liên kết / Hành động trên hình này", "🗑 Remove Link / Action"), null, (s, e) => {
                     SaveUndoState();
                     shape.ClickActionType = SlideActionType.None;
                     shape.ClickTargetSlideIndex = -1;
@@ -21537,20 +21837,27 @@ namespace ZenQOffice.UI
                     if (parentControl != null) parentControl.Invalidate();
                 });
             }
-            ToolStripMenuItem miSavePic = new ToolStripMenuItem("Lưu thành ảnh…", GetContextMenuIcon("SavePic",CreateSavePicIcon), (s, e) => {
+            ToolStripMenuItem miSavePic = new ToolStripMenuItem(AppL10n.T("Lưu thành ảnh…", "Save as Picture..."), GetContextMenuIcon("SavePic",CreateSavePicIcon), (s, e) => {
                 SaveShapeAsPicture(shape);
             });
-            ToolStripMenuItem miSizePos = new ToolStripMenuItem("Kích thước và vị trí…", GetContextMenuIcon("SizePos",CreateSizePosIcon), (s, e) => {
+            if (shape.Type == ShapeType.Image || shape.CachedImage != null || !string.IsNullOrEmpty(shape.ImagePath))
+            {
+                ToolStripMenuItem miBlender = new ToolStripMenuItem(AppL10n.T("Tiện ích: Image Blender (Làm rõ dần)…", "Add-in: Image Blender..."), null, (s, e) => {
+                    OpenImageBlender(shape);
+                });
+                menu.Items.Add(miBlender);
+            }
+            ToolStripMenuItem miSizePos = new ToolStripMenuItem(AppL10n.T("Kích thước và vị trí…", "Size and Position..."), GetContextMenuIcon("SizePos",CreateSizePosIcon), (s, e) => {
                 SidebarPanel = SidebarPanelType.Properties;
                 IsSidebarOpen = true;
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miFormatShape = new ToolStripMenuItem("Định dạng hình…", GetContextMenuIcon("FormatShapeMenu",CreateFormatShapeMenuIcon), (s, e) => {
+            ToolStripMenuItem miFormatShape = new ToolStripMenuItem(AppL10n.T("Định dạng hình…", "Format Shape..."), GetContextMenuIcon("FormatShapeMenu",CreateFormatShapeMenuIcon), (s, e) => {
                 SidebarPanel = SidebarPanelType.Properties;
                 IsSidebarOpen = true;
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miSelectionPane = new ToolStripMenuItem("Ngăn lựa chọn…", GetContextMenuIcon("SelectionPane",CreateSelectionPaneIcon), (s, e) => {
+            ToolStripMenuItem miSelectionPane = new ToolStripMenuItem(AppL10n.T("Ngăn lựa chọn…", "Selection Pane..."), GetContextMenuIcon("SelectionPane",CreateSelectionPaneIcon), (s, e) => {
                 SidebarPanel = SidebarPanelType.SelectionPane;
                 IsSidebarOpen = true;
                 if (parentControl != null) parentControl.Invalidate();
@@ -21563,10 +21870,10 @@ namespace ZenQOffice.UI
             menu.Items.Add(miFormatShape);
             menu.Items.Add(miSelectionPane);
             var pasteItems=new List<ToolStripItem>();
-            foreach(ToolStripItem item in menu.Items)if(item is ToolStripControlHost||(item.Text=="Dán"||item.Text.StartsWith("Tùy chọn Dán")))pasteItems.Add(item);
+            foreach(ToolStripItem item in menu.Items)if(item is ToolStripControlHost||(item.Text=="Dán"||item.Text=="Paste"||item.Text.StartsWith("Tùy chọn Dán")||item.Text.StartsWith("Paste Options")))pasteItems.Add(item);
             var smartItems=new List<ToolStripItem>();
             foreach(ToolStripItem item in menu.Items)if(item!=miQuickFill&&item!=miQuickStroke&&item.Text.Contains("SmartArt"))smartItems.Add(item);
-            var effects=new ToolStripMenuItem("Hiệu ứng");
+            var effects=new ToolStripMenuItem(AppL10n.T("Hiệu ứng", "Effects"));
             effects.DropDownItems.AddRange(new ToolStripItem[]{miOpacity,miShadow,miGlass,miGrad,miWarp});
             menu.Items.Clear();
             menu.Items.Add(miCut);menu.Items.Add(miCopy);
@@ -21576,7 +21883,7 @@ namespace ZenQOffice.UI
             menu.Items.Add(miEditText);menu.Items.Add(miEditPoints);menu.Items.Add(miGroup);
             menu.Items.Add(miFront);menu.Items.Add(miBack);menu.Items.Add(miFlip);
             menu.Items.Add(new ToolStripSeparator());menu.Items.Add(miLink);
-            var advanced=new ToolStripMenuItem("Thao tác khác");
+            var advanced=new ToolStripMenuItem(AppL10n.T("Thao tác khác", "More Actions"));
             advanced.DropDownItems.AddRange(new ToolStripItem[]{miQuickFill,miQuickStroke,effects,miPicFill,miCropToShape,miActionSettings,miQuickQuiz,miSelectionPane});
             menu.Items.Add(advanced);menu.Items.Add(miSavePic);menu.Items.Add(miSizePos);menu.Items.Add(miFormatShape);
             menu.Closed+=(sender,args)=>{if(menu.IsHandleCreated)menu.BeginInvoke(new Action(menu.Dispose));};
@@ -21762,14 +22069,14 @@ namespace ZenQOffice.UI
                 if (parentControl != null) parentControl.Invalidate();
             });
             menu.Items.Add(new ToolStripSeparator());
-            ToolStripMenuItem miNewSlide = new ToolStripMenuItem("Trang chiếu Mới (New Slide)", CreateNewSlideMenuIcon(), (s, e) =>
+            ToolStripMenuItem miNewSlide = new ToolStripMenuItem(AppL10n.T("Trang chiếu Mới (New Slide)", "New Slide"), CreateNewSlideMenuIcon(), (s, e) =>
             {
                 EmptyGapInsertAfterSlideIndex = -1;
                 SaveUndoState();
                 InsertNewSlideAfter(insertAfterSlideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miAddSection = new ToolStripMenuItem("Thêm Phần (Add Section)", CreateAddSectionMenuIcon(), (s, e) =>
+            ToolStripMenuItem miAddSection = new ToolStripMenuItem(AppL10n.T("Thêm Phần (Add Section)", "Add Section"), CreateAddSectionMenuIcon(), (s, e) =>
             {
                 EmptyGapInsertAfterSlideIndex = -1;
                 int targetSecIdx = Math.Max(0, Math.Min(Presentation.Slides.Count - 1, insertAfterSlideIndex + 1));
@@ -21793,12 +22100,12 @@ namespace ZenQOffice.UI
             menu.Font = new Font("Segoe UI", 9f);
             menu.ShowImageMargin = true;
             // 1. Cut / Copy / Paste Options
-            ToolStripMenuItem miCut = new ToolStripMenuItem("Cắt (Cut)", CreateCutIcon(), (s, e) => {
+            ToolStripMenuItem miCut = new ToolStripMenuItem(AppL10n.T("Cắt (Cut)", "Cut"), CreateCutIcon(), (s, e) => {
                 SaveUndoState();
                 CutSlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miCopy = new ToolStripMenuItem("Sao chép (Copy)", CreateCopyIcon(), (s, e) => {
+            ToolStripMenuItem miCopy = new ToolStripMenuItem(AppL10n.T("Sao chép (Copy)", "Copy"), CreateCopyIcon(), (s, e) => {
                 CopySlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -21820,22 +22127,22 @@ namespace ZenQOffice.UI
             });
             menu.Items.Add(new ToolStripSeparator());
             // 2. New Slide, Duplicate Slide, Delete Slide, Add Section
-            ToolStripMenuItem miNewSlide = new ToolStripMenuItem("Trang chiếu Mới (New Slide)", CreateNewSlideMenuIcon(), (s, e) => {
+            ToolStripMenuItem miNewSlide = new ToolStripMenuItem(AppL10n.T("Trang chiếu Mới (New Slide)", "New Slide"), CreateNewSlideMenuIcon(), (s, e) => {
                 SaveUndoState();
                 InsertNewSlideAfter(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miDupSlide = new ToolStripMenuItem("Nhân bản Trang chiếu (Duplicate Slide)", CreateDupSlideMenuIcon(), (s, e) => {
+            ToolStripMenuItem miDupSlide = new ToolStripMenuItem(AppL10n.T("Nhân bản Trang chiếu (Duplicate Slide)", "Duplicate Slide"), CreateDupSlideMenuIcon(), (s, e) => {
                 SaveUndoState();
                 DuplicateSlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miDelSlide = new ToolStripMenuItem("Xóa Trang chiếu (Delete Slide)", CreateDeleteSlideMenuIcon(), (s, e) => {
+            ToolStripMenuItem miDelSlide = new ToolStripMenuItem(AppL10n.T("Xóa Trang chiếu (Delete Slide)", "Delete Slide"), CreateDeleteSlideMenuIcon(), (s, e) => {
                 SaveUndoState();
                 DeleteSlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
-            ToolStripMenuItem miAddSection = new ToolStripMenuItem("Thêm Phần (Add Section)", CreateAddSectionMenuIcon(), (s, e) => {
+            ToolStripMenuItem miAddSection = new ToolStripMenuItem(AppL10n.T("Thêm Phần (Add Section)", "Add Section"), CreateAddSectionMenuIcon(), (s, e) => {
                 AddSection(parentControl, slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -21845,7 +22152,7 @@ namespace ZenQOffice.UI
             menu.Items.Add(miAddSection);
             menu.Items.Add(new ToolStripSeparator());
             // 3. Layout ▾
-            ToolStripMenuItem miLayout = new ToolStripMenuItem("Bố cục (Layout)", CreateLayoutMenuIcon());
+            ToolStripMenuItem miLayout = new ToolStripMenuItem(AppL10n.T("Bố cục (Layout)", "Layout"), CreateLayoutMenuIcon());
             SlideLayoutType[] layouts = new SlideLayoutType[] {
                 SlideLayoutType.TitleSlide, SlideLayoutType.TitleAndContent, SlideLayoutType.SectionHeader,
                 SlideLayoutType.TwoContent, SlideLayoutType.Comparison, SlideLayoutType.TitleOnly,
@@ -21870,14 +22177,14 @@ namespace ZenQOffice.UI
             }
             menu.Items.Add(miLayout);
             // 4. Reset Slide
-            ToolStripMenuItem miReset = new ToolStripMenuItem("Đặt lại Trang chiếu (Reset Slide)", CreateResetSlideIcon(), (s, e) => {
+            ToolStripMenuItem miReset = new ToolStripMenuItem(AppL10n.T("Đặt lại Trang chiếu (Reset Slide)", "Reset Slide"), CreateResetSlideIcon(), (s, e) => {
                 SaveUndoState();
                 ResetSlide(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
             menu.Items.Add(miReset);
             // 5. Format Background...
-            ToolStripMenuItem miFmtBg = new ToolStripMenuItem("Định dạng Nền (Format Background)...", CreateFormatBgIcon(), (s, e) => {
+            ToolStripMenuItem miFmtBg = new ToolStripMenuItem(AppL10n.T("Định dạng Nền (Format Background)...", "Format Background..."), CreateFormatBgIcon(), (s, e) => {
                 SidebarPanel = SidebarPanelType.FormatBackground;
                 IsSidebarOpen = true;
                 if (parentControl != null) parentControl.Invalidate();
@@ -21885,11 +22192,11 @@ namespace ZenQOffice.UI
             menu.Items.Add(miFmtBg);
             menu.Items.Add(new ToolStripSeparator());
             // 6. Photo Album...
-            ToolStripMenuItem miPhotoAlbum = new ToolStripMenuItem("Bộ sưu tập ảnh...", CreatePhotoAlbumIcon());
+            ToolStripMenuItem miPhotoAlbum = new ToolStripMenuItem(AppL10n.T("Bộ sưu tập ảnh...", "Photo Album..."), CreatePhotoAlbumIcon());
             miPhotoAlbum.Enabled = false;
             menu.Items.Add(miPhotoAlbum);
             // 7. Hide Slide / Unhide Slide
-            string hideText = targetSlide.IsHidden ? "Hiện Trang chiếu (Unhide Slide)" : "Ẩn Trang chiếu (Hide Slide)";
+            string hideText = targetSlide.IsHidden ? AppL10n.T("Hiện Trang chiếu (Unhide Slide)", "Unhide Slide") : AppL10n.T("Ẩn Trang chiếu (Hide Slide)", "Hide Slide");
             ToolStripMenuItem miHide = new ToolStripMenuItem(hideText, CreateHideSlideMenuIcon(), (s, e) => {
                 targetSlide.IsHidden = !targetSlide.IsHidden;
                 if (parentControl != null) parentControl.Invalidate();
@@ -21898,7 +22205,7 @@ namespace ZenQOffice.UI
             menu.Items.Add(miHide);
             menu.Items.Add(new ToolStripSeparator());
             // 8. New Comment
-            ToolStripMenuItem miNewComment = new ToolStripMenuItem("Bình luận mới (New Comment)", CreateNewCommentMenuIcon(), (s, e) => {
+            ToolStripMenuItem miNewComment = new ToolStripMenuItem(AppL10n.T("Bình luận mới (New Comment)", "New Comment"), CreateNewCommentMenuIcon(), (s, e) => {
                 using (NewCommentDialogForm dlg = new NewCommentDialogForm())
                 {
                     if (dlg.ShowDialog(parentControl) == DialogResult.OK && !string.IsNullOrWhiteSpace(dlg.CommentText))
@@ -22052,7 +22359,7 @@ namespace ZenQOffice.UI
             menu.Font = new Font("Segoe UI", 9f);
             menu.ShowImageMargin = true;
             // 1. Rename Section
-            ToolStripMenuItem miRename = new ToolStripMenuItem("Đổi tên Phần (Rename Section)", CreateRenameSecIcon(), (s, e) => {
+            ToolStripMenuItem miRename = new ToolStripMenuItem(AppL10n.T("Đổi tên Phần (Rename Section)", "Rename Section"), CreateRenameSecIcon(), (s, e) => {
                 string renamed = PromptRenameSection(parentControl, secSlide.SectionName);
                 if (renamed != null)
                 {
@@ -22061,13 +22368,13 @@ namespace ZenQOffice.UI
                 }
             });
             // 2. Remove Section
-            ToolStripMenuItem miRemoveSec = new ToolStripMenuItem("Xóa Phần (Remove Section)", CreateRemoveSecIcon(), (s, e) => {
+            ToolStripMenuItem miRemoveSec = new ToolStripMenuItem(AppL10n.T("Xóa Phần (Remove Section)", "Remove Section"), CreateRemoveSecIcon(), (s, e) => {
                 secSlide.IsSectionHeader = false;
                 secSlide.SectionName = "";
                 if (parentControl != null) parentControl.Invalidate();
             });
             // 3. Remove Section & Slides
-            ToolStripMenuItem miRemoveSecAndSlides = new ToolStripMenuItem("Xóa Phần và Trang chiếu (Remove Section & Slides)", CreateRemoveSecAndSlidesIcon(), (s, e) => {
+            ToolStripMenuItem miRemoveSecAndSlides = new ToolStripMenuItem(AppL10n.T("Xóa Phần và Trang chiếu (Remove Section & Slides)", "Remove Section & Slides"), CreateRemoveSecAndSlidesIcon(), (s, e) => {
                 int nextSec = slideIndex + 1;
                 while (nextSec < Presentation.Slides.Count && !Presentation.Slides[nextSec].IsSectionHeader)
                 {
@@ -22091,7 +22398,7 @@ namespace ZenQOffice.UI
                 if (parentControl != null) parentControl.Invalidate();
             });
             // 4. Remove All Sections
-            ToolStripMenuItem miRemoveAll = new ToolStripMenuItem("Xóa Tất cả các Phần (Remove All Sections)", CreateRemoveAllSecIcon(), (s, e) => {
+            ToolStripMenuItem miRemoveAll = new ToolStripMenuItem(AppL10n.T("Xóa Tất cả các Phần (Remove All Sections)", "Remove All Sections"), CreateRemoveAllSecIcon(), (s, e) => {
                 RemoveAllSections();
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -22101,7 +22408,7 @@ namespace ZenQOffice.UI
             menu.Items.Add(miRemoveAll);
             menu.Items.Add(new ToolStripSeparator());
             // 5. Move Section Up
-            ToolStripMenuItem miMoveUp = new ToolStripMenuItem("Di chuyển Phần Lên trên (Move Section Up)", CreateMoveSecUpIcon(), (s, e) => {
+            ToolStripMenuItem miMoveUp = new ToolStripMenuItem(AppL10n.T("Di chuyển Phần Lên trên (Move Section Up)", "Move Section Up"), CreateMoveSecUpIcon(), (s, e) => {
                 MoveSectionUp(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -22113,7 +22420,7 @@ namespace ZenQOffice.UI
             {
                 if (Presentation.Slides[k].IsSectionHeader) { canMoveDown = true; break; }
             }
-            ToolStripMenuItem miMoveDown = new ToolStripMenuItem("Di chuyển Phần Xuống dưới (Move Section Down)", CreateMoveSecDownIcon(), (s, e) => {
+            ToolStripMenuItem miMoveDown = new ToolStripMenuItem(AppL10n.T("Di chuyển Phần Xuống dưới (Move Section Down)", "Move Section Down"), CreateMoveSecDownIcon(), (s, e) => {
                 MoveSectionDown(slideIndex);
                 if (parentControl != null) parentControl.Invalidate();
             });
@@ -22122,7 +22429,7 @@ namespace ZenQOffice.UI
             menu.Items.Add(miMoveDown);
             menu.Items.Add(new ToolStripSeparator());
             // 7. Collapse All
-            ToolStripMenuItem miCollapseAll = new ToolStripMenuItem("Thu gọn Tất cả (Collapse All)", CreateCollapseAllIcon(), (s, e) => {
+            ToolStripMenuItem miCollapseAll = new ToolStripMenuItem(AppL10n.T("Thu gọn Tất cả (Collapse All)", "Collapse All"), CreateCollapseAllIcon(), (s, e) => {
                 foreach (var sl in Presentation.Slides)
                 {
                     if (sl.IsSectionHeader || (sl == Presentation.Slides[0] && HasAnySections()))
@@ -22133,7 +22440,7 @@ namespace ZenQOffice.UI
                 if (parentControl != null) parentControl.Invalidate();
             });
             // 8. Expand All
-            ToolStripMenuItem miExpandAll = new ToolStripMenuItem("Mở rộng Tất cả (Expand All)", CreateExpandAllIcon(), (s, e) => {
+            ToolStripMenuItem miExpandAll = new ToolStripMenuItem(AppL10n.T("Mở rộng Tất cả (Expand All)", "Expand All"), CreateExpandAllIcon(), (s, e) => {
                 foreach (var sl in Presentation.Slides)
                 {
                     sl.IsSectionCollapsed = false;
@@ -23365,7 +23672,7 @@ namespace ZenQOffice.UI
                     }
                 }
                 // Size Badge tag at bottom right
-                string tip = isSquare ? string.Format("{0} × {1} (Khóa 1:1)", w, h) : string.Format("{0} × {1} px", w, h);
+                string tip = isSquare ? string.Format(AppL10n.T("{0} × {1} (Khóa 1:1)", "{0} × {1} (1:1 Locked)"), w, h) : string.Format("{0} × {1} px", w, h);
                 using (Font tipFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
                 using (SolidBrush tipBg = new SolidBrush(Color.FromArgb(220, 15, 23, 42)))
                 {
@@ -23407,7 +23714,7 @@ namespace ZenQOffice.UI
                 using (Font endFont = new Font("Segoe UI", 12.0f, FontStyle.Regular))
                 using (SolidBrush endBrush = new SolidBrush(Color.FromArgb(170, 180, 195)))
                 {
-                    string endText = "Kết thúc trình chiếu, bấm chuột hoặc nhấn phím bất kỳ để thoát.";
+                    string endText = AppL10n.T("Kết thúc trình chiếu, bấm chuột hoặc nhấn phím bất kỳ để thoát.", "End of slide show, click or press any key to exit.");
                     SizeF sz = g.MeasureString(endText, endFont);
                     g.DrawString(endText, endFont, endBrush, (screenW - sz.Width) / 2f, (screenH - sz.Height) / 2f);
                 }
@@ -23768,22 +24075,22 @@ namespace ZenQOffice.UI
                 Rectangle pauseRect = new Rectangle(210, 8, 100, 30);
                 g.FillRectangle(btnBg, pauseRect);
                 g.DrawRectangle(bPen, pauseRect);
-                g.DrawString(IsPresentationTimerPaused ? "▶ Tiếp tục" : "⏸ Tạm dừng", btnFont, Brushes.WhiteSmoke, pauseRect.X + 16, pauseRect.Y + 6);
+                g.DrawString(AppL10n.Tr(IsPresentationTimerPaused ? "▶ Tiếp tục" : "⏸ Tạm dừng"), btnFont, Brushes.WhiteSmoke, pauseRect.X + 16, pauseRect.Y + 6);
                 Rectangle resetRect = new Rectangle(320, 8, 90, 30);
                 g.FillRectangle(btnBg, resetRect);
                 g.DrawRectangle(bPen, resetRect);
-                g.DrawString("🔄 Đặt lại", btnFont, Brushes.WhiteSmoke, resetRect.X + 16, resetRect.Y + 6);
+                g.DrawString(AppL10n.Tr("🔄 Đặt lại"), btnFont, Brushes.WhiteSmoke, resetRect.X + 16, resetRect.Y + 6);
                 Rectangle dispRect = new Rectangle(420, 8, 170, 30);
                 g.FillRectangle(btnBg, dispRect);
                 g.DrawRectangle(bPen, dispRect);
-                g.DrawString("🖥️ Cài đặt hiển thị ▼", btnFont, Brushes.WhiteSmoke, dispRect.X + 14, dispRect.Y + 6);
+                g.DrawString(AppL10n.Tr("🖥️ Cài đặt hiển thị ▼"), btnFont, Brushes.WhiteSmoke, dispRect.X + 14, dispRect.Y + 6);
                 // Nút Kết thúc trình chiếu (End Show)
                 Rectangle endRect = new Rectangle(screenW - 200, 8, 184, 30);
                 using (SolidBrush redBtn = new SolidBrush(Color.FromArgb(180, 40, 40)))
                 {
                     g.FillRectangle(redBtn, endRect);
                     g.DrawRectangle(Pens.DarkRed, endRect);
-                    g.DrawString("✕ Kết thúc trình chiếu", btnFont, Brushes.White, endRect.X + 18, endRect.Y + 6);
+                    g.DrawString(AppL10n.Tr("✕ Kết thúc trình chiếu"), btnFont, Brushes.White, endRect.X + 18, endRect.Y + 6);
                 }
             }
             // Đồng hồ thời gian thực hiện tại
@@ -23801,7 +24108,7 @@ namespace ZenQOffice.UI
             // Khung Slide hiện tại (Bên Trái)
             using (Font headerFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
             {
-                g.DrawString("Slide hiện tại (Slide " + (ActiveSlideIndex + 1) + " / " + Presentation.Slides.Count + ")", headerFont, Brushes.DarkOrange, 20, mainY + 2);
+                g.DrawString(AppL10n.T($"Slide hiện tại (Slide {ActiveSlideIndex + 1} / {Presentation.Slides.Count})", $"Current Slide ({ActiveSlideIndex + 1} / {Presentation.Slides.Count})"), headerFont, Brushes.DarkOrange, 20, mainY + 2);
             }
             int currSlideMaxW = leftW - 32;
             int currSlideMaxH = mainH - 36;
@@ -23822,7 +24129,7 @@ namespace ZenQOffice.UI
                 using (Font endFont = new Font("Segoe UI", 10.5f, FontStyle.Regular))
                 using (SolidBrush endBrush = new SolidBrush(Color.FromArgb(170, 180, 195)))
                 {
-                    string endText = "Kết thúc trình chiếu, bấm chuột để thoát.";
+                    string endText = AppL10n.T("Kết thúc trình chiếu, bấm chuột để thoát.", "End of slide show, click to exit.");
                     SizeF sz = g.MeasureString(endText, endFont);
                     g.DrawString(endText, endFont, endBrush, curSlideRect.X + (curSlideRect.Width - sz.Width) / 2f, curSlideRect.Y + (curSlideRect.Height - sz.Height) / 2f);
                 }
@@ -23894,7 +24201,7 @@ namespace ZenQOffice.UI
             int nextH = (int)(mainH * 0.44f);
             using (Font headerFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
             {
-                g.DrawString("Slide tiếp theo:", headerFont, Brushes.LightGray, rightX, mainY + 2);
+                g.DrawString(AppL10n.Tr("Slide tiếp theo:"), headerFont, Brushes.LightGray, rightX, mainY + 2);
             }
             int nextMaxW = rightW - 24;
             int nextMaxH = nextH - 32;
@@ -23989,7 +24296,7 @@ namespace ZenQOffice.UI
                 g.DrawRectangle(Pens.DimGray, nextRect);
                 using (Font endFont = new Font("Segoe UI", 11.0f, FontStyle.Italic))
                 {
-                    g.DrawString("Hết bản trình chiếu (End of Slide Show)", endFont, Brushes.DimGray, nextX + 16, nextY + nextHActual / 2 - 10);
+                    g.DrawString(AppL10n.Tr("Hết bản trình chiếu (End of Slide Show)"), endFont, Brushes.DimGray, nextX + 16, nextY + nextHActual / 2 - 10);
                 }
             }
             // Khung Phải Bottom: Ghi chú của Diễn giả (Speaker Notes)
@@ -23998,7 +24305,7 @@ namespace ZenQOffice.UI
             using (Font headerFont = new Font("Segoe UI", 11.0f, FontStyle.Bold))
             using (Font smallFont = new Font("Segoe UI", 9.0f))
             {
-                g.DrawString("Ghi chú người thuyết trình:", headerFont, Brushes.LightGray, rightX, notesY);
+                g.DrawString(AppL10n.Tr("Ghi chú người thuyết trình:"), headerFont, Brushes.LightGray, rightX, notesY);
                 // Nút thu phóng chữ A- / A+
                 Rectangle btnMinus = new Rectangle(screenW - 80, notesY, 26, 20);
                 Rectangle btnPlus = new Rectangle(screenW - 48, notesY, 26, 20);
@@ -24047,11 +24354,11 @@ namespace ZenQOffice.UI
                 Rectangle penBtn = new Rectangle(240, botY + 14, 110, 36);
                 g.FillRectangle((AnnotationPenMode || LaserPointerMode) ? Brushes.DarkRed : btnBg, penBtn);
                 g.DrawRectangle(bPen, penBtn);
-                g.DrawString("🖊️ Bút / Laser", toolFont, Brushes.White, penBtn.X + 10, penBtn.Y + 8);
+                g.DrawString(AppL10n.Tr("🖊️ Bút / Laser"), toolFont, Brushes.White, penBtn.X + 10, penBtn.Y + 8);
                 Rectangle gridBtn = new Rectangle(360, botY + 14, 130, 36);
                 g.FillRectangle(btnBg, gridBtn);
                 g.DrawRectangle(bPen, gridBtn);
-                g.DrawString("🗂️ Tất cả Slide", toolFont, Brushes.White, gridBtn.X + 10, gridBtn.Y + 8);
+                g.DrawString(AppL10n.Tr("🗂️ Tất cả Slide"), toolFont, Brushes.White, gridBtn.X + 10, gridBtn.Y + 8);
                 Rectangle zoomBtn = new Rectangle(500, botY + 14, 90, 36);
                 g.FillRectangle(IsSlideZoomActive ? Brushes.DarkRed : btnBg, zoomBtn);
                 g.DrawRectangle(bPen, zoomBtn);
@@ -24059,7 +24366,7 @@ namespace ZenQOffice.UI
                 Rectangle blackBtn = new Rectangle(600, botY + 14, 120, 36);
                 g.FillRectangle(BlackScreenMode ? Brushes.DimGray : btnBg, blackBtn);
                 g.DrawRectangle(bPen, blackBtn);
-                g.DrawString("⬛ Màn đen (B)", toolFont, Brushes.White, blackBtn.X + 10, blackBtn.Y + 8);
+                g.DrawString(AppL10n.Tr("⬛ Màn đen (B)"), toolFont, Brushes.White, blackBtn.X + 10, blackBtn.Y + 8);
             }
         }
         private void DrawSlideSorterModal(D2DGraphics g, int screenW, int screenH)
@@ -24069,21 +24376,36 @@ namespace ZenQOffice.UI
         public void ShowPresentationHelp()
         {
             ZenQOffice.UI.FluentMessageBox.Show(
-                "PHÍM TẮT TRÌNH CHIẾU SLIDES:\n\n" +
-                "• Tiến slide / bước tiếp theo: Chuột Trái, Mũi tên Phải/Lên, Space, Enter, PageDown\n" +
-                "• Lùi slide / bước trước đó: Mũi tên Trái/Xuống, Backspace, PageUp\n" +
-                "• Bút vẽ (Pen): Phím P hoặc Ctrl+P\n" +
-                "• Con trỏ Laser đỏ: Phím L hoặc Ctrl+L\n" +
-                "• Bút dạ quang (Highlighter): Phím H hoặc Ctrl+I\n" +
-                "• Xóa tất cả nét vẽ trên slide: Phím E\n" +
-                "• Mũi tên chuột bình thường: Ctrl+A\n" +
-                "• Màn hình đen: Phím B | Màn hình trắng: Phím W\n" +
-                "• Xem danh sách tất cả slide (Grid): Nút Grid góc dưới trái\n" +
-                "• Thu phóng slide (Zoom): Nút Kính lúp góc dưới trái\n" +
-                "• Chế độ Diễn giả (Presenter View): Alt+F5\n" +
-                "• Menu chuột phải: Chứa đầy đủ các tùy chọn trình chiếu\n" +
-                "• Kết thúc trình chiếu: Phím Escape (Esc)",
-                "Trợ giúp Trình chiếu ZenQ Slides", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AppL10n.T(
+                    "PHÍM TẮT TRÌNH CHIẾU SLIDES:\n\n" +
+                    "• Tiến slide / bước tiếp theo: Chuột Trái, Mũi tên Phải/Lên, Space, Enter, PageDown\n" +
+                    "• Lùi slide / bước trước đó: Mũi tên Trái/Xuống, Backspace, PageUp\n" +
+                    "• Bút vẽ (Pen): Phím P hoặc Ctrl+P\n" +
+                    "• Con trỏ Laser đỏ: Phím L hoặc Ctrl+L\n" +
+                    "• Bút dạ quang (Highlighter): Phím H hoặc Ctrl+I\n" +
+                    "• Xóa tất cả nét vẽ trên slide: Phím E\n" +
+                    "• Mũi tên chuột bình thường: Ctrl+A\n" +
+                    "• Màn hình đen: Phím B | Màn hình trắng: Phím W\n" +
+                    "• Xem danh sách tất cả slide (Grid): Nút Grid góc dưới trái\n" +
+                    "• Thu phóng slide (Zoom): Nút Kính lúp góc dưới trái\n" +
+                    "• Chế độ Diễn giả (Presenter View): Alt+F5\n" +
+                    "• Menu chuột phải: Chứa đầy đủ các tùy chọn trình chiếu\n" +
+                    "• Kết thúc trình chiếu: Phím Escape (Esc)",
+                    "SLIDE SHOW SHORTCUTS:\n\n" +
+                    "• Next slide / animation: Left Click, Right/Up Arrow, Space, Enter, PageDown\n" +
+                    "• Previous slide / animation: Left/Down Arrow, Backspace, PageUp\n" +
+                    "• Pen tool: P or Ctrl+P\n" +
+                    "• Laser pointer: L or Ctrl+L\n" +
+                    "• Highlighter: H or Ctrl+I\n" +
+                    "• Erase all ink on slide: E\n" +
+                    "• Normal arrow pointer: Ctrl+A\n" +
+                    "• Black screen: B | White screen: W\n" +
+                    "• See all slides (Grid): Grid button (bottom left)\n" +
+                    "• Zoom slide: Magnifier button (bottom left)\n" +
+                    "• Presenter View: Alt+F5\n" +
+                    "• Right-click menu: Full slide show controls\n" +
+                    "• End slide show: Esc"),
+                AppL10n.T("Trợ giúp Trình chiếu ZenQ Slides", "ZenQ Slides Help"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         public void ShowPresentationContextMenu(Control parent, Point pt)
         {
@@ -24091,7 +24413,7 @@ namespace ZenQOffice.UI
             menu.Renderer = ZenQOffice.UI.FluentUi.MenuRenderer;
             menu.Font = new Font("Segoe UI", 9.5f);
             // 1. Next
-            ToolStripMenuItem miNext = new ToolStripMenuItem("Tiếp theo (Next) [Space / Click]", null, (s, e) =>
+            ToolStripMenuItem miNext = new ToolStripMenuItem(AppL10n.T("Tiếp theo (Next) [Space / Click]", "Next [Space / Click]"), null, (s, e) =>
             {
                 AdvancePresenterStep();
                 if (parent != null) parent.Invalidate();
@@ -24099,7 +24421,7 @@ namespace ZenQOffice.UI
             miNext.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             menu.Items.Add(miNext);
             // 2. Previous
-            ToolStripMenuItem miPrev = new ToolStripMenuItem("Trước đó (Previous) [Backspace / ◀]", null, (s, e) =>
+            ToolStripMenuItem miPrev = new ToolStripMenuItem(AppL10n.T("Trước đó (Previous) [Backspace / ◀]", "Previous [Backspace / ◀]"), null, (s, e) =>
             {
                 PreviousPresenterStep();
                 if (parent != null) parent.Invalidate();
@@ -24107,7 +24429,7 @@ namespace ZenQOffice.UI
             miPrev.Enabled = (ActiveSlideIndex > 0 || CurrentAnimationStep > 0);
             menu.Items.Add(miPrev);
             // 3. Last Viewed
-            ToolStripMenuItem miLastViewed = new ToolStripMenuItem("Vừa xem (Last Viewed)");
+            ToolStripMenuItem miLastViewed = new ToolStripMenuItem(AppL10n.T("Vừa xem (Last Viewed)", "Last Viewed"));
             miLastViewed.Enabled = (LastViewedSlideIndex >= 0 && LastViewedSlideIndex < Presentation.Slides.Count);
             miLastViewed.Click += (s, e) =>
             {
@@ -24122,14 +24444,14 @@ namespace ZenQOffice.UI
             };
             menu.Items.Add(miLastViewed);
             // 4. See All Slides (Grid)
-            ToolStripMenuItem miSeeAll = new ToolStripMenuItem("Xem tất cả slide (See All Slides) [Grid]", null, (s, e) =>
+            ToolStripMenuItem miSeeAll = new ToolStripMenuItem(AppL10n.T("Xem tất cả slide (See All Slides) [Grid]", "See All Slides [Grid]"), null, (s, e) =>
             {
                 IsSlideSorterModalOpen = true;
                 if (parent != null) parent.Invalidate();
             });
             menu.Items.Add(miSeeAll);
             // 5. Zoom In
-            ToolStripMenuItem miZoom = new ToolStripMenuItem("Thu phóng (Zoom In)", null, (s, e) =>
+            ToolStripMenuItem miZoom = new ToolStripMenuItem(AppL10n.T("Thu phóng (Zoom In)", "Zoom In"), null, (s, e) =>
             {
                 IsSlideZoomActive = !IsSlideZoomActive;
                 SlideZoomCenter = pt;
@@ -24138,7 +24460,7 @@ namespace ZenQOffice.UI
             miZoom.Checked = IsSlideZoomActive;
             menu.Items.Add(miZoom);
             // 6. Show Presenter View
-            ToolStripMenuItem miPresenter = new ToolStripMenuItem(IsPresenterViewMode ? "Ẩn Chế độ Diễn giả (Hide Presenter View)" : "Xem Chế độ Diễn giả (Show Presenter View) [Alt+F5]", null, (s, e) =>
+            ToolStripMenuItem miPresenter = new ToolStripMenuItem(IsPresenterViewMode ? AppL10n.T("Ẩn Chế độ Diễn giả (Hide Presenter View)", "Hide Presenter View") : AppL10n.T("Xem Chế độ Diễn giả (Show Presenter View) [Alt+F5]", "Show Presenter View [Alt+F5]"), null, (s, e) =>
             {
                 IsPresenterViewMode = !IsPresenterViewMode;
                 if (parent != null) parent.Invalidate();
@@ -24146,8 +24468,8 @@ namespace ZenQOffice.UI
             menu.Items.Add(miPresenter);
             menu.Items.Add(new ToolStripSeparator());
             // 7. Pointer Options ▶
-            ToolStripMenuItem miPointerOptions = new ToolStripMenuItem("Tùy chọn con trỏ (Pointer Options)");
-            ToolStripMenuItem miArrow = new ToolStripMenuItem("Mũi tên thông thường (Arrow) [Ctrl+A]", null, (s, e) =>
+            ToolStripMenuItem miPointerOptions = new ToolStripMenuItem(AppL10n.T("Tùy chọn con trỏ (Pointer Options)", "Pointer Options"));
+            ToolStripMenuItem miArrow = new ToolStripMenuItem(AppL10n.T("Mũi tên thông thường (Arrow) [Ctrl+A]", "Arrow [Ctrl+A]"), null, (s, e) =>
             {
                 LaserPointerMode = false;
                 AnnotationPenMode = false;
@@ -24156,7 +24478,7 @@ namespace ZenQOffice.UI
             });
             miArrow.Checked = (!LaserPointerMode && !AnnotationPenMode);
             miPointerOptions.DropDownItems.Add(miArrow);
-            ToolStripMenuItem miLaser = new ToolStripMenuItem("Con trỏ Laser đỏ (Laser Pointer) [L / Ctrl+L]", null, (s, e) =>
+            ToolStripMenuItem miLaser = new ToolStripMenuItem(AppL10n.T("Con trỏ Laser đỏ (Laser Pointer) [L / Ctrl+L]", "Laser Pointer [L / Ctrl+L]"), null, (s, e) =>
             {
                 LaserPointerMode = true;
                 AnnotationPenMode = false;
@@ -24164,7 +24486,7 @@ namespace ZenQOffice.UI
             });
             miLaser.Checked = LaserPointerMode;
             miPointerOptions.DropDownItems.Add(miLaser);
-            ToolStripMenuItem miPen = new ToolStripMenuItem("Bút vẽ ghi chú (Pen) [P / Ctrl+P]", null, (s, e) =>
+            ToolStripMenuItem miPen = new ToolStripMenuItem(AppL10n.T("Bút vẽ ghi chú (Pen) [P / Ctrl+P]", "Pen [P / Ctrl+P]"), null, (s, e) =>
             {
                 AnnotationPenMode = true;
                 LaserPointerMode = false;
@@ -24174,7 +24496,7 @@ namespace ZenQOffice.UI
             });
             miPen.Checked = (AnnotationPenMode && !IsHighlighter);
             miPointerOptions.DropDownItems.Add(miPen);
-            ToolStripMenuItem miHighlighter = new ToolStripMenuItem("Bút dạ quang (Highlighter) [H / Ctrl+I]", null, (s, e) =>
+            ToolStripMenuItem miHighlighter = new ToolStripMenuItem(AppL10n.T("Bút dạ quang (Highlighter) [H / Ctrl+I]", "Highlighter [H / Ctrl+I]"), null, (s, e) =>
             {
                 AnnotationPenMode = true;
                 LaserPointerMode = false;
@@ -24185,7 +24507,7 @@ namespace ZenQOffice.UI
             });
             miHighlighter.Checked = (AnnotationPenMode && IsHighlighter);
             miPointerOptions.DropDownItems.Add(miHighlighter);
-            ToolStripMenuItem miEraser = new ToolStripMenuItem("Tẩy nét vẽ (Eraser) [E]", null, (s, e) =>
+            ToolStripMenuItem miEraser = new ToolStripMenuItem(AppL10n.T("Tẩy nét vẽ (Eraser) [E]", "Eraser [E]"), null, (s, e) =>
             {
                 AnnotationPenMode = false;
                 LaserPointerMode = false;
@@ -24194,7 +24516,7 @@ namespace ZenQOffice.UI
                 if (parent != null) parent.Invalidate();
             });
             miPointerOptions.DropDownItems.Add(miEraser);
-            ToolStripMenuItem miEraseAll = new ToolStripMenuItem("Xóa toàn bộ nét vẽ trên Slide (Erase All Ink)", null, (s, e) =>
+            ToolStripMenuItem miEraseAll = new ToolStripMenuItem(AppL10n.T("Xóa toàn bộ nét vẽ trên Slide (Erase All Ink)", "Erase All Ink on Slide"), null, (s, e) =>
             {
                 PenStrokes.Clear();
                 CurrentStroke.Clear();
@@ -24203,7 +24525,7 @@ namespace ZenQOffice.UI
             miPointerOptions.DropDownItems.Add(miEraseAll);
             miPointerOptions.DropDownItems.Add(new ToolStripSeparator());
             // Ink Color submenu
-            ToolStripMenuItem miInkColor = new ToolStripMenuItem("Màu mực vẽ (Ink Color)");
+            ToolStripMenuItem miInkColor = new ToolStripMenuItem(AppL10n.T("Màu mực vẽ (Ink Color)", "Ink Color"));
             Color[] colors = new Color[] { Color.Red, Color.Yellow, Color.LimeGreen, Color.DeepSkyBlue, Color.White, Color.Black };
             string[] colorNames = new string[] { "Đỏ (Red)", "Vàng (Yellow)", "Xanh lá (Green)", "Xanh lam (Blue)", "Trắng (White)", "Đen (Black)" };
             for (int ci = 0; ci < colors.Length; ci++)
@@ -24223,22 +24545,22 @@ namespace ZenQOffice.UI
             miPointerOptions.DropDownItems.Add(miInkColor);
             menu.Items.Add(miPointerOptions);
             // 8. Screen ▶
-            ToolStripMenuItem miScreen = new ToolStripMenuItem("Màn hình (Screen)");
-            ToolStripMenuItem miBlack = new ToolStripMenuItem("Màn hình Đen (Black Screen) [B]", null, (s, e) =>
+            ToolStripMenuItem miScreen = new ToolStripMenuItem(AppL10n.T("Màn hình (Screen)", "Screen"));
+            ToolStripMenuItem miBlack = new ToolStripMenuItem(AppL10n.T("Màn hình Đen (Black Screen) [B]", "Black Screen [B]"), null, (s, e) =>
             {
                 BlackScreenMode = !BlackScreenMode;
                 WhiteScreenMode = false;
                 if (parent != null) parent.Invalidate();
             });
             miBlack.Checked = BlackScreenMode;
-            ToolStripMenuItem miWhite = new ToolStripMenuItem("Màn hình Trắng (White Screen) [W]", null, (s, e) =>
+            ToolStripMenuItem miWhite = new ToolStripMenuItem(AppL10n.T("Màn hình Trắng (White Screen) [W]", "White Screen [W]"), null, (s, e) =>
             {
                 WhiteScreenMode = !WhiteScreenMode;
                 BlackScreenMode = false;
                 if (parent != null) parent.Invalidate();
             });
             miWhite.Checked = WhiteScreenMode;
-            ToolStripMenuItem miTaskbar = new ToolStripMenuItem("Hiện thanh Taskbar (Show Taskbar)", null, (s, e) =>
+            ToolStripMenuItem miTaskbar = new ToolStripMenuItem(AppL10n.T("Hiện thanh Taskbar (Show Taskbar)", "Show Taskbar"), null, (s, e) =>
             {
                 if (parent is Form) ((Form)parent).TopMost = false;
             });
@@ -24247,14 +24569,14 @@ namespace ZenQOffice.UI
             miScreen.DropDownItems.Add(miTaskbar);
             menu.Items.Add(miScreen);
             // 9. Help
-            ToolStripMenuItem miHelp = new ToolStripMenuItem("Trợ giúp phím tắt (Help) [F1]", null, (s, e) =>
+            ToolStripMenuItem miHelp = new ToolStripMenuItem(AppL10n.T("Trợ giúp phím tắt (Help) [F1]", "Help [F1]"), null, (s, e) =>
             {
                 ShowPresentationHelp();
             });
             menu.Items.Add(miHelp);
             menu.Items.Add(new ToolStripSeparator());
             // 10. End Show
-            ToolStripMenuItem miEndShow = new ToolStripMenuItem("Kết thúc trình chiếu (End Show) [Esc]", null, (s, e) =>
+            ToolStripMenuItem miEndShow = new ToolStripMenuItem(AppL10n.T("Kết thúc trình chiếu (End Show) [Esc]", "End Show [Esc]"), null, (s, e) =>
             {
                 StopPresenting();
                 if (parent != null) parent.Invalidate();
@@ -24272,7 +24594,7 @@ namespace ZenQOffice.UI
             ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
             menu.Renderer = ZenQOffice.UI.FluentUi.MenuRenderer;
             menu.Font = new Font("Segoe UI", 9.5f);
-            ToolStripMenuItem miArrow = new ToolStripMenuItem("Arrow (Con trỏ chuột thường / Tắt bút) [A / Esc]", null, (s, e) =>
+            ToolStripMenuItem miArrow = new ToolStripMenuItem(AppL10n.T("Arrow (Con trỏ chuột thường / Tắt bút) [A / Esc]", "Arrow (Disable Pen) [A / Esc]"), null, (s, e) =>
             {
                 LaserPointerMode = false;
                 AnnotationPenMode = false;
@@ -24282,7 +24604,7 @@ namespace ZenQOffice.UI
             miArrow.Checked = (!LaserPointerMode && !AnnotationPenMode);
             menu.Items.Add(miArrow);
             menu.Items.Add(new ToolStripSeparator());
-            ToolStripMenuItem miLaser = new ToolStripMenuItem("Laser Pointer (Con trỏ Laser đỏ) [L]", null, (s, e) =>
+            ToolStripMenuItem miLaser = new ToolStripMenuItem(AppL10n.T("Laser Pointer (Con trỏ Laser đỏ) [L]", "Laser Pointer [L]"), null, (s, e) =>
             {
                 LaserPointerMode = !LaserPointerMode;
                 AnnotationPenMode = false;
@@ -24290,7 +24612,7 @@ namespace ZenQOffice.UI
             });
             miLaser.Checked = LaserPointerMode;
             menu.Items.Add(miLaser);
-            ToolStripMenuItem miPen = new ToolStripMenuItem("Pen (Bút vẽ ghi chú) [P]", null, (s, e) =>
+            ToolStripMenuItem miPen = new ToolStripMenuItem(AppL10n.T("Pen (Bút vẽ ghi chú) [P]", "Pen [P]"), null, (s, e) =>
             {
                 AnnotationPenMode = !AnnotationPenMode;
                 LaserPointerMode = false;
@@ -24300,7 +24622,7 @@ namespace ZenQOffice.UI
             });
             miPen.Checked = (AnnotationPenMode && !IsHighlighter);
             menu.Items.Add(miPen);
-            ToolStripMenuItem miHigh = new ToolStripMenuItem("Highlighter (Bút dạ quang) [H]", null, (s, e) =>
+            ToolStripMenuItem miHigh = new ToolStripMenuItem(AppL10n.T("Highlighter (Bút dạ quang) [H]", "Highlighter [H]"), null, (s, e) =>
             {
                 if (AnnotationPenMode && IsHighlighter)
                 {
@@ -24318,14 +24640,14 @@ namespace ZenQOffice.UI
             });
             miHigh.Checked = (AnnotationPenMode && IsHighlighter);
             menu.Items.Add(miHigh);
-            ToolStripMenuItem miEraser = new ToolStripMenuItem("Eraser (Tẩy nét vẽ) [E]", null, (s, e) =>
+            ToolStripMenuItem miEraser = new ToolStripMenuItem(AppL10n.T("Eraser (Tẩy nét vẽ) [E]", "Eraser [E]"), null, (s, e) =>
             {
                 PenStrokes.Clear();
                 CurrentStroke.Clear();
                 if (parent != null) parent.Invalidate();
             });
             menu.Items.Add(miEraser);
-            ToolStripMenuItem miInkColor = new ToolStripMenuItem("Ink Color (Màu mực vẽ)");
+            ToolStripMenuItem miInkColor = new ToolStripMenuItem(AppL10n.T("Ink Color (Màu mực vẽ)", "Ink Color"));
             Color[] colors = new Color[] { Color.Red, Color.Yellow, Color.Lime, Color.Cyan, Color.White, Color.Black };
             string[] names = new string[] { "Đỏ (Red)", "Vàng (Yellow)", "Xanh lá (Green)", "Xanh lam (Cyan)", "Trắng (White)", "Đen (Black)" };
             for (int i = 0; i < colors.Length; i++)
@@ -24343,7 +24665,7 @@ namespace ZenQOffice.UI
             }
             menu.Items.Add(miInkColor);
             menu.Items.Add(new ToolStripSeparator());
-            ToolStripMenuItem miClear = new ToolStripMenuItem("Erase All Ink on Slide (Xóa tất cả nét vẽ)", null, (s, e) =>
+            ToolStripMenuItem miClear = new ToolStripMenuItem(AppL10n.T("Erase All Ink on Slide (Xóa tất cả nét vẽ)", "Erase All Ink on Slide"), null, (s, e) =>
             {
                 PenStrokes.Clear();
                 CurrentStroke.Clear();
@@ -24357,12 +24679,12 @@ namespace ZenQOffice.UI
             ContextMenuStrip menu = new ZenQOffice.UI.FluentContextMenuStrip();
             menu.Renderer = ZenQOffice.UI.FluentUi.MenuRenderer;
             menu.Font = new Font("Segoe UI", 9.5f);
-            ToolStripMenuItem miSwap = new ToolStripMenuItem("Swap Presenter View and Slide Show (Hoán đổi 2 màn hình)", null, (s, e) =>
+            ToolStripMenuItem miSwap = new ToolStripMenuItem(AppL10n.T("Swap Presenter View and Slide Show (Hoán đổi 2 màn hình)", "Swap Presenter View and Slide Show"), null, (s, e) =>
             {
                 IsPresenterViewMode = !IsPresenterViewMode;
                 if (parent != null) parent.Invalidate();
             });
-            ToolStripMenuItem miDuplicate = new ToolStripMenuItem("Duplicate Slide Show (Nhân bản chiếu slide)", null, (s, e) =>
+            ToolStripMenuItem miDuplicate = new ToolStripMenuItem(AppL10n.T("Duplicate Slide Show (Nhân bản chiếu slide)", "Duplicate Slide Show"), null, (s, e) =>
             {
                 IsPresenterViewMode = false;
                 if (parent != null) parent.Invalidate();
@@ -25637,7 +25959,7 @@ namespace ZenQOffice.UI
             using (Font titleFont = new Font("Segoe UI", 12.0f, FontStyle.Bold))
             using (Font bodyFont = new Font("Segoe UI", 10.0f, FontStyle.Regular))
             {
-                g.DrawString("📋 CHẾ ĐỘ XEM DÀN BÀI (OUTLINE VIEW)", titleFont, Brushes.DarkOrange, x + 30, py);
+                g.DrawString(AppL10n.Tr("📋 CHẾ ĐỘ XEM DÀN BÀI (OUTLINE VIEW)"), titleFont, Brushes.DarkOrange, x + 30, py);
                 py += 35;
                 for (int i = 0; i < Presentation.Slides.Count; i++)
                 {
@@ -25702,7 +26024,7 @@ namespace ZenQOffice.UI
             }
             using (Font headerFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
             {
-                g.DrawString("GHI CHÚ DIỄN GIẢ (SPEAKER NOTES):", headerFont, Brushes.DarkOrange, notesRect.X + 8, notesRect.Y + 8);
+                g.DrawString(AppL10n.Tr("GHI CHÚ DIỄN GIẢ (SPEAKER NOTES):"), headerFont, Brushes.DarkOrange, notesRect.X + 8, notesRect.Y + 8);
             }
             RectangleF notesTextBounds = new RectangleF(notesRect.X + 8, notesRect.Y + 30, Math.Max(40, notesRect.Width - 16), Math.Max(20, notesRect.Height - 38));
             DrawInteractiveSpeakerNotesContent(g, notesTextBounds, 10.5f, false);
@@ -25778,8 +26100,8 @@ namespace ZenQOffice.UI
             using (Font titleFont = new Font("Segoe UI", 16.0f, FontStyle.Bold))
             using (Font subFont = new Font("Segoe UI", 10.0f, FontStyle.Italic))
             {
-                g.DrawString("🎨 CHẾ ĐỘ XEM SLIDE MASTER TEMPLATE", titleFont, Brushes.DarkRed, slideX + 40, slideY + 40);
-                g.DrawString("Định hình tiêu đề toàn cục, chân trang, phông chữ và bố cục định sẵn...", subFont, Brushes.DimGray, slideX + 40, slideY + 80);
+                g.DrawString(AppL10n.Tr("🎨 CHẾ ĐỘ XEM SLIDE MASTER TEMPLATE"), titleFont, Brushes.DarkRed, slideX + 40, slideY + 40);
+                g.DrawString(AppL10n.Tr("Định hình tiêu đề toàn cục, chân trang, phông chữ và bố cục định sẵn..."), subFont, Brushes.DimGray, slideX + 40, slideY + 80);
             }
         }
         #endregion
@@ -26762,7 +27084,7 @@ namespace ZenQOffice.UI
                             ActiveSlide.BgFillType = BackgroundFillType.Picture;
                             using (OpenFileDialog ofd = new OpenFileDialog())
                             {
-                                ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp";
+                                ofd.Filter = AppL10n.T("Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp", "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp");
                                 if (ofd.ShowDialog() == DialogResult.OK)
                                 {
                                     ActiveSlide.BgImagePath = ofd.FileName;
@@ -27012,7 +27334,7 @@ namespace ZenQOffice.UI
                         {
                             using (OpenFileDialog ofd = new OpenFileDialog())
                             {
-                                ofd.Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp";
+                                ofd.Filter = AppL10n.T("Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp", "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp");
                                 if (ofd.ShowDialog() == DialogResult.OK)
                                 {
                                     ActiveSlide.BgImagePath = ofd.FileName;
@@ -27123,7 +27445,7 @@ namespace ZenQOffice.UI
                                     }
                                 }
                             }
-                            ZenQOffice.UI.FluentMessageBox.Show("Đã áp dụng định dạng nền cho toàn bộ trang chiếu!", "Định dạng Nền", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã áp dụng định dạng nền cho toàn bộ trang chiếu!", "Applied background formatting to all slides!"), AppL10n.T("Định dạng Nền", "Format Background"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                             return;
                         }
                         // Reset Background (X: panelX + 138..panelX + 272)
@@ -27568,6 +27890,11 @@ namespace ZenQOffice.UI
                 int slideX, slideY, slideW, slideH;
                 float scale;
                 GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+            if (IsImageBlenderActive && HandleImageBlenderMouseDown(mousePos, slideX, slideY, scale, buttons))
+            {
+                if (InvalidateCallback != null) InvalidateCallback();
+                return;
+            }
                 // Xử lý Chế độ Chỉnh sửa điểm hình dạng (PowerPoint Edit Points)
                 if (IsEditingShapePoints && EditingPointsShape != null)
                 {
@@ -27592,7 +27919,7 @@ namespace ZenQOffice.UI
                             ContextMenuStrip pointMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                             pointMenu.Renderer = ZenQOffice.UI.FluentUi.MenuRenderer;
                             int pointToDelete = hitIdx;
-                            ToolStripMenuItem miDel = new ToolStripMenuItem("Xóa điểm (Delete Point)", null, (s, e) => {
+                            ToolStripMenuItem miDel = new ToolStripMenuItem(AppL10n.T("Xóa điểm (Delete Point)", "Delete Point"), null, (s, e) => {
                                 if (ShapeEditPoints.Count > 3 && pointToDelete >= 0 && pointToDelete < ShapeEditPoints.Count)
                                 {
                                     ShapeEditPoints.RemoveAt(pointToDelete);
@@ -27606,7 +27933,7 @@ namespace ZenQOffice.UI
                             miDel.Enabled = (ShapeEditPoints.Count > 3);
                             pointMenu.Items.Add(miDel);
                             pointMenu.Items.Add(new ToolStripSeparator());
-                            pointMenu.Items.Add("Thoát chế độ sửa điểm (Exit Edit Points)", null, (s, e) => {
+                            pointMenu.Items.Add(AppL10n.T("Thoát chế độ sửa điểm (Exit Edit Points)", "Exit Edit Points"), null, (s, e) => {
                                 EndEditShapePoints();
                                 if (parentControl != null) parentControl.Invalidate();
                             });
@@ -27620,7 +27947,7 @@ namespace ZenQOffice.UI
                             segMenu.Renderer = ZenQOffice.UI.FluentUi.MenuRenderer;
                             PointF addPt = HoveredEditSegmentPoint.Value;
                             int insIdx = HoveredEditSegmentIndex + 1;
-                            segMenu.Items.Add("Thêm điểm (Add Point)", null, (s, e) => {
+                            segMenu.Items.Add(AppL10n.T("Thêm điểm (Add Point)", "Add Point"), null, (s, e) => {
                                 ShapeEditPoints.Insert(insIdx, addPt);
                                 SelectedEditPointIndex = insIdx;
                                 RebuildCustomPathFromEditPoints();
@@ -27628,7 +27955,7 @@ namespace ZenQOffice.UI
                                 if (parentControl != null) parentControl.Invalidate();
                             });
                             segMenu.Items.Add(new ToolStripSeparator());
-                            segMenu.Items.Add("Thoát chế độ sửa điểm (Exit Edit Points)", null, (s, e) => {
+                            segMenu.Items.Add(AppL10n.T("Thoát chế độ sửa điểm (Exit Edit Points)", "Exit Edit Points"), null, (s, e) => {
                                 EndEditShapePoints();
                                 if (parentControl != null) parentControl.Invalidate();
                             });
@@ -27673,7 +28000,7 @@ namespace ZenQOffice.UI
                         {
                             ContextMenuStrip shapeEditMenu = new ZenQOffice.UI.FluentContextMenuStrip();
                             shapeEditMenu.Renderer = ZenQOffice.UI.FluentUi.MenuRenderer;
-                            shapeEditMenu.Items.Add("Thoát chế độ sửa điểm (Exit Edit Points)", null, (s, e) => {
+                            shapeEditMenu.Items.Add(AppL10n.T("Thoát chế độ sửa điểm (Exit Edit Points)", "Exit Edit Points"), null, (s, e) => {
                                 EndEditShapePoints();
                                 if (parentControl != null) parentControl.Invalidate();
                             });
@@ -28586,6 +28913,31 @@ namespace ZenQOffice.UI
             if(IsSlideSorterModalOpen && _gridDraggingScroll) { DragPresentationGridScroll(mousePos,width,height); return; }
             UpdateGifHover(mousePos, width, height);
             CurrentMouseCanvasPos = mousePos;
+            if (IsDraggingBlenderSlider)
+            {
+                if ((Control.MouseButtons & MouseButtons.Left) == 0)
+                {
+                    IsDraggingBlenderSlider = false;
+                    if (ParentControl != null) ParentControl.Capture = false;
+                }
+                else
+                {
+                    UpdateBlenderSliderFromMouse(mousePos);
+                    return;
+                }
+            }
+            if (IsImageBlenderActive)
+            {
+                int b_sbW, b_cX, b_cW, b_cY, b_cH, b_btmH;
+                GetEffectiveLayoutMetrics(width, height, out b_sbW, out b_cX, out b_cW, out b_cY, out b_cH, out b_btmH);
+                int b_sX, b_sY, b_sW, b_sH;
+                float b_scale;
+                GetSlideCanvasBounds(b_cX, b_cY, b_cW, b_cH, out b_sX, out b_sY, out b_sW, out b_sH, out b_scale);
+                if (HandleImageBlenderMouseMove(mousePos, b_sX, b_sY, b_scale))
+                {
+                    return;
+                }
+            }
             if(catalogDragging){if((Control.MouseButtons&MouseButtons.Left)==0){catalogDragging=false;if(ParentControl!=null)ParentControl.Capture=false;}else{MoveCatalogScroll(mousePos);return;}}
             if(IsElementsDrawerOpen&&!IsElementsDrawerCollapsed&&ElementsDrawerSelectedTab!=1&&catalogViewport.Contains(mousePos)){InvalidateCallback?.Invoke();return;}
             if (DraggingColorControlType != 0)
@@ -29683,55 +30035,6 @@ namespace ZenQOffice.UI
                 float sinR = (float)Math.Sin(rotRad);
                 float localDx = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * cosR - dy * sinR) : dx;
                 float localDy = (Math.Abs(shape.Transform.Rotation) > 0.001f) ? (dx * sinR + dy * cosR) : dy;
-                bool isSvgOrGraphic = shape.IsGraphic || shape.IsSvg || (!string.IsNullOrEmpty(shape.ImagePath) && shape.ImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) || (shape.Type == ShapeType.Image && shape.CachedImage != null);
-                if (isSvgOrGraphic && !isCornerHandle)
-                {
-                    float initW = Math.Max(10f, CropInitialShapeW > 0 ? CropInitialShapeW : startW);
-                    float initH = Math.Max(10f, CropInitialShapeH > 0 ? CropInitialShapeH : startH);
-                    float initVisWFrac = Math.Max(0.05f, 1.0f - CropInitialLeft - CropInitialRight);
-                    float initVisHFrac = Math.Max(0.05f, 1.0f - CropInitialTop - CropInitialBottom);
-                    float cropRotPosRad = (float)(shape.Transform.Rotation * Math.PI / 180.0);
-                    float cropCosP = (float)Math.Cos(cropRotPosRad);
-                    float cropSinP = (float)Math.Sin(cropRotPosRad);
-                    if (DragResizeHandleIndex == 7) // Left edge
-                    {
-                        float fracDelta = (localDx / initW) * initVisWFrac;
-                        shape.CropLeft = Math.Max(0f, Math.Min(0.95f - CropInitialRight, CropInitialLeft + fracDelta));
-                        float activeVisWFrac = Math.Max(0.05f, 1.0f - shape.CropLeft - shape.CropRight);
-                        float w = Math.Max(10f, initW * (activeVisWFrac / initVisWFrac));
-                        float deltaCropW = (shape.CropLeft - CropInitialLeft) * (initW / initVisWFrac);
-                        shape.Transform.Width = w;
-                        shape.Transform.X = CropInitialShapeX + deltaCropW * cropCosP;
-                        shape.Transform.Y = CropInitialShapeY + deltaCropW * cropSinP;
-                    }
-                    else if (DragResizeHandleIndex == 3) // Right edge
-                    {
-                        float fracDelta = (-localDx / initW) * initVisWFrac;
-                        shape.CropRight = Math.Max(0f, Math.Min(0.95f - CropInitialLeft, CropInitialRight + fracDelta));
-                        float activeVisWFrac = Math.Max(0.05f, 1.0f - shape.CropLeft - shape.CropRight);
-                        shape.Transform.Width = Math.Max(10f, initW * (activeVisWFrac / initVisWFrac));
-                    }
-                    else if (DragResizeHandleIndex == 1) // Top edge
-                    {
-                        float fracDelta = (localDy / initH) * initVisHFrac;
-                        shape.CropTop = Math.Max(0f, Math.Min(0.95f - CropInitialBottom, CropInitialTop + fracDelta));
-                        float activeVisHFrac = Math.Max(0.05f, 1.0f - shape.CropTop - shape.CropBottom);
-                        float h = Math.Max(10f, initH * (activeVisHFrac / initVisHFrac));
-                        float deltaCropH = (shape.CropTop - CropInitialTop) * (initH / initVisHFrac);
-                        shape.Transform.Height = h;
-                        shape.Transform.X = CropInitialShapeX - deltaCropH * cropSinP;
-                        shape.Transform.Y = CropInitialShapeY + deltaCropH * cropCosP;
-                    }
-                    else if (DragResizeHandleIndex == 5) // Bottom edge
-                    {
-                        float fracDelta = (-localDy / initH) * initVisHFrac;
-                        shape.CropBottom = Math.Max(0f, Math.Min(0.95f - CropInitialTop, CropInitialBottom + fracDelta));
-                        float activeVisHFrac = Math.Max(0.05f, 1.0f - shape.CropTop - shape.CropBottom);
-                        shape.Transform.Height = Math.Max(10f, initH * (activeVisHFrac / initVisHFrac));
-                    }
-                    if (InvalidateCallback != null) InvalidateCallback();
-                    return;
-                }
                 float ax = 0.5f, ay = 0.5f;
                 switch (DragResizeHandleIndex)
                 {
@@ -30438,6 +30741,10 @@ namespace ZenQOffice.UI
             int slideX, slideY, slideW, slideH;
             float scale;
             GetSlideCanvasBounds(canvasX, contentY, canvasW, contentH, out slideX, out slideY, out slideW, out slideH, out scale);
+            if (IsImageBlenderActive && IsMouseOverBlenderHandle(mousePos, slideX, slideY, scale))
+            {
+                return Cursors.Hand;
+            }
             // Kiểm tra con trỏ trên chấm đỏ End Dot của Đường chuyển động
             if (ActiveSlide != null && ActiveSlide.Animations != null && ActiveSlide.Animations.Count > 0)
             {
@@ -30588,6 +30895,23 @@ namespace ZenQOffice.UI
         }
         public void HandleMouseUp(Point mousePos, int width, int height)
         {
+            if (IsDraggingBlenderSlider)
+            {
+                IsDraggingBlenderSlider = false;
+                if (ParentControl != null) ParentControl.Capture = false;
+            }
+            if (IsImageBlenderActive)
+            {
+                int b_sbW, b_cX, b_cW, b_cY, b_cH, b_btmH;
+                GetEffectiveLayoutMetrics(width, height, out b_sbW, out b_cX, out b_cW, out b_cY, out b_cH, out b_btmH);
+                int b_sX, b_sY, b_sW, b_sH;
+                float b_scale;
+                GetSlideCanvasBounds(b_cX, b_cY, b_cW, b_cH, out b_sX, out b_sY, out b_sW, out b_sH, out b_scale);
+                if (HandleImageBlenderMouseUp(mousePos, b_sX, b_sY, b_scale))
+                {
+                    return;
+                }
+            }
             if((catalogDragging || IsDraggingHScrollBar || IsDraggingVScrollBar || _isDraggingThumbScrollBar || IsDraggingBottomThumbScrollBar || ShapeTaskPane?.IsDraggingScrollbar == true) && ParentControl!=null)ParentControl.Capture=false;
             catalogDragging=false;
             _gridDraggingScroll=false;

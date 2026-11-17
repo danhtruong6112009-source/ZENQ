@@ -36,7 +36,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "So sánh tài liệu (Document Compare & Legal Blackline)";
+            this.Text = AppL10n.T("So sánh tài liệu (Document Compare & Legal Blackline)", "Compare Documents");
             this.Size = new Size(540, 420);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -46,21 +46,21 @@ namespace ZenQOffice.UI
             this.BackColor = Color.FromArgb(248, 250, 252);
 
             // Original Document Section
-            Label lblOrig = new Label { Text = "Tài liệu gốc (Original Document):", Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
-            _txtOriginalPath = new TextBox { Location = new Point(20, 38), Width = 380, Text = "[Tài liệu đang mở hiện tại]" };
-            _btnBrowseOrig = new Button { Text = "Duyệt...", Location = new Point(410, 37), Width = 95, Height = 25 };
+            Label lblOrig = new Label { Text = AppL10n.T("Tài liệu gốc (Original Document):", "Original Document:"), Location = new Point(20, 16), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            _txtOriginalPath = new TextBox { Location = new Point(20, 38), Width = 380, Text = AppL10n.T("[Tài liệu đang mở hiện tại]", "[Current Open Document]") };
+            _btnBrowseOrig = new Button { Text = AppL10n.T("Duyệt...", "Browse..."), Location = new Point(410, 37), Width = 95, Height = 25 };
             _btnBrowseOrig.Click += (s, e) => BrowseFile(_txtOriginalPath);
 
             // Revised Document Section
-            Label lblRev = new Label { Text = "Tài liệu sửa đổi (Revised Document):", Location = new Point(20, 75), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblRev = new Label { Text = AppL10n.T("Tài liệu sửa đổi (Revised Document):", "Revised Document:"), Location = new Point(20, 75), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             _txtRevisedPath = new TextBox { Location = new Point(20, 97), Width = 380 };
-            _btnBrowseRev = new Button { Text = "Duyệt...", Location = new Point(410, 96), Width = 95, Height = 25 };
+            _btnBrowseRev = new Button { Text = AppL10n.T("Duyệt...", "Browse..."), Location = new Point(410, 96), Width = 95, Height = 25 };
             _btnBrowseRev.Click += (s, e) => BrowseFile(_txtRevisedPath);
 
             // Compare Action Button
             _btnCompare = new Button
             {
-                Text = "⚡ Tiến hành So sánh",
+                Text = AppL10n.T("⚡ Tiến hành So sánh", "⚡ Compare Documents"),
                 Location = new Point(20, 134),
                 Width = 485,
                 Height = 32,
@@ -74,26 +74,26 @@ namespace ZenQOffice.UI
             // Results GroupBox
             _grpResults = new GroupBox
             {
-                Text = "Kết quả phân tích chênh lệch (Diff Metrics)",
+                Text = AppL10n.T("Kết quả phân tích chênh lệch (Diff Metrics)", "Comparison Metrics"),
                 Location = new Point(20, 180),
                 Width = 485,
                 Height = 145,
                 ForeColor = Color.FromArgb(30, 41, 59)
             };
 
-            _lblSimilarity = new Label { Text = "Độ tương đồng: -- %", Location = new Point(20, 28), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
+            _lblSimilarity = new Label { Text = AppL10n.T("Độ tương đồng: -- %", "Similarity: -- %"), Location = new Point(20, 28), AutoSize = true, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
             _prgSimilarity = new ProgressBar { Location = new Point(20, 50), Width = 445, Height = 18, Value = 0, Maximum = 100 };
 
-            _lblInsertions = new Label { Text = "Nội dung thêm mới: 0 từ", Location = new Point(20, 80), AutoSize = true, ForeColor = Color.FromArgb(16, 185, 129), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
-            _lblDeletions = new Label { Text = "Nội dung bị xóa: 0 từ", Location = new Point(200, 80), AutoSize = true, ForeColor = Color.FromArgb(239, 68, 68), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
-            _lblUnchanged = new Label { Text = "Nội dung giữ nguyên: 0 từ", Location = new Point(20, 110), AutoSize = true, ForeColor = Color.FromArgb(71, 85, 105) };
+            _lblInsertions = new Label { Text = AppL10n.T("Nội dung thêm mới: 0 từ", "Insertions: 0 words"), Location = new Point(20, 80), AutoSize = true, ForeColor = Color.FromArgb(16, 185, 129), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            _lblDeletions = new Label { Text = AppL10n.T("Nội dung bị xóa: 0 từ", "Deletions: 0 words"), Location = new Point(200, 80), AutoSize = true, ForeColor = Color.FromArgb(239, 68, 68), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            _lblUnchanged = new Label { Text = AppL10n.T("Nội dung giữ nguyên: 0 từ", "Unchanged: 0 words"), Location = new Point(20, 110), AutoSize = true, ForeColor = Color.FromArgb(71, 85, 105) };
 
             _grpResults.Controls.AddRange(new Control[] { _lblSimilarity, _prgSimilarity, _lblInsertions, _lblDeletions, _lblUnchanged });
 
             // Bottom Buttons
             _btnApply = new Button
             {
-                Text = "Áp dụng vào Văn bản (Track Changes)",
+                Text = AppL10n.T("Áp dụng vào Văn bản (Track Changes)", "Apply to Document (Track Changes)"),
                 Location = new Point(20, 338),
                 Width = 260,
                 Height = 32,
@@ -107,7 +107,7 @@ namespace ZenQOffice.UI
 
             _btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 Location = new Point(415, 338),
                 Width = 90,
                 Height = 32
@@ -125,8 +125,8 @@ namespace ZenQOffice.UI
         {
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                ofd.Filter = "Tệp văn bản (*.docx;*.odt;*.txt;*.rtf;*.md)|*.docx;*.odt;*.txt;*.rtf;*.md|Tất cả tệp (*.*)|*.*";
-                ofd.Title = "Chọn tệp văn bản để so sánh";
+                ofd.Filter = AppL10n.T("Tệp văn bản (*.docx;*.odt;*.txt;*.rtf;*.md)|*.docx;*.odt;*.txt;*.rtf;*.md|Tất cả tệp (*.*)|*.*", "Document Files (*.docx;*.odt;*.txt;*.rtf;*.md)|*.docx;*.odt;*.txt;*.rtf;*.md|All Files (*.*)|*.*");
+                ofd.Title = AppL10n.T("Chọn tệp văn bản để so sánh", "Select Document to Compare");
                 if (ofd.ShowDialog(this) == DialogResult.OK)
                 {
                     targetBox.Text = ofd.FileName;
@@ -140,7 +140,7 @@ namespace ZenQOffice.UI
             string revText = "";
 
             // Read original
-            if (_txtOriginalPath.Text.Contains("[Tài liệu đang mở hiện tại]"))
+            if (_txtOriginalPath.Text.Contains("[Tài liệu đang mở hiện tại]") || _txtOriginalPath.Text.Contains("[Current Open Document]"))
             {
                 origText = _writerView != null && _writerView.PieceTable != null ? _writerView.PieceTable.GetText() : "";
             }
@@ -150,7 +150,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn tài liệu gốc hợp lệ.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng chọn tài liệu gốc hợp lệ.", "Please select a valid original document."), AppL10n.T("Lỗi", "Error"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -161,7 +161,7 @@ namespace ZenQOffice.UI
             }
             else
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng chọn tài liệu sửa đổi cần so sánh.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng chọn tài liệu sửa đổi cần so sánh.", "Please select a valid revised document."), AppL10n.T("Lỗi", "Error"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -169,11 +169,11 @@ namespace ZenQOffice.UI
             try
             {
                 _lastResult = DocumentCompareEngine.CompareDocuments(origText, revText);
-                _lblSimilarity.Text = $"Độ tương đồng: {_lastResult.SimilarityPercentage}%";
+                _lblSimilarity.Text = string.Format(AppL10n.T("Độ tương đồng: {0}%", "Similarity: {0}%"), _lastResult.SimilarityPercentage);
                 _prgSimilarity.Value = Math.Max(0, Math.Min(100, (int)_lastResult.SimilarityPercentage));
-                _lblInsertions.Text = $"Nội dung thêm mới: +{_lastResult.InsertionsCount} từ";
-                _lblDeletions.Text = $"Nội dung bị xóa: -{_lastResult.DeletionsCount} từ";
-                _lblUnchanged.Text = $"Nội dung giữ nguyên: {_lastResult.UnchangedWordsCount} từ";
+                _lblInsertions.Text = string.Format(AppL10n.T("Nội dung thêm mới: +{0} từ", "Insertions: +{0} words"), _lastResult.InsertionsCount);
+                _lblDeletions.Text = string.Format(AppL10n.T("Nội dung bị xóa: -{0} từ", "Deletions: -{0} words"), _lastResult.DeletionsCount);
+                _lblUnchanged.Text = string.Format(AppL10n.T("Nội dung giữ nguyên: {0} từ", "Unchanged: {0} words"), _lastResult.UnchangedWordsCount);
                 _btnApply.Enabled = true;
             }
             finally
@@ -187,7 +187,7 @@ namespace ZenQOffice.UI
             if (_lastResult != null && _writerView != null)
             {
                 DocumentCompareEngine.ApplyToWriterView(_writerView, _lastResult);
-                ZenQOffice.UI.FluentMessageBox.Show("Đã nạp toàn bộ các thay đổi so sánh vào chế độ Theo dõi sửa đổi (Track Changes) của tài liệu!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã nạp toàn bộ các thay đổi so sánh vào chế độ Theo dõi sửa đổi (Track Changes) của tài liệu!", "All comparison changes have been loaded into Track Changes!"), AppL10n.T("Thành công", "Success"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.Close();
             }
         }
@@ -213,7 +213,7 @@ namespace ZenQOffice.UI
             }
             catch (Exception ex)
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Không thể đọc tệp: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Không thể đọc tệp: ", "Unable to read file: ") + ex.Message, AppL10n.T("Lỗi", "Error"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return "";
             }
         }

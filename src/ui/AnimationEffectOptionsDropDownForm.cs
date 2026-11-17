@@ -214,7 +214,7 @@ namespace ZenQOffice.UI
         {
             Label lbl = new Label
             {
-                Text = title,
+                Text = AppL10n.Tr(title),
                 Location = new Point(8, curY + 2),
                 Size = new Size(w - 16, 18),
                 ForeColor = Color.FromArgb(109, 40, 217),
@@ -278,7 +278,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush txtBrush = new SolidBrush(isSelected ? Color.FromArgb(91, 33, 182) : Color.FromArgb(31, 41, 55)))
                 {
                     StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center };
-                    g.DrawString(text, txtFont, txtBrush, new RectangleF(12, 0, w - 16, h), sf);
+                    g.DrawString(AppL10n.Tr(text), txtFont, txtBrush, new RectangleF(12, 0, w - 16, h), sf);
                 }
             };
 
@@ -339,7 +339,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush txtBrush = new SolidBrush(isSelected ? Color.FromArgb(91, 33, 182) : Color.FromArgb(31, 41, 55)))
                 {
                     StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center };
-                    g.DrawString(name, txtFont, txtBrush, new RectangleF(36, 0, w - 40, h), sf);
+                    g.DrawString(AppL10n.Tr(name), txtFont, txtBrush, new RectangleF(36, 0, w - 40, h), sf);
                 }
             };
 
@@ -378,7 +378,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush txtBrush = new SolidBrush(Color.FromArgb(109, 40, 217)))
                 {
                     StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                    g.DrawString(text, txtFont, txtBrush, new RectangleF(0, 0, w, h), sf);
+                    g.DrawString(AppL10n.Tr(text), txtFont, txtBrush, new RectangleF(0, 0, w, h), sf);
                 }
             };
 
@@ -446,7 +446,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush txtBrush = new SolidBrush(isSelected ? Color.FromArgb(91, 33, 182) : Color.FromArgb(31, 41, 55)))
                 {
                     StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center };
-                    g.DrawString(text, txtFont, txtBrush, new RectangleF(38, 0, w - 42, h), sf);
+                    g.DrawString(AppL10n.Tr(text), txtFont, txtBrush, new RectangleF(38, 0, w - 42, h), sf);
                 }
             };
 

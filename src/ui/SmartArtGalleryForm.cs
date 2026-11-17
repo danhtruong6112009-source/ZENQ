@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -719,7 +720,7 @@ namespace ZenQOffice.UI
         {
             if (selectedTemplateIndex >= 0 && selectedTemplateIndex < filteredTemplates.Count)
             {
-                txtDescription.Text = filteredTemplates[selectedTemplateIndex].Description;
+                txtDescription.Text = AppL10n.Tr(filteredTemplates[selectedTemplateIndex].Description);
             }
             else
             {
@@ -771,7 +772,7 @@ namespace ZenQOffice.UI
                 using (Font f = new Font("Segoe UI", 9.0f, isSelected ? FontStyle.Bold : FontStyle.Regular))
                 using (SolidBrush tb = new SolidBrush(isSelected ? Color.FromArgb(0, 51, 102) : Color.FromArgb(40, 40, 40)))
                 {
-                    g.DrawString(categoryDisplayNames[i], f, tb, 34, itemRect.Top + 8);
+                    g.DrawString(AppL10n.Tr(categoryDisplayNames[i]), f, tb, 34, itemRect.Top + 8);
                 }
             }
         }
@@ -3756,7 +3757,7 @@ namespace ZenQOffice.UI
                 using (Font f = new Font("Segoe UI", 9.0f, isSelected ? FontStyle.Bold : FontStyle.Regular))
                 using (SolidBrush tb = new SolidBrush(isSelected ? Color.FromArgb(0, 51, 102) : Color.FromArgb(40, 40, 40)))
                 {
-                    g.DrawString(categoryDisplayNames[i], f, tb, leftR.X + 34, itemRect.Top + 8);
+                    g.DrawString(AppL10n.Tr(categoryDisplayNames[i]), f, tb, leftR.X + 34, itemRect.Top + 8);
                 }
             }
 
@@ -3815,7 +3816,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush db = new SolidBrush(Color.FromArgb(80, 85, 95)))
                 {
                     RectangleF descRect = new RectangleF(rightR.X + 12, rightR.Y + 236, rightR.Width - 24, rightR.Height - 244);
-                    g.DrawString(tmpl.Description, descF, db, descRect);
+                    g.DrawString(AppL10n.Tr(tmpl.Description), descF, db, descRect);
                 }
             }
 

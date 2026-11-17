@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -19,7 +20,7 @@ namespace ZenQOffice.UI
 
         public FindReplaceForm()
         {
-            Text = "Tìm kiếm & Thay thế - ZenQ Writer";
+            Text = AppL10n.T("Tìm kiếm & Thay thế - ZenQ Writer", "Find and Replace - ZenQ Writer");
             Size = new Size(460, 200);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -28,15 +29,15 @@ namespace ZenQOffice.UI
             BackColor = Color.FromArgb(243, 242, 241);
             Font = new Font("Segoe UI", 9f);
 
-            Label lblFind = new Label { Text = "Nội dung tìm kiếm:", Location = new Point(15, 20), AutoSize = true };
+            Label lblFind = new Label { Text = AppL10n.T("Nội dung tìm kiếm:", "Find what:"), Location = new Point(15, 20), AutoSize = true };
             txtFind = new TextBox { Location = new Point(135, 18), Width = 285 };
 
-            Label lblReplace = new Label { Text = "Thay thế bằng:", Location = new Point(15, 55), AutoSize = true };
+            Label lblReplace = new Label { Text = AppL10n.T("Thay thế bằng:", "Replace with:"), Location = new Point(15, 55), AutoSize = true };
             txtReplace = new TextBox { Location = new Point(135, 53), Width = 285 };
 
             btnFindNext = new Button
             {
-                Text = "Tìm tiếp",
+                Text = AppL10n.T("Tìm tiếp", "Find Next"),
                 Location = new Point(15, 105),
                 Width = 92,
                 Height = 30,
@@ -48,7 +49,7 @@ namespace ZenQOffice.UI
             };
             btnReplace = new Button
             {
-                Text = "Thay thế",
+                Text = AppL10n.T("Thay thế", "Replace"),
                 Location = new Point(115, 105),
                 Width = 95,
                 Height = 30,
@@ -60,7 +61,7 @@ namespace ZenQOffice.UI
             };
             btnReplaceAll = new Button
             {
-                Text = "Thay tất cả",
+                Text = AppL10n.T("Thay tất cả", "Replace All"),
                 Location = new Point(218, 105),
                 Width = 110,
                 Height = 30,
@@ -72,7 +73,7 @@ namespace ZenQOffice.UI
             };
             btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 Location = new Point(336, 105),
                 Width = 84,
                 Height = 30,

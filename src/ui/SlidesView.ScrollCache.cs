@@ -1,10 +1,10 @@
-﻿using System;using System.Drawing;using System.Linq;using ZenQOffice.Core;using Vortice.Direct2D1;
+using System;using System.Drawing;using System.Linq;using ZenQOffice.Core;using Vortice.Direct2D1;
 namespace ZenQOffice.UI { public partial class SlidesView {
  FlowLayer editorScrollLayer;SlideNode editorScrollSlide;ID2D1RenderTarget editorScrollTarget;float editorScrollScale;string editorScrollSelection;int editorScrollShapeCount;bool editorScrollThumbnailDirty;
- void ClearEditorScrollCache(){editorScrollLayer?.Dispose();editorScrollLayer=null;editorScrollSlide=null;editorScrollTarget=null;}
+ public void ClearEditorScrollCache(){editorScrollLayer?.Dispose();editorScrollLayer=null;editorScrollSlide=null;editorScrollTarget=null;}
  bool DrawEditorScrollCache(D2DGraphics g,SlideNode slide,int slideX,int slideY,float scale,Rectangle viewport){
   bool moving=DeferThumbnailWork();
-  if(IsInlineEditing||IsDraggingShape||IsResizingShape||IsRotatingShape||IsDrawingActive||IsRemovingBackground||IsScanningActive||IsCropping||IsPlayingAnimationPreview||IsEditingShapePoints||ViewMode!=ImpressViewMode.Normal||g.RenderTarget==null){ClearEditorScrollCache();return false;}
+  if(IsInlineEditing||IsDraggingShape||IsResizingShape||IsRotatingShape||IsDrawingActive||IsRemovingBackground||IsScanningActive||IsCropping||IsImageBlenderActive||IsPlayingAnimationPreview||IsEditingShapePoints||ViewMode!=ImpressViewMode.Normal||g.RenderTarget==null){ClearEditorScrollCache();return false;}
   if(slide.Shapes.Any(s=>s.Type==ShapeType.Video||s.Type==ShapeType.Audio||s.NativeGifFrames?.Length>1||(s.ImagePath??"").EndsWith(".gif",StringComparison.OrdinalIgnoreCase))){ClearEditorScrollCache();return false;}
   string selection=SelectedShapeIndex+":"+string.Join(",",SelectedShapeIndices??new System.Collections.Generic.List<int>());
   var visible=new RectangleF(viewport.X-slideX,viewport.Y-slideY,viewport.Width,viewport.Height);

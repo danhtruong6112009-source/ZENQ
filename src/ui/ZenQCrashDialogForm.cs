@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -29,7 +30,7 @@ namespace ZenQOffice.UI
         private Button _btnCopy;
         private bool _detailsExpanded = false;
 
-        public static void ShowDialogSafe(Exception ex, string contextTitle = "Sự cố giao diện", bool isFatal = false)
+        public static void ShowDialogSafe(Exception ex, string contextTitle = null, bool isFatal = false)
         {
             try
             {
@@ -47,7 +48,7 @@ namespace ZenQOffice.UI
         public ZenQCrashDialogForm(Exception ex, string contextTitle, bool isFatal)
         {
             _exception = ex;
-            _contextTitle = string.IsNullOrWhiteSpace(contextTitle) ? "Thông báo hệ thống" : contextTitle;
+            _contextTitle = string.IsNullOrWhiteSpace(contextTitle) ? AppL10n.T("Thông báo hệ thống", "System Notice") : contextTitle;
             _isFatal = isFatal;
             _sanitizedDetails = SanitizeExceptionDetails(ex);
 
@@ -109,7 +110,7 @@ namespace ZenQOffice.UI
                 using (Font subFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
                 using (SolidBrush bSub = new SolidBrush(Color.FromArgb(100, 116, 139)))
                 {
-                    string sub = _isFatal ? "Ứng dụng cần tạm dừng để bảo vệ an toàn dữ liệu" : "Đã bảo vệ phiên làm việc của bạn";
+                    string sub = _isFatal ? AppL10n.T("Ứng dụng cần tạm dừng để bảo vệ an toàn dữ liệu", "Application paused to protect your data") : AppL10n.T("Đã bảo vệ phiên làm việc của bạn", "Your session has been protected");
                     e.Graphics.DrawString(sub, subFont, bSub, 68, 36);
                 }
             };
@@ -131,7 +132,7 @@ namespace ZenQOffice.UI
 
             _btnToggleDetails = new Button
             {
-                Text = "Chi tiết kỹ thuật ▾",
+                Text = AppL10n.T("Chi tiết kỹ thuật ▾", "Technical Details ▾"),
                 FlatStyle = FlatStyle.Flat,
                 FlatAppearance = { BorderSize = 0 },
                 ForeColor = Color.FromArgb(71, 85, 105),
@@ -145,7 +146,7 @@ namespace ZenQOffice.UI
 
             _btnCopy = new Button
             {
-                Text = "Sao chép",
+                Text = AppL10n.T("Sao chép", "Copy"),
                 FlatStyle = FlatStyle.Flat,
                 FlatAppearance = { BorderColor = Color.FromArgb(203, 213, 225), BorderSize = 1 },
                 ForeColor = Color.FromArgb(51, 65, 85),
@@ -160,11 +161,11 @@ namespace ZenQOffice.UI
                 try
                 {
                     Clipboard.SetText(_sanitizedDetails);
-                    _btnCopy.Text = "✓ Đã chép";
+                    _btnCopy.Text = AppL10n.T("✓ Đã chép", "✓ Copied");
                     Timer t = new Timer { Interval = 2000 };
                     t.Tick += (ts, te) =>
                     {
-                        _btnCopy.Text = "Sao chép";
+                        _btnCopy.Text = AppL10n.T("Sao chép", "Copy");
                         t.Stop();
                         t.Dispose();
                     };
@@ -175,7 +176,7 @@ namespace ZenQOffice.UI
 
             _btnClose = new Button
             {
-                Text = _isFatal ? "Đóng" : "Bỏ qua",
+                Text = _isFatal ? AppL10n.T("Đóng", "Close") : AppL10n.T("Bỏ qua", "Ignore"),
                 FlatStyle = FlatStyle.Flat,
                 FlatAppearance = { BorderColor = Color.FromArgb(203, 213, 225), BorderSize = 1 },
                 ForeColor = Color.FromArgb(51, 65, 85),
@@ -192,7 +193,7 @@ namespace ZenQOffice.UI
 
             _btnContinue = new Button
             {
-                Text = _isFatal ? "Khởi động lại" : "Tiếp tục",
+                Text = _isFatal ? AppL10n.T("Khởi động lại", "Restart") : AppL10n.T("Tiếp tục", "Continue"),
                 FlatStyle = FlatStyle.Flat,
                 FlatAppearance = { BorderSize = 0 },
                 ForeColor = Color.White,
@@ -251,8 +252,8 @@ namespace ZenQOffice.UI
                 Font = new Font("Segoe UI", 9.5f),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Text = _isFatal
-                    ? "Ứng dụng vừa ghi nhận sự cố hệ thống cần được khởi động lại để đảm bảo tính toàn vẹn của tệp tài liệu."
-                    : "Một xung đột hiển thị tạm thời đã được phát hiện và tự động cô lập. Bạn có thể bấm 'Tiếp tục' để tiếp tục làm việc bình thường."
+                    ? AppL10n.T("Ứng dụng vừa ghi nhận sự cố hệ thống cần được khởi động lại để đảm bảo tính toàn vẹn của tệp tài liệu.", "A critical error occurred. Restart is recommended to protect document integrity.")
+                    : AppL10n.T("Một xung đột hiển thị tạm thời đã được phát hiện và tự động cô lập. Bạn có thể bấm 'Tiếp tục' để tiếp tục làm việc bình thường.", "A temporary rendering issue was isolated safely. Click 'Continue' to resume work.")
             };
 
             Panel pnlCard = new Panel
@@ -272,7 +273,7 @@ namespace ZenQOffice.UI
             string friendlyErrorName = GetFriendlyErrorMessage(_exception);
             Label lblErrorTitle = new Label
             {
-                Text = "Mã sự cố:",
+                Text = AppL10n.T("Mã sự cố:", "Incident Code:"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Location = new Point(14, 12),
@@ -290,7 +291,7 @@ namespace ZenQOffice.UI
 
             Label lblTipTitle = new Label
             {
-                Text = "Trạng thái:",
+                Text = AppL10n.T("Trạng thái:", "Status:"),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Location = new Point(14, 34),
@@ -298,7 +299,7 @@ namespace ZenQOffice.UI
             };
             Label lblTipVal = new Label
             {
-                Text = _isFatal ? "Đang chuẩn bị lưu dữ liệu an toàn..." : "Phiên làm việc và nội dung văn bản được bảo vệ nguyên vẹn.",
+                Text = _isFatal ? AppL10n.T("Đang chuẩn bị lưu dữ liệu an toàn...", "Preparing safe recovery...") : AppL10n.T("Phiên làm việc và nội dung văn bản được bảo vệ nguyên vẹn.", "Active documents and session state remain intact."),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 ForeColor = _isFatal ? Color.FromArgb(220, 38, 38) : Color.FromArgb(22, 101, 52),
                 Location = new Point(86, 34),
@@ -332,28 +333,28 @@ namespace ZenQOffice.UI
             {
                 _pnlDetails.Visible = true;
                 _btnCopy.Visible = true;
-                _btnToggleDetails.Text = "Ẩn chi tiết ▴";
+                _btnToggleDetails.Text = AppL10n.T("Ẩn chi tiết ▴", "Hide Details ▴");
                 ClientSize = new Size(540, 420);
             }
             else
             {
                 _pnlDetails.Visible = false;
                 _btnCopy.Visible = false;
-                _btnToggleDetails.Text = "Chi tiết kỹ thuật ▾";
+                _btnToggleDetails.Text = AppL10n.T("Chi tiết kỹ thuật ▾", "Technical Details ▾");
                 ClientSize = new Size(540, 260);
             }
         }
 
         private static string GetFriendlyErrorMessage(Exception ex)
         {
-            if (ex == null) return "Không xác định";
+            if (ex == null) return AppL10n.T("Không xác định", "Unknown");
             if (ex.Message != null && ex.Message.IndexOf("Object is currently in use elsewhere", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                return "Xung đột tài nguyên kết xuất đồ họa (GDI+ Concurrent Lock)";
+                return AppL10n.T("Xung đột tài nguyên kết xuất đồ họa (GDI+ Concurrent Lock)", "Graphics rendering conflict (GDI+ Concurrent Lock)");
             }
-            if (ex is OutOfMemoryException) return "Bộ nhớ đồ họa tạm thời quá tải (Out of Memory)";
-            if (ex is System.IO.IOException) return "Xung đột truy xuất tệp hoặc dữ liệu lưu trữ";
-            return ex.GetType().Name + ": " + (ex.Message ?? "Đã xảy ra sự cố trong quá trình xử lý.");
+            if (ex is OutOfMemoryException) return AppL10n.T("Bộ nhớ đồ họa tạm thời quá tải (Out of Memory)", "Temporary graphics memory limit reached");
+            if (ex is System.IO.IOException) return AppL10n.T("Xung đột truy xuất tệp hoặc dữ liệu lưu trữ", "File or storage access conflict");
+            return ex.GetType().Name + ": " + (ex.Message ?? AppL10n.T("Đã xảy ra sự cố trong quá trình xử lý.", "An unexpected processing error occurred."));
         }
 
         /// <summary>
@@ -362,7 +363,7 @@ namespace ZenQOffice.UI
         /// </summary>
         public static string SanitizeExceptionDetails(Exception ex)
         {
-            if (ex == null) return "Không có thông tin chi tiết.";
+            if (ex == null) return AppL10n.T("Không có thông tin chi tiết.", "No additional details.");
 
             string raw = ex.ToString();
 

@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -23,7 +24,7 @@ namespace ZenQOffice.UI
 
         private void InitializeUI(bool isAlreadyProtected)
         {
-            this.Text = isAlreadyProtected ? "Mở Khóa Trang Tính" : "Bảo Vệ Trang Tính";
+            this.Text = isAlreadyProtected ? AppL10n.T("Mở Khóa Trang Tính", "Unprotect Sheet") : AppL10n.T("Bảo Vệ Trang Tính", "Protect Sheet");
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -45,8 +46,8 @@ namespace ZenQOffice.UI
                 using (Font hFont = new Font("Segoe UI", 11f, FontStyle.Bold))
                 using (Font subFont = new Font("Segoe UI", 8f, FontStyle.Regular))
                 {
-                    string hText = isAlreadyProtected ? "🔓 Mở Khóa Trang Tính (Unprotect Sheet)" : "🔒 Bảo Vệ Trang Tính (Protect Sheet)";
-                    string sText = isAlreadyProtected ? "Nhập mật khẩu để cho phép chỉnh sửa lại trang tính" : "Bảo vệ trang tính và khóa nội dung ô chống sửa đổi";
+                    string hText = isAlreadyProtected ? AppL10n.T("🔓 Mở Khóa Trang Tính (Unprotect Sheet)", "🔓 Unprotect Sheet") : AppL10n.T("🔒 Bảo Vệ Trang Tính (Protect Sheet)", "🔒 Protect Sheet");
+                    string sText = isAlreadyProtected ? AppL10n.T("Nhập mật khẩu để cho phép chỉnh sửa lại trang tính", "Enter password to allow editing this worksheet") : AppL10n.T("Bảo vệ trang tính và khóa nội dung ô chống sửa đổi", "Protect worksheet and contents of locked cells");
                     e.Graphics.DrawString(hText, hFont, Brushes.White, 14, 8);
                     e.Graphics.DrawString(sText, subFont, Brushes.WhiteSmoke, 16, 28);
                 }
@@ -57,7 +58,7 @@ namespace ZenQOffice.UI
 
             Label lblPwd = new Label
             {
-                Text = "Mật khẩu (tùy chọn):",
+                Text = AppL10n.T("Mật khẩu (tùy chọn):", "Password (optional):"),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(16, curY),
@@ -80,7 +81,7 @@ namespace ZenQOffice.UI
             {
                 Label lblOptions = new Label
                 {
-                    Text = "Cho phép người dùng trang tính này:",
+                    Text = AppL10n.T("Cho phép người dùng trang tính này:", "Allow all users of this worksheet to:"),
                     Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
                     ForeColor = Color.FromArgb(71, 85, 105),
                     Location = new Point(16, curY),
@@ -89,19 +90,19 @@ namespace ZenQOffice.UI
                 this.Controls.Add(lblOptions);
                 curY += 20;
 
-                chkSelectLocked = new CheckBox { Text = "Chọn các ô bị khóa", Checked = true, Location = new Point(20, curY), AutoSize = true };
+                chkSelectLocked = new CheckBox { Text = AppL10n.T("Chọn các ô bị khóa", "Select locked cells"), Checked = true, Location = new Point(20, curY), AutoSize = true };
                 this.Controls.Add(chkSelectLocked);
                 curY += 22;
 
-                chkSelectUnlocked = new CheckBox { Text = "Chọn các ô chưa khóa", Checked = true, Location = new Point(20, curY), AutoSize = true };
+                chkSelectUnlocked = new CheckBox { Text = AppL10n.T("Chọn các ô chưa khóa", "Select unlocked cells"), Checked = true, Location = new Point(20, curY), AutoSize = true };
                 this.Controls.Add(chkSelectUnlocked);
                 curY += 22;
 
-                chkFormatCells = new CheckBox { Text = "Định dạng ô & phông chữ", Checked = false, Location = new Point(20, curY), AutoSize = true };
+                chkFormatCells = new CheckBox { Text = AppL10n.T("Định dạng ô & phông chữ", "Format cells & fonts"), Checked = false, Location = new Point(20, curY), AutoSize = true };
                 this.Controls.Add(chkFormatCells);
                 curY += 22;
 
-                chkSort = new CheckBox { Text = "Sắp xếp dữ liệu", Checked = false, Location = new Point(20, curY), AutoSize = true };
+                chkSort = new CheckBox { Text = AppL10n.T("Sắp xếp dữ liệu", "Sort"), Checked = false, Location = new Point(20, curY), AutoSize = true };
                 this.Controls.Add(chkSort);
                 curY += 26;
             }
@@ -117,7 +118,7 @@ namespace ZenQOffice.UI
 
             btnOk = new Button
             {
-                Text = "Đồng ý",
+                Text = AppL10n.T("Đồng ý", "OK"),
                 DialogResult = DialogResult.OK,
                 Size = new Size(86, 30),
                 Location = new Point(176, 8),
@@ -132,7 +133,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Size = new Size(76, 30),
                 Location = new Point(272, 8),

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -36,7 +37,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Phong bì và Nhãn (Envelopes and Labels)";
+            this.Text = AppL10n.T("Phong bì và Nhãn (Envelopes and Labels)", "Envelopes and Labels");
             this.Size = new Size(540, 480);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -51,11 +52,11 @@ namespace ZenQOffice.UI
             tabControl.Font = new Font("Segoe UI", 9.2f, FontStyle.Regular);
 
             // ==================== TAB 1: PHONG BÌ ====================
-            tabEnvelopes = new TabPage("✉ Phong bì (Envelopes)");
+            tabEnvelopes = new TabPage(AppL10n.T("✉ Phong bì (Envelopes)", "✉ Envelopes"));
             tabEnvelopes.BackColor = Color.White;
 
             Label lblDeliv = new Label();
-            lblDeliv.Text = "Địa chỉ người nhận (Delivery address):";
+            lblDeliv.Text = AppL10n.T("Địa chỉ người nhận (Delivery address):", "Delivery address:");
             lblDeliv.Location = new Point(16, 14);
             lblDeliv.AutoSize = true;
             lblDeliv.Font = new Font("Segoe UI", 8.8f, FontStyle.Bold);
@@ -67,11 +68,11 @@ namespace ZenQOffice.UI
             txtDeliveryAddress.Location = new Point(16, 36);
             txtDeliveryAddress.Size = new Size(490, 80);
             txtDeliveryAddress.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
-            txtDeliveryAddress.Text = "Kính gửi: Ông / Bà [Họ và tên]\r\nCông ty: [Tên doanh nghiệp]\r\nĐịa chỉ: [Số nhà, Đường, Quận/Huyện, Tỉnh/Thành]";
+            txtDeliveryAddress.Text = AppL10n.T("Kính gửi: Ông / Bà [Họ và tên]\r\nCông ty: [Tên doanh nghiệp]\r\nĐịa chỉ: [Số nhà, Đường, Quận/Huyện, Tỉnh/Thành]", "To: [Recipient Name]\r\nCompany: [Company Name]\r\nAddress: [Street, City, State, ZIP]");
             tabEnvelopes.Controls.Add(txtDeliveryAddress);
 
             Label lblReturn = new Label();
-            lblReturn.Text = "Địa chỉ người gửi (Return address):";
+            lblReturn.Text = AppL10n.T("Địa chỉ người gửi (Return address):", "Return address:");
             lblReturn.Location = new Point(16, 126);
             lblReturn.AutoSize = true;
             lblReturn.Font = new Font("Segoe UI", 8.8f, FontStyle.Bold);
@@ -83,11 +84,11 @@ namespace ZenQOffice.UI
             txtReturnAddress.Location = new Point(16, 148);
             txtReturnAddress.Size = new Size(490, 70);
             txtReturnAddress.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
-            txtReturnAddress.Text = "Người gửi: Ban Giám Đốc ZENQ OFFICE\r\nĐịa chỉ: Tòa nhà Văn phòng Quốc tế, Hà Nội, Việt Nam";
+            txtReturnAddress.Text = AppL10n.T("Người gửi: Ban Giám Đốc ZENQ OFFICE\r\nĐịa chỉ: Tòa nhà Văn phòng Quốc tế, Hà Nội, Việt Nam", "From: ZENQ OFFICE\r\nAddress: International Office Tower");
             tabEnvelopes.Controls.Add(txtReturnAddress);
 
             Label lblSize = new Label();
-            lblSize.Text = "Khổ phong bì chuẩn:";
+            lblSize.Text = AppL10n.T("Khổ phong bì chuẩn:", "Envelope size:");
             lblSize.Location = new Point(16, 230);
             lblSize.AutoSize = true;
             lblSize.Font = new Font("Segoe UI", 8.8f, FontStyle.Bold);
@@ -98,16 +99,16 @@ namespace ZenQOffice.UI
             cboEnvelopeSize.Location = new Point(16, 252);
             cboEnvelopeSize.Size = new Size(320, 26);
             cboEnvelopeSize.Items.AddRange(new object[] {
-                "Khổ #10 (241 x 105 mm) - Tiêu chuẩn thương mại Mỹ & Quốc tế",
-                "Khổ DL (220 x 110 mm) - Bì thư phổ biến gấp 3 giấy A4",
-                "Khổ C5 (229 x 162 mm) - Khổ thư A5 phẳng",
-                "Khổ B4 (250 x 353 mm) - Khổ bưu phẩm hồ sơ lớn"
+                AppL10n.T("Khổ #10 (241 x 105 mm) - Tiêu chuẩn thương mại Mỹ & Quốc tế", "Size #10 (241 x 105 mm) - Commercial Standard"),
+                AppL10n.T("Khổ DL (220 x 110 mm) - Bì thư phổ biến gấp 3 giấy A4", "Size DL (220 x 110 mm) - Standard A4 Fold"),
+                AppL10n.T("Khổ C5 (229 x 162 mm) - Khổ thư A5 phẳng", "Size C5 (229 x 162 mm) - Flat A5 Envelope"),
+                AppL10n.T("Khổ B4 (250 x 353 mm) - Khổ bưu phẩm hồ sơ lớn", "Size B4 (250 x 353 mm) - Large Document Mailer")
             });
             cboEnvelopeSize.SelectedIndex = 1;
             tabEnvelopes.Controls.Add(cboEnvelopeSize);
 
             btnAddEnvelopeToDoc = new Button();
-            btnAddEnvelopeToDoc.Text = "Thêm vào tài liệu";
+            btnAddEnvelopeToDoc.Text = AppL10n.T("Thêm vào tài liệu", "Add to Document");
             btnAddEnvelopeToDoc.Location = new Point(16, 330);
             btnAddEnvelopeToDoc.Size = new Size(150, 34);
             btnAddEnvelopeToDoc.BackColor = Color.FromArgb(16, 110, 190);
@@ -118,7 +119,7 @@ namespace ZenQOffice.UI
             tabEnvelopes.Controls.Add(btnAddEnvelopeToDoc);
 
             btnPrintEnvelope = new Button();
-            btnPrintEnvelope.Text = "In phong bì...";
+            btnPrintEnvelope.Text = AppL10n.T("In phong bì...", "Print...");
             btnPrintEnvelope.Location = new Point(176, 330);
             btnPrintEnvelope.Size = new Size(120, 34);
             btnPrintEnvelope.BackColor = Color.FromArgb(235, 236, 238);
@@ -135,7 +136,7 @@ namespace ZenQOffice.UI
             tabEnvelopes.Controls.Add(btnPrintEnvelope);
 
             Button btnClose1 = new Button();
-            btnClose1.Text = "Đóng";
+            btnClose1.Text = AppL10n.T("Đóng", "Close");
             btnClose1.Location = new Point(420, 330);
             btnClose1.Size = new Size(86, 34);
             btnClose1.BackColor = Color.FromArgb(235, 236, 238);
@@ -148,11 +149,11 @@ namespace ZenQOffice.UI
             tabControl.TabPages.Add(tabEnvelopes);
 
             // ==================== TAB 2: NHÃN THƯ ====================
-            tabLabels = new TabPage("🏷 Nhãn (Labels)");
+            tabLabels = new TabPage(AppL10n.T("🏷 Nhãn (Labels)", "🏷 Labels"));
             tabLabels.BackColor = Color.White;
 
             Label lblLblText = new Label();
-            lblLblText.Text = "Nội dung in nhãn:";
+            lblLblText.Text = AppL10n.T("Nội dung in nhãn:", "Label address:");
             lblLblText.Location = new Point(16, 14);
             lblLblText.AutoSize = true;
             lblLblText.Font = new Font("Segoe UI", 8.8f, FontStyle.Bold);
@@ -164,11 +165,11 @@ namespace ZenQOffice.UI
             txtLabelText.Location = new Point(16, 36);
             txtLabelText.Size = new Size(490, 120);
             txtLabelText.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
-            txtLabelText.Text = "Họ và tên: [Người Nhận]\r\nĐịa chỉ: [Địa chỉ nhận hàng]\r\nĐiện thoại: [Số điện thoại]";
+            txtLabelText.Text = AppL10n.T("Họ và tên: [Người Nhận]\r\nĐịa chỉ: [Địa chỉ nhận hàng]\r\nĐiện thoại: [Số điện thoại]", "Name: [Recipient]\r\nAddress: [Shipping Address]\r\nPhone: [Phone Number]");
             tabLabels.Controls.Add(txtLabelText);
 
             Label lblLayout = new Label();
-            lblLayout.Text = "Định dạng trang nhãn in:";
+            lblLayout.Text = AppL10n.T("Định dạng trang nhãn in:", "Label layout:");
             lblLayout.Location = new Point(16, 170);
             lblLayout.AutoSize = true;
             lblLayout.Font = new Font("Segoe UI", 8.8f, FontStyle.Bold);
@@ -179,15 +180,15 @@ namespace ZenQOffice.UI
             cboLabelLayout.Location = new Point(16, 192);
             cboLabelLayout.Size = new Size(320, 26);
             cboLabelLayout.Items.AddRange(new object[] {
-                "30 nhãn / trang (3 cột x 10 hàng - Avery 5160)",
-                "14 nhãn / trang (2 cột x 7 hàng - Avery 5162)",
-                "8 nhãn / trang (2 cột x 4 hàng - Nhãn bưu kiện)"
+                AppL10n.T("30 nhãn / trang (3 cột x 10 hàng - Avery 5160)", "30 per page (3 cols x 10 rows - Avery 5160)"),
+                AppL10n.T("14 nhãn / trang (2 cột x 7 hàng - Avery 5162)", "14 per page (2 cols x 7 rows - Avery 5162)"),
+                AppL10n.T("8 nhãn / trang (2 cột x 4 hàng - Nhãn bưu kiện)", "8 per page (2 cols x 4 rows - Shipping Labels)")
             });
             cboLabelLayout.SelectedIndex = 0;
             tabLabels.Controls.Add(cboLabelLayout);
 
             btnCreateLabelsTable = new Button();
-            btnCreateLabelsTable.Text = "Tạo trang nhãn mới";
+            btnCreateLabelsTable.Text = AppL10n.T("Tạo trang nhãn mới", "New Document");
             btnCreateLabelsTable.Location = new Point(16, 330);
             btnCreateLabelsTable.Size = new Size(160, 34);
             btnCreateLabelsTable.BackColor = Color.FromArgb(16, 110, 190);
@@ -198,7 +199,7 @@ namespace ZenQOffice.UI
             tabLabels.Controls.Add(btnCreateLabelsTable);
 
             Button btnClose2 = new Button();
-            btnClose2.Text = "Đóng";
+            btnClose2.Text = AppL10n.T("Đóng", "Close");
             btnClose2.Location = new Point(420, 330);
             btnClose2.Size = new Size(86, 34);
             btnClose2.BackColor = Color.FromArgb(235, 236, 238);
@@ -220,7 +221,7 @@ namespace ZenQOffice.UI
             string deliv = txtDeliveryAddress.Text.Trim();
 
             string headerEnvelope = string.Format(
-                "==================== [KHỔ PHONG BÌ: {0}] ====================\r\n{1}\r\n\r\n\t\t\t\t\t\t{2}\r\n====================================================================\r\n\r\n",
+                AppL10n.T("==================== [KHỔ PHONG BÌ: {0}] ====================\r\n{1}\r\n\r\n\t\t\t\t\t\t{2}\r\n====================================================================\r\n\r\n", "==================== [ENVELOPE SIZE: {0}] ====================\r\n{1}\r\n\r\n\t\t\t\t\t\t{2}\r\n====================================================================\r\n\r\n"),
                 cboEnvelopeSize.SelectedItem != null ? cboEnvelopeSize.SelectedItem.ToString() : "DL",
                 ret,
                 deliv.Replace("\r\n", "\r\n\t\t\t\t\t\t")

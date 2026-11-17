@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -8,7 +9,7 @@ namespace ZenQOffice.UI
     {
         public ShortcutsHelpForm()
         {
-            this.Text = "Bảng Tổng Hợp Phím Tắt Chuẩn Microsoft Word - ZENQ OFFICE";
+            this.Text = AppL10n.Tr("Bảng Tổng Hợp Phím Tắt Chuẩn Microsoft Word - ZENQ OFFICE");
             this.Size = new Size(820, 620);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -32,7 +33,7 @@ namespace ZenQOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "BẢNG TRA CỨU PHÍM TẮT ZENQ OFFICE / MICROSOFT WORD",
+                Text = AppL10n.Tr("BẢNG TRA CỨU PHÍM TẮT ZENQ OFFICE / MICROSOFT WORD"),
                 Font = new Font("Segoe UI", 12.5f, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(56, 12),
@@ -42,7 +43,7 @@ namespace ZenQOffice.UI
 
             Label lblSub = new Label
             {
-                Text = "Tương thích 100% phím tắt chuẩn Microsoft Word 2016-365",
+                Text = AppL10n.Tr("Tương thích 100% phím tắt chuẩn Microsoft Word 2016-365"),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(224, 231, 255),
                 Location = new Point(58, 38),
@@ -189,7 +190,7 @@ namespace ZenQOffice.UI
 
             Button btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.Tr("Đóng"),
                 Size = new Size(110, 30),
                 Location = new Point(this.ClientSize.Width - 130, 8),
                 BackColor = Color.FromArgb(30, 64, 175),
@@ -210,7 +211,7 @@ namespace ZenQOffice.UI
 
         private void AddCategoryTab(TabControl tabCtrl, string title, string[,] items)
         {
-            TabPage page = new TabPage(title)
+            TabPage page = new TabPage(AppL10n.Tr(title))
             {
                 BackColor = Color.White,
                 Padding = new Padding(10)
@@ -226,13 +227,13 @@ namespace ZenQOffice.UI
                 Font = new Font("Segoe UI", 9.5f)
             };
 
-            lv.Columns.Add("Phím Tắt", 220);
-            lv.Columns.Add("Chức Năng Chi Tiết", 520);
+            lv.Columns.Add(AppL10n.Tr("Phím Tắt"), 220);
+            lv.Columns.Add(AppL10n.Tr("Chức Năng Chi Tiết"), 520);
 
             for (int i = 0; i < items.GetLength(0); i++)
             {
-                ListViewItem lvi = new ListViewItem(items[i, 0]);
-                lvi.SubItems.Add(items[i, 1]);
+                ListViewItem lvi = new ListViewItem(AppL10n.Tr(items[i, 0]));
+                lvi.SubItems.Add(AppL10n.Tr(items[i, 1]));
                 lvi.UseItemStyleForSubItems = false;
                 lvi.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
                 lvi.ForeColor = Color.FromArgb(30, 64, 175);

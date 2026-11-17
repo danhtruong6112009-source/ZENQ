@@ -22,19 +22,19 @@ namespace ZenQOffice.UI
         {
             switch (sound)
             {
-                case SlideActionSound.None: return "(Không âm thanh)";
-                case SlideActionSound.Chime: return "🔔 Tiếng chuông Đúng (Chime / Correct)";
-                case SlideActionSound.Buzzer: return "🚨 Tiếng còi báo Sai (Buzzer / Wrong)";
-                case SlideActionSound.Applause: return "👏 Tiếng vỗ tay (Applause)";
-                case SlideActionSound.Coin: return "🪙 Tiếng đồng xu (Coin)";
-                case SlideActionSound.Click: return "🖱️ Tiếng bấm máy (Click)";
-                case SlideActionSound.DrumRoll: return "🥁 Tiếng trống dồn (Drum Roll)";
-                case SlideActionSound.Explosion: return "💥 Tiếng nổ (Explosion)";
-                case SlideActionSound.Laser: return "⚡ Tiếng tia Laser (Laser)";
-                case SlideActionSound.Camera: return "📷 Tiếng chụp ảnh (Camera)";
-                case SlideActionSound.Whoosh: return "💨 Tiếng gió vút (Whoosh)";
-                case SlideActionSound.Bell: return "🛎️ Tiếng chuông ngân (Bell)";
-                case SlideActionSound.CustomFile: return "📂 Tệp âm thanh khác (.wav)...";
+                case SlideActionSound.None: return AppL10n.T("(Không âm thanh)", "(No sound)");
+                case SlideActionSound.Chime: return AppL10n.T("🔔 Tiếng chuông Đúng (Chime / Correct)", "🔔 Chime (Correct)");
+                case SlideActionSound.Buzzer: return AppL10n.T("🚨 Tiếng còi báo Sai (Buzzer / Wrong)", "🚨 Buzzer (Wrong)");
+                case SlideActionSound.Applause: return AppL10n.T("👏 Tiếng vỗ tay (Applause)", "👏 Applause");
+                case SlideActionSound.Coin: return AppL10n.T("🪙 Tiếng đồng xu (Coin)", "🪙 Coin");
+                case SlideActionSound.Click: return AppL10n.T("🖱️ Tiếng bấm máy (Click)", "🖱️ Click");
+                case SlideActionSound.DrumRoll: return AppL10n.T("🥁 Tiếng trống dồn (Drum Roll)", "🥁 Drum Roll");
+                case SlideActionSound.Explosion: return AppL10n.T("💥 Tiếng nổ (Explosion)", "💥 Explosion");
+                case SlideActionSound.Laser: return AppL10n.T("⚡ Tiếng tia Laser (Laser)", "⚡ Laser");
+                case SlideActionSound.Camera: return AppL10n.T("📷 Tiếng chụp ảnh (Camera)", "📷 Camera");
+                case SlideActionSound.Whoosh: return AppL10n.T("💨 Tiếng gió vút (Whoosh)", "💨 Whoosh");
+                case SlideActionSound.Bell: return AppL10n.T("🛎️ Tiếng chuông ngân (Bell)", "🛎️ Bell");
+                case SlideActionSound.CustomFile: return AppL10n.T("📂 Tệp âm thanh khác (.wav)...", "📂 Other Sound (.wav)...");
                 default: return sound.ToString();
             }
         }
@@ -333,8 +333,8 @@ namespace ZenQOffice.UI
             }
 
             this.Text = _isSlidesMode
-                ? "Chèn Liên kết & Chuyển hướng Trang chiếu (Insert Hyperlink - MS365)"
-                : "Chèn Liên kết (Insert Hyperlink)";
+                ? AppL10n.T("Chèn Liên kết & Chuyển hướng Trang chiếu (Insert Hyperlink - MS365)", "Insert Hyperlink & Slide Navigation")
+                : AppL10n.T("Chèn Liên kết (Insert Hyperlink)", "Insert Hyperlink");
             this.Size = new Size(720, 520);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -358,24 +358,24 @@ namespace ZenQOffice.UI
             };
             this.Controls.Add(topBar);
 
-            Label lblText = new Label { Text = "Văn bản hiển thị:", Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59) };
+            Label lblText = new Label { Text = AppL10n.T("Văn bản hiển thị:", "Text to display:"), Location = new Point(16, 14), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59) };
             topBar.Controls.Add(lblText);
 
             txtText = new TextBox
             {
-                Text = string.IsNullOrEmpty(initText) ? (_isSlidesMode ? "Đi tới trang chiếu" : "Nhấp vào đây để xem chi tiết") : initText,
+                Text = string.IsNullOrEmpty(initText) ? (_isSlidesMode ? AppL10n.T("Đi tới trang chiếu", "Go to slide") : AppL10n.T("Nhấp vào đây để xem chi tiết", "Click here for details")) : initText,
                 Location = new Point(140, 11),
                 Width = 545
             };
             topBar.Controls.Add(txtText);
 
-            Label lblTip = new Label { Text = "Gợi ý màn hình:", Location = new Point(16, 44), AutoSize = true, ForeColor = Color.FromArgb(71, 85, 105) };
+            Label lblTip = new Label { Text = AppL10n.T("Gợi ý màn hình:", "ScreenTip:"), Location = new Point(16, 44), AutoSize = true, ForeColor = Color.FromArgb(71, 85, 105) };
             topBar.Controls.Add(lblTip);
 
             txtScreenTip = new TextBox
             {
                 Text = initTip,
-                PlaceholderText = "Chú thích hiện ra khi di chuột qua liên kết (tùy chọn)...",
+                PlaceholderText = AppL10n.T("Chú thích hiện ra khi di chuột qua liên kết (tùy chọn)...", "Optional tooltip shown on hover..."),
                 Location = new Point(140, 41),
                 Width = 545
             };
@@ -397,7 +397,7 @@ namespace ZenQOffice.UI
 
             Label lblLinkTo = new Label
             {
-                Text = "LIÊN KẾT ĐẾN:",
+                Text = AppL10n.T("LIÊN KẾT ĐẾN:", "LINK TO:"),
                 Location = new Point(12, 10),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
@@ -407,10 +407,10 @@ namespace ZenQOffice.UI
 
             string[] navTitles = new string[]
             {
-                "📑 Trang chiếu trong bài",
-                "🌐 Trang Web / Tệp",
-                "🎯 Đáp án Trắc nghiệm",
-                "✉️ Địa chỉ Email"
+                AppL10n.T("📑 Trang chiếu trong bài", "📑 Place in This Deck"),
+                AppL10n.T("🌐 Trang Web / Tệp", "🌐 Web Page or File"),
+                AppL10n.T("🎯 Đáp án Trắc nghiệm", "🎯 Quiz Feedback"),
+                AppL10n.T("✉️ Địa chỉ Email", "✉️ Email Address")
             };
             _navButtons = new Button[navTitles.Length];
             for (int i = 0; i < navTitles.Length; i++)
@@ -458,7 +458,7 @@ namespace ZenQOffice.UI
             // Sound & Highlight Footer Options (when in Slides mode)
             if (_isSlidesMode)
             {
-                Label lblSound = new Label { Text = "🔊 Âm thanh khi bấm:", Location = new Point(14, 425), AutoSize = true, ForeColor = Color.FromArgb(51, 65, 85) };
+                Label lblSound = new Label { Text = AppL10n.T("🔊 Âm thanh khi bấm:", "🔊 Play Sound:"), Location = new Point(14, 425), AutoSize = true, ForeColor = Color.FromArgb(51, 65, 85) };
                 this.Controls.Add(lblSound);
 
                 cboSound = new ZenQOffice.UI.FluentComboBox
@@ -477,7 +477,7 @@ namespace ZenQOffice.UI
 
                 Button btnTestSound = new Button
                 {
-                    Text = "▶ Nghe",
+                    Text = AppL10n.T("▶ Nghe", "▶ Test"),
                     Location = new Point(386, 420),
                     Size = new Size(64, 25),
                     FlatStyle = FlatStyle.Flat,
@@ -493,7 +493,7 @@ namespace ZenQOffice.UI
 
                 chkHighlightClick = new CheckBox
                 {
-                    Text = "Làm sáng nút khi nhấp (Highlight click)",
+                    Text = AppL10n.T("Làm sáng nút khi nhấp (Highlight click)", "Highlight click"),
                     Location = new Point(462, 423),
                     AutoSize = true,
                     Checked = HighlightClick,
@@ -510,7 +510,7 @@ namespace ZenQOffice.UI
             {
                 Button btnRemove = new Button
                 {
-                    Text = "🗑️ Xóa Liên kết",
+                    Text = AppL10n.T("🗑️ Xóa Liên kết", "🗑️ Remove Link"),
                     Location = new Point(14, 11),
                     Size = new Size(125, 29),
                     BackColor = Color.FromArgb(254, 242, 242),
@@ -532,7 +532,7 @@ namespace ZenQOffice.UI
 
             Button btnOk = new Button
             {
-                Text = "Áp dụng (OK)",
+                Text = AppL10n.T("Áp dụng (OK)", "OK"),
                 Location = new Point(492, 11),
                 Size = new Size(105, 29),
                 BackColor = Color.FromArgb(37, 99, 235),
@@ -547,7 +547,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(605, 11),
                 Size = new Size(82, 29),
                 BackColor = Color.White,
@@ -582,7 +582,7 @@ namespace ZenQOffice.UI
 
             Label lblHeader = new Label
             {
-                Text = "Chọn một vị trí hoặc trang chiếu trong bài thuyết trình này:",
+                Text = AppL10n.T("Chọn một vị trí hoặc trang chiếu trong bài thuyết trình này:", "Select a place or slide in this presentation:"),
                 Location = new Point(14, 12),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
@@ -600,12 +600,12 @@ namespace ZenQOffice.UI
 
             if (_isSlidesMode)
             {
-                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.NextSlide, SlideIndex = -1, Label = "⏭ Trang chiếu tiếp theo (Next Slide)" });
-                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.PreviousSlide, SlideIndex = -1, Label = "⏮ Trang chiếu trước đó (Previous Slide)" });
-                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.FirstSlide, SlideIndex = 0, Label = "⏪ Trang chiếu đầu tiên (First Slide)" });
-                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.LastSlide, SlideIndex = _presentation.Slides.Count - 1, Label = "⏩ Trang chiếu cuối cùng (Last Slide)" });
-                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.LastSlideViewed, SlideIndex = -1, Label = "🔙 Trang chiếu vừa xem (Last Viewed)" });
-                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.EndShow, SlideIndex = -1, Label = "⏹ Kết thúc trình chiếu (End Show)" });
+                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.NextSlide, SlideIndex = -1, Label = AppL10n.T("⏭ Trang chiếu tiếp theo (Next Slide)", "⏭ Next Slide") });
+                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.PreviousSlide, SlideIndex = -1, Label = AppL10n.T("⏮ Trang chiếu trước đó (Previous Slide)", "⏮ Previous Slide") });
+                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.FirstSlide, SlideIndex = 0, Label = AppL10n.T("⏪ Trang chiếu đầu tiên (First Slide)", "⏪ First Slide") });
+                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.LastSlide, SlideIndex = _presentation.Slides.Count - 1, Label = AppL10n.T("⏩ Trang chiếu cuối cùng (Last Slide)", "⏩ Last Slide") });
+                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.LastSlideViewed, SlideIndex = -1, Label = AppL10n.T("🔙 Trang chiếu vừa xem (Last Viewed)", "🔙 Last Slide Viewed") });
+                lstSlideTargets.Items.Add(new SlideTargetItem { ActionType = SlideActionType.EndShow, SlideIndex = -1, Label = AppL10n.T("⏹ Kết thúc trình chiếu (End Show)", "⏹ End Show") });
 
                 for (int i = 0; i < _presentation.Slides.Count; i++)
                 {
@@ -615,7 +615,7 @@ namespace ZenQOffice.UI
                     {
                         ActionType = SlideActionType.SpecificSlide,
                         SlideIndex = i,
-                        Label = string.Format("📄 Trang {0}: {1}", i + 1, stitle)
+                        Label = AppL10n.T(string.Format("📄 Trang {0}: {1}", i + 1, stitle), string.Format("📄 Slide {0}: {1}", i + 1, stitle))
                     });
                 }
             }
@@ -624,7 +624,7 @@ namespace ZenQOffice.UI
             {
                 UpdateSlidePreview();
                 SlideTargetItem sel = lstSlideTargets.SelectedItem as SlideTargetItem;
-                if (sel != null && (string.IsNullOrEmpty(txtText.Text) || txtText.Text == "Đi tới trang chiếu" || txtText.Text.StartsWith("Trang ") || txtText.Text.StartsWith("Đi tới ")))
+                if (sel != null && (string.IsNullOrEmpty(txtText.Text) || txtText.Text == "Đi tới trang chiếu" || txtText.Text == "Go to slide" || txtText.Text.StartsWith("Trang ") || txtText.Text.StartsWith("Slide ") || txtText.Text.StartsWith("Đi tới ") || txtText.Text.StartsWith("Go to ")))
                 {
                     txtText.Text = sel.Label.Substring(sel.Label.IndexOf(' ') + 1);
                 }
@@ -634,7 +634,7 @@ namespace ZenQOffice.UI
             // Slide Preview Box on the Right
             Label lblPreviewHdr = new Label
             {
-                Text = "Xem trước trang chiếu (Slide Preview):",
+                Text = AppL10n.T("Xem trước trang chiếu (Slide Preview):", "Slide preview:"),
                 Location = new Point(272, 36),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
@@ -664,7 +664,7 @@ namespace ZenQOffice.UI
 
             chkShowAndReturn = new CheckBox
             {
-                Text = "Hiển thị và quay lại\n(Show and return)",
+                Text = AppL10n.T("Hiển thị và quay lại\n(Show and return)", "Show and return"),
                 Location = new Point(272, 236),
                 Size = new Size(210, 42),
                 Checked = ShowAndReturn,
@@ -710,7 +710,7 @@ namespace ZenQOffice.UI
 
             Label lblUrl = new Label
             {
-                Text = "Địa chỉ Trang Web (URL) hoặc Đường dẫn Tệp cục bộ:",
+                Text = AppL10n.T("Địa chỉ Trang Web (URL) hoặc Đường dẫn Tệp cục bộ:", "Web URL or local file path:"),
                 Location = new Point(16, 18),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
@@ -729,7 +729,7 @@ namespace ZenQOffice.UI
 
             Button btnBrowseFile = new Button
             {
-                Text = "📂 Chọn Tệp...",
+                Text = AppL10n.T("📂 Chọn Tệp...", "📂 Browse File..."),
                 Location = new Point(388, 42),
                 Size = new Size(94, 27),
                 FlatStyle = FlatStyle.Flat,
@@ -740,8 +740,8 @@ namespace ZenQOffice.UI
             {
                 using (OpenFileDialog ofd = new OpenFileDialog())
                 {
-                    ofd.Title = "Chọn tệp hoặc tài liệu để liên kết";
-                    ofd.Filter = "Tất cả các tệp (*.*)|*.*|Bài thuyết trình (*.pptx)|*.pptx|Tài liệu (*.docx;*.pdf)|*.docx;*.pdf";
+                    ofd.Title = AppL10n.T("Chọn tệp hoặc tài liệu để liên kết", "Select File to Link");
+                    ofd.Filter = AppL10n.T("Tất cả các tệp (*.*)|*.*|Bài thuyết trình (*.pptx)|*.pptx|Tài liệu (*.docx;*.pdf)|*.docx;*.pdf", "All Files (*.*)|*.*|Presentations (*.pptx)|*.pptx|Documents (*.docx;*.pdf)|*.docx;*.pdf");
                     if (ofd.ShowDialog(this) == DialogResult.OK)
                     {
                         txtUrl.Text = ofd.FileName;
@@ -752,7 +752,7 @@ namespace ZenQOffice.UI
 
             Label lblQuick = new Label
             {
-                Text = "Mẫu đường dẫn nhanh:",
+                Text = AppL10n.T("Mẫu đường dẫn nhanh:", "Quick URL presets:"),
                 Location = new Point(16, 88),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
@@ -786,7 +786,7 @@ namespace ZenQOffice.UI
 
             Label lblTitle = new Label
             {
-                Text = "Thiết lập Tương tác Câu hỏi Trắc nghiệm (Interactive Quiz):",
+                Text = AppL10n.T("Thiết lập Tương tác Câu hỏi Trắc nghiệm (Interactive Quiz):", "Interactive Quiz Action Setup:"),
                 Location = new Point(16, 16),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
@@ -796,7 +796,7 @@ namespace ZenQOffice.UI
 
             Label lblDesc = new Label
             {
-                Text = "Khi trình chiếu, nếu người thuyết trình hoặc học sinh nhấp chuột vào đối tượng này, hệ thống sẽ tự động đổi màu phản hồi, phát hiệu ứng hoạt họa và âm thanh tương ứng:",
+                Text = AppL10n.T("Khi trình chiếu, nếu người thuyết trình hoặc học sinh nhấp chuột vào đối tượng này, hệ thống sẽ tự động đổi màu phản hồi, phát hiệu ứng hoạt họa và âm thanh tương ứng:", "During Slide Show, clicking this object automatically shows color feedback, animation, and sound:"),
                 Location = new Point(16, 40),
                 Size = new Size(465, 42),
                 ForeColor = Color.FromArgb(71, 85, 105)
@@ -805,7 +805,7 @@ namespace ZenQOffice.UI
 
             rbQuizCorrect = new RadioButton
             {
-                Text = "✅ ĐÁP ÁN ĐÚNG: Đổi sang màu Xanh lá + Hiệu ứng nảy sáng + Tiếng chuông Đúng (Chime)",
+                Text = AppL10n.T("✅ ĐÁP ÁN ĐÚNG: Đổi sang màu Xanh lá + Hiệu ứng nảy sáng + Tiếng chuông Đúng (Chime)", "✅ CORRECT ANSWER: Green highlight + celebrate animation + Chime"),
                 Location = new Point(20, 95),
                 Size = new Size(460, 44),
                 Font = new Font("Segoe UI", 9.25f, FontStyle.Bold),
@@ -821,7 +821,7 @@ namespace ZenQOffice.UI
 
             rbQuizWrong = new RadioButton
             {
-                Text = "❌ ĐÁP ÁN SAI: Đổi sang màu Đỏ + Hiệu ứng rung lắc cảnh báo + Tiếng còi Sai (Buzzer)",
+                Text = AppL10n.T("❌ ĐÁP ÁN SAI: Đổi sang màu Đỏ + Hiệu ứng rung lắc cảnh báo + Tiếng còi Sai (Buzzer)", "❌ WRONG ANSWER: Red highlight + shake warning + Buzzer"),
                 Location = new Point(20, 150),
                 Size = new Size(460, 44),
                 Font = new Font("Segoe UI", 9.25f, FontStyle.Bold),
@@ -837,7 +837,7 @@ namespace ZenQOffice.UI
 
             Label lblTipQuiz = new Label
             {
-                Text = "💡 Mẹo: Bạn cũng có thể dùng nút '⚡ Kích hoạt (Trigger)' trong tab Hoạt họa (Animations) để kích hoạt bất kỳ hiệu ứng xuất hiện/nhấn mạnh/biến mất nào khi bấm vào một câu trả lời giống hệt PowerPoint 365!",
+                Text = AppL10n.T("💡 Mẹo: Bạn cũng có thể dùng nút '⚡ Kích hoạt (Trigger)' trong tab Hoạt họa (Animations) để kích hoạt bất kỳ hiệu ứng xuất hiện/nhấn mạnh/biến mất nào khi bấm vào một câu trả lời giống hệt PowerPoint 365!", "💡 Tip: You can also use '⚡ Trigger' on the Animations tab to trigger any animation effect when an answer shape is clicked."),
                 Location = new Point(20, 215),
                 Size = new Size(455, 65),
                 ForeColor = Color.FromArgb(37, 99, 235)
@@ -853,19 +853,19 @@ namespace ZenQOffice.UI
 
             Label lblMail = new Label
             {
-                Text = "Địa chỉ Email người nhận:",
+                Text = AppL10n.T("Địa chỉ Email người nhận:", "Email address:"),
                 Location = new Point(16, 20),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
             };
             _panelEmail.Controls.Add(lblMail);
 
-            txtEmail = new TextBox { Location = new Point(16, 44), Width = 450, PlaceholderText = "ví dụ: lienhe@zenqoffice.vn" };
+            txtEmail = new TextBox { Location = new Point(16, 44), Width = 450, PlaceholderText = AppL10n.T("ví dụ: lienhe@zenqoffice.vn", "e.g. contact@zenqoffice.vn") };
             _panelEmail.Controls.Add(txtEmail);
 
             Label lblSub = new Label
             {
-                Text = "Chủ đề thư (Subject):",
+                Text = AppL10n.T("Chủ đề thư (Subject):", "Subject:"),
                 Location = new Point(16, 86),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
@@ -903,7 +903,7 @@ namespace ZenQOffice.UI
 
         public static string GetFriendlySlideTitle(SlideNode slide, int index)
         {
-            if (slide == null) return "Trang chiếu " + (index + 1);
+            if (slide == null) return AppL10n.T("Trang chiếu ", "Slide ") + (index + 1);
             if (!string.IsNullOrEmpty(slide.Title) && !slide.Title.StartsWith("Slide "))
                 return slide.Title;
 
@@ -919,7 +919,7 @@ namespace ZenQOffice.UI
                     }
                 }
             }
-            return "Trang chiếu " + (index + 1);
+            return AppL10n.T("Trang chiếu ", "Slide ") + (index + 1);
         }
 
         public static Bitmap RenderMiniSlidePreview(PresentationRoot pres, int slideIdx, int width, int height)
@@ -935,7 +935,7 @@ namespace ZenQOffice.UI
                     using (Font f = new Font("Segoe UI", 9f, FontStyle.Italic))
                     using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     {
-                        g.DrawString("Điều hướng động khi trình chiếu", f, Brushes.SlateGray, new RectangleF(0, 0, width, height), sf);
+                        g.DrawString(AppL10n.T("Điều hướng động khi trình chiếu", "Dynamic presentation navigation"), f, Brushes.SlateGray, new RectangleF(0, 0, width, height), sf);
                     }
                     return bmp;
                 }
@@ -1112,7 +1112,7 @@ namespace ZenQOffice.UI
             _currentSlideIndex = currentSlideIndex;
             _shape = shape;
 
-            this.Text = "Cài đặt Hành động & Tương tác (Action Settings - PowerPoint 365)";
+            this.Text = AppL10n.T("Cài đặt Hành động & Tương tác (Action Settings - PowerPoint 365)", "Action Settings");
             this.Size = new Size(580, 565);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -1128,8 +1128,8 @@ namespace ZenQOffice.UI
                 Font = new Font("Segoe UI", 9.0f)
             };
 
-            TabPage tabClick = new TabPage("🖱️ Nhấp chuột (Mouse Click)") { BackColor = Color.White, Padding = new Padding(12) };
-            TabPage tabHover = new TabPage("👆 Di chuột qua (Mouse Over)") { BackColor = Color.White, Padding = new Padding(12) };
+            TabPage tabClick = new TabPage(AppL10n.T("🖱️ Nhấp chuột (Mouse Click)", "🖱️ Mouse Click")) { BackColor = Color.White, Padding = new Padding(12) };
+            TabPage tabHover = new TabPage(AppL10n.T("👆 Di chuột qua (Mouse Over)", "👆 Mouse Over")) { BackColor = Color.White, Padding = new Padding(12) };
 
             _clickControls = BuildActionTab(tabClick, true);
             _hoverControls = BuildActionTab(tabHover, false);
@@ -1160,7 +1160,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy",
+                Text = AppL10n.T("Hủy", "Cancel"),
                 Location = new Point(464, 11),
                 Size = new Size(88, 29),
                 BackColor = Color.White,
@@ -1181,7 +1181,7 @@ namespace ZenQOffice.UI
 
             GroupBox grpAction = new GroupBox
             {
-                Text = isClickTab ? "Hành động khi nhấp chuột (Action on click)" : "Hành động khi di chuột qua (Action on mouse over)",
+                Text = isClickTab ? AppL10n.T("Hành động khi nhấp chuột (Action on click)", "Action on click") : AppL10n.T("Hành động khi di chuột qua (Action on mouse over)", "Action on mouse over"),
                 Location = new Point(12, y),
                 Size = new Size(508, 305),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
@@ -1191,10 +1191,10 @@ namespace ZenQOffice.UI
 
             Font regFont = new Font("Segoe UI", 9.0f, FontStyle.Regular);
 
-            c.RbNone = new RadioButton { Text = "Không có (None)", Location = new Point(16, 24), AutoSize = true, Font = regFont, Checked = true };
+            c.RbNone = new RadioButton { Text = AppL10n.T("Không có (None)", "None"), Location = new Point(16, 24), AutoSize = true, Font = regFont, Checked = true };
             grpAction.Controls.Add(c.RbNone);
 
-            c.RbHyperlink = new RadioButton { Text = "Liên kết đến (Hyperlink to):", Location = new Point(16, 50), AutoSize = true, Font = regFont };
+            c.RbHyperlink = new RadioButton { Text = AppL10n.T("Liên kết đến (Hyperlink to):", "Hyperlink to:"), Location = new Point(16, 50), AutoSize = true, Font = regFont };
             grpAction.Controls.Add(c.RbHyperlink);
 
             c.CboHyperlinkTarget = new ZenQOffice.UI.FluentComboBox
@@ -1206,15 +1206,15 @@ namespace ZenQOffice.UI
             };
             c.CboHyperlinkTarget.Items.AddRange(new object[]
             {
-                "Trang chiếu tiếp theo (Next Slide)",
-                "Trang chiếu trước đó (Previous Slide)",
-                "Trang chiếu đầu tiên (First Slide)",
-                "Trang chiếu cuối cùng (Last Slide)",
-                "Trang chiếu vừa xem (Last Slide Viewed)",
-                "Kết thúc trình chiếu (End Show)",
-                "Trang chiếu cụ thể... (Slide...)",
-                "Địa chỉ Trang Web (URL...)",
-                "Tệp khác... (Other File...)"
+                AppL10n.T("Trang chiếu tiếp theo (Next Slide)", "Next Slide"),
+                AppL10n.T("Trang chiếu trước đó (Previous Slide)", "Previous Slide"),
+                AppL10n.T("Trang chiếu đầu tiên (First Slide)", "First Slide"),
+                AppL10n.T("Trang chiếu cuối cùng (Last Slide)", "Last Slide"),
+                AppL10n.T("Trang chiếu vừa xem (Last Slide Viewed)", "Last Slide Viewed"),
+                AppL10n.T("Kết thúc trình chiếu (End Show)", "End Show"),
+                AppL10n.T("Trang chiếu cụ thể... (Slide...)", "Slide..."),
+                AppL10n.T("Địa chỉ Trang Web (URL...)", "URL..."),
+                AppL10n.T("Tệp khác... (Other File...)", "Other File...")
             });
             c.CboHyperlinkTarget.SelectedIndex = 0;
             grpAction.Controls.Add(c.CboHyperlinkTarget);
@@ -1232,7 +1232,7 @@ namespace ZenQOffice.UI
                 for (int i = 0; i < _presentation.Slides.Count; i++)
                 {
                     string st = InsertHyperlinkForm.GetFriendlySlideTitle(_presentation.Slides[i], i);
-                    c.CboSpecificSlide.Items.Add(string.Format("Trang {0}: {1}", i + 1, st));
+                    c.CboSpecificSlide.Items.Add(AppL10n.T(string.Format("Trang {0}: {1}", i + 1, st), string.Format("Slide {0}: {1}", i + 1, st)));
                 }
                 if (c.CboSpecificSlide.Items.Count > 0) c.CboSpecificSlide.SelectedIndex = 0;
             }
@@ -1250,7 +1250,7 @@ namespace ZenQOffice.UI
 
             c.BtnBrowseFile = new Button
             {
-                Text = "Duyệt...",
+                Text = AppL10n.T("Duyệt...", "Browse..."),
                 Location = new Point(240, 103),
                 Size = new Size(61, 25),
                 Font = regFont,
@@ -1268,7 +1268,7 @@ namespace ZenQOffice.UI
 
             c.ChkShowAndReturn = new CheckBox
             {
-                Text = "Hiển thị và quay lại (Show and return)",
+                Text = AppL10n.T("Hiển thị và quay lại (Show and return)", "Show and return"),
                 Location = new Point(36, 133),
                 AutoSize = true,
                 Font = regFont
@@ -1287,16 +1287,16 @@ namespace ZenQOffice.UI
             grpAction.Controls.Add(c.PicSlidePreview);
 
             // Run Program
-            c.RbRunProgram = new RadioButton { Text = "Chạy chương trình (Run program):", Location = new Point(16, 160), AutoSize = true, Font = regFont };
+            c.RbRunProgram = new RadioButton { Text = AppL10n.T("Chạy chương trình (Run program):", "Run program:"), Location = new Point(16, 160), AutoSize = true, Font = regFont };
             grpAction.Controls.Add(c.RbRunProgram);
 
             c.TxtProgramPath = new TextBox { Location = new Point(36, 184), Width = 200, Font = regFont, Enabled = false };
             grpAction.Controls.Add(c.TxtProgramPath);
 
-            c.BtnBrowseProgram = new Button { Text = "Duyệt...", Location = new Point(240, 183), Size = new Size(61, 25), Font = regFont, Enabled = false };
+            c.BtnBrowseProgram = new Button { Text = AppL10n.T("Duyệt...", "Browse..."), Location = new Point(240, 183), Size = new Size(61, 25), Font = regFont, Enabled = false };
             c.BtnBrowseProgram.Click += (s, e) =>
             {
-                using (OpenFileDialog ofd = new OpenFileDialog { Filter = "Chương trình (*.exe;*.bat)|*.exe;*.bat|Tất cả (*.*)|*.*" })
+                using (OpenFileDialog ofd = new OpenFileDialog { Filter = AppL10n.T("Chương trình (*.exe;*.bat)|*.exe;*.bat|Tất cả (*.*)|*.*", "Programs (*.exe;*.bat)|*.exe;*.bat|All Files (*.*)|*.*") })
                 {
                     if (ofd.ShowDialog(this) == DialogResult.OK)
                         c.TxtProgramPath.Text = ofd.FileName;
@@ -1307,7 +1307,7 @@ namespace ZenQOffice.UI
             // Quiz Correct / Wrong Radio Options
             c.RbQuizCorrect = new RadioButton
             {
-                Text = "✅ Trắc nghiệm: Đáp án ĐÚNG (Đổi màu Xanh lá + Hiệu ứng chúc mừng)",
+                Text = AppL10n.T("✅ Trắc nghiệm: Đáp án ĐÚNG (Đổi màu Xanh lá + Hiệu ứng chúc mừng)", "✅ Quiz: CORRECT Answer (Green highlight + celebration effect)"),
                 Location = new Point(16, 216),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
@@ -1317,7 +1317,7 @@ namespace ZenQOffice.UI
 
             c.RbQuizWrong = new RadioButton
             {
-                Text = "❌ Trắc nghiệm: Đáp án SAI (Đổi màu Đỏ + Hiệu ứng rung lắc cảnh báo)",
+                Text = AppL10n.T("❌ Trắc nghiệm: Đáp án SAI (Đổi màu Đỏ + Hiệu ứng rung lắc cảnh báo)", "❌ Quiz: WRONG Answer (Red highlight + shake warning)"),
                 Location = new Point(16, 242),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
@@ -1330,7 +1330,7 @@ namespace ZenQOffice.UI
             {
                 c.ChkRevealShape = new CheckBox
                 {
-                    Text = "💡 Hiện / Ẩn hình giải thích khi bấm:",
+                    Text = AppL10n.T("💡 Hiện / Ẩn hình giải thích khi bấm:", "💡 Show / Hide explanation shape on click:"),
                     Location = new Point(16, 271),
                     AutoSize = true,
                     Font = regFont
@@ -1367,7 +1367,7 @@ namespace ZenQOffice.UI
             // Sound & Highlight GroupBox
             GroupBox grpFeedback = new GroupBox
             {
-                Text = "Âm thanh & Phản hồi Trực quan",
+                Text = AppL10n.T("Âm thanh & Phản hồi Trực quan", "Sound & Visual Feedback"),
                 Location = new Point(12, 325),
                 Size = new Size(508, 92),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
@@ -1375,7 +1375,7 @@ namespace ZenQOffice.UI
             };
             page.Controls.Add(grpFeedback);
 
-            c.ChkPlaySound = new CheckBox { Text = "Phát âm thanh (Play sound):", Location = new Point(16, 26), AutoSize = true, Font = regFont };
+            c.ChkPlaySound = new CheckBox { Text = AppL10n.T("Phát âm thanh (Play sound):", "Play sound:"), Location = new Point(16, 26), AutoSize = true, Font = regFont };
             grpFeedback.Controls.Add(c.ChkPlaySound);
 
             c.CboSound = new ZenQOffice.UI.FluentComboBox
@@ -1412,7 +1412,7 @@ namespace ZenQOffice.UI
 
             c.ChkHighlight = new CheckBox
             {
-                Text = isClickTab ? "Làm sáng nổi bật khi nhấp chuột (Highlight click)" : "Làm sáng nổi bật khi di chuột qua (Highlight when mouse over)",
+                Text = isClickTab ? AppL10n.T("Làm sáng nổi bật khi nhấp chuột (Highlight click)", "Highlight click") : AppL10n.T("Làm sáng nổi bật khi di chuột qua (Highlight when mouse over)", "Highlight when mouse over"),
                 Location = new Point(16, 58),
                 AutoSize = true,
                 Font = regFont

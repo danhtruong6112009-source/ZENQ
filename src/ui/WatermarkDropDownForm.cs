@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -78,7 +79,7 @@ namespace ZenQOffice.UI
             using (Font tileLabelFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
             using (Font itemFont = new Font("Segoe UI", 9.0f, FontStyle.Regular))
             {
-                g.DrawString("Bảo mật (Confidential)", groupFont, Brushes.Black, 15, 12);
+                g.DrawString(AppL10n.Tr("Bảo mật (Confidential)"), groupFont, Brushes.Black, 15, 12);
 
                 int tileW = 110;
                 int tileH = 135;
@@ -107,6 +108,7 @@ namespace ZenQOffice.UI
 
         private void DrawActionRow(Graphics g, int x, int y, int w, int h, string text, Font font, bool isHovered)
         {
+            text = AppL10n.Tr(text);
             Rectangle rowRect = new Rectangle(x + 4, y, w - 8, h);
             if (isHovered)
             {
@@ -120,6 +122,8 @@ namespace ZenQOffice.UI
 
         private void DrawWatermarkTile(Graphics g, int x, int y, int w, int h, string wmText, bool isDiagonal, string label, Font labelFont, bool isHovered)
         {
+            wmText = AppL10n.Tr(wmText);
+            label = AppL10n.Tr(label);
             Rectangle paperRect = new Rectangle(x, y, w, h - 22);
 
             // Paper BG

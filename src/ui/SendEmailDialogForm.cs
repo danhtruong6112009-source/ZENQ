@@ -47,7 +47,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Chia sẻ & Gửi Thư điện tử (Send by Email)";
+            this.Text = AppL10n.T("Chia sẻ & Gửi Thư điện tử (Send by Email)", "Send by Email");
             this.Size = new Size(540, 520);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -70,8 +70,8 @@ namespace ZenQOffice.UI
                 using (Font hFont = new Font("Segoe UI", 11.5f, FontStyle.Bold))
                 using (Font subFont = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("Gửi tài liệu qua Email", hFont, Brushes.White, 48, 8);
-                    e.Graphics.DrawString("Đính kèm tệp tài liệu và soạn thư trực tiếp trong ứng dụng Mail", subFont, Brushes.WhiteSmoke, 48, 32);
+                    e.Graphics.DrawString(AppL10n.T("Gửi tài liệu qua Email", "Send Document by Email"), hFont, Brushes.White, 48, 8);
+                    e.Graphics.DrawString(AppL10n.T("Đính kèm tệp tài liệu và soạn thư trực tiếp trong ứng dụng Mail", "Attach the document file and compose in your Mail app"), subFont, Brushes.WhiteSmoke, 48, 32);
                 }
             };
             this.Controls.Add(topPanel);
@@ -79,7 +79,7 @@ namespace ZenQOffice.UI
             int curY = 68;
 
             // To
-            Label lblTo = new Label { Text = "Gửi tới (To):", Location = new Point(18, curY + 2), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblTo = new Label { Text = AppL10n.T("Gửi tới (To):", "To:"), Location = new Point(18, curY + 2), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             this.Controls.Add(lblTo);
 
             _txtTo = new TextBox { Location = new Point(130, curY), Size = new Size(376, 24), PlaceholderText = "nhap_email_nguoi_nhan@example.com" };
@@ -87,7 +87,7 @@ namespace ZenQOffice.UI
             curY += 34;
 
             // CC
-            Label lblCc = new Label { Text = "Đồng gửi (CC):", Location = new Point(18, curY + 2), AutoSize = true };
+            Label lblCc = new Label { Text = AppL10n.T("Đồng gửi (CC):", "CC:"), Location = new Point(18, curY + 2), AutoSize = true };
             this.Controls.Add(lblCc);
 
             _txtCc = new TextBox { Location = new Point(130, curY), Size = new Size(376, 24) };
@@ -95,27 +95,27 @@ namespace ZenQOffice.UI
             curY += 34;
 
             // Subject
-            Label lblSubject = new Label { Text = "Tiêu đề (Subject):", Location = new Point(18, curY + 2), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+            Label lblSubject = new Label { Text = AppL10n.T("Tiêu đề (Subject):", "Subject:"), Location = new Point(18, curY + 2), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
             this.Controls.Add(lblSubject);
 
-            _txtSubject = new TextBox { Location = new Point(130, curY), Size = new Size(376, 24), Text = "Tài liệu: " + _documentTitle };
+            _txtSubject = new TextBox { Location = new Point(130, curY), Size = new Size(376, 24), Text = AppL10n.T("Tài liệu: ", "Document: ") + _documentTitle };
             this.Controls.Add(_txtSubject);
             curY += 34;
 
             // Format Options
-            GroupBox grpFormat = new GroupBox { Text = "Định dạng tệp đính kèm", Location = new Point(18, curY), Size = new Size(488, 62) };
-            _radOriginal = new RadioButton { Text = "Tệp gốc tài liệu (" + GetDefaultExtension() + ")", Location = new Point(16, 24), AutoSize = true, Checked = true };
+            GroupBox grpFormat = new GroupBox { Text = AppL10n.T("Định dạng tệp đính kèm", "Attachment Format"), Location = new Point(18, curY), Size = new Size(488, 62) };
+            _radOriginal = new RadioButton { Text = AppL10n.T("Tệp gốc tài liệu (", "Original file (") + GetDefaultExtension() + ")", Location = new Point(16, 24), AutoSize = true, Checked = true };
             _radOriginal.CheckedChanged += (s, e) => UpdateAttachmentLabel();
             grpFormat.Controls.Add(_radOriginal);
 
-            _radPdf = new RadioButton { Text = "Tệp định dạng PDF (.pdf)", Location = new Point(240, 24), AutoSize = true };
+            _radPdf = new RadioButton { Text = AppL10n.T("Tệp định dạng PDF (.pdf)", "PDF file (.pdf)"), Location = new Point(240, 24), AutoSize = true };
             _radPdf.CheckedChanged += (s, e) => UpdateAttachmentLabel();
             grpFormat.Controls.Add(_radPdf);
             this.Controls.Add(grpFormat);
             curY += 70;
 
             // Body
-            Label lblBody = new Label { Text = "Nội dung thư (Message):", Location = new Point(18, curY), AutoSize = true };
+            Label lblBody = new Label { Text = AppL10n.T("Nội dung thư (Message):", "Message:"), Location = new Point(18, curY), AutoSize = true };
             this.Controls.Add(lblBody);
             curY += 22;
 
@@ -125,7 +125,7 @@ namespace ZenQOffice.UI
                 Size = new Size(488, 110),
                 Multiline = true,
                 ScrollBars = ScrollBars.Vertical,
-                Text = "Kính gửi quý anh/chị,\r\n\r\nTôi xin gửi tài liệu đính kèm \"" + _documentTitle + "\" để phục vụ công việc.\r\n\r\nTrân trọng,\r\nZenQ Office User"
+                Text = AppL10n.T("Kính gửi quý anh/chị,\r\n\r\nTôi xin gửi tài liệu đính kèm \"", "Hello,\r\n\r\nPlease find attached the document \"") + _documentTitle + AppL10n.T("\" để phục vụ công việc.\r\n\r\nTrân trọng,\r\nZenQ Office User", "\" for your review.\r\n\r\nBest regards,\r\nZenQ Office User")
             };
             this.Controls.Add(_txtBody);
             curY += 118;
@@ -144,7 +144,7 @@ namespace ZenQOffice.UI
             // Bottom Buttons
             _btnSend = new Button
             {
-                Text = "Mở ứng dụng Mail & Đính kèm",
+                Text = AppL10n.T("Mở ứng dụng Mail & Đính kèm", "Open Mail App & Attach"),
                 Image = FluentIconRenderer.GetGlyphBitmap('\uE715', 16, 16, Color.White),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -164,7 +164,7 @@ namespace ZenQOffice.UI
 
             _btnOpenFolder = new Button
             {
-                Text = "Thư mục đính kèm",
+                Text = AppL10n.T("Thư mục đính kèm", "Open Folder"),
                 Image = FluentIconRenderer.GetGlyphBitmap('\uE838', 15, 15, Color.Black),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -183,7 +183,7 @@ namespace ZenQOffice.UI
 
             _btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 Image = FluentIconRenderer.GetGlyphBitmap('\uE711', 13, 13, Color.Black),
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -215,7 +215,7 @@ namespace ZenQOffice.UI
         {
             string ext = _radPdf.Checked ? ".pdf" : GetDefaultExtension();
             string fileName = Path.GetFileNameWithoutExtension(_documentTitle) + ext;
-            _lblAttachmentInfo.Text = "Tệp đính kèm sẽ được chuẩn bị: " + fileName + "\nỨng dụng sẽ tự động khởi chạy Outlook, Thunderbird hoặc Windows Mail.";
+            _lblAttachmentInfo.Text = AppL10n.T("Tệp đính kèm sẽ được chuẩn bị: ", "Attachment will be prepared: ") + fileName + AppL10n.T("\nỨng dụng sẽ tự động khởi chạy Outlook, Thunderbird hoặc Windows Mail.", "\nAutomatically launches Outlook, Thunderbird, or Windows Mail.");
         }
 
         private string PrepareAttachmentFile()
@@ -311,7 +311,7 @@ namespace ZenQOffice.UI
                 if (!string.IsNullOrEmpty(attachmentPath) && File.Exists(attachmentPath))
                 {
                     ZenQOffice.UI.FluentMessageBox.Show(this,
-                        "Cửa sổ soạn thư đã được mở thành công!\n\nTệp đính kèm đã được chuẩn bị tại:\n" + attachmentPath + "\n(Đã sao chép sẵn vào Clipboard, bạn có thể dán tệp trực tiếp bằng Ctrl+V).",
+                        AppL10n.T("Cửa sổ soạn thư đã được mở thành công!\n\nTệp đính kèm đã được chuẩn bị tại:\n", "Email composer opened!\n\nAttachment prepared at:\n") + attachmentPath + AppL10n.T("\n(Đã sao chép sẵn vào Clipboard, bạn có thể dán tệp trực tiếp bằng Ctrl+V).", "\n(Copied to clipboard — you can paste with Ctrl+V)."),
                         "ZenQ Office Email", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 this.Close();
@@ -319,8 +319,8 @@ namespace ZenQOffice.UI
             catch (Exception ex)
             {
                 ZenQOffice.UI.FluentMessageBox.Show(this,
-                    "Không thể mở ứng dụng gửi thư mặc định: " + ex.Message + "\n\nTệp đính kèm đã sẵn sàng tại: " + (attachmentPath ?? "Chưa lưu"),
-                    "Lỗi gửi thư", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    AppL10n.T("Không thể mở ứng dụng gửi thư mặc định: ", "Could not open default mail app: ") + ex.Message + AppL10n.T("\n\nTệp đính kèm đã sẵn sàng tại: ", "\n\nAttachment ready at: ") + (attachmentPath ?? AppL10n.T("Chưa lưu", "Not saved")),
+                    AppL10n.T("Lỗi gửi thư", "Email Error"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 

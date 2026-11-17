@@ -1288,6 +1288,7 @@ namespace ZenQOffice.UI
             {
                 g.FillRoundedRectangle(b, r, 5f);
                 g.DrawRoundedRectangle(p, r, 5f);
+                text = ZenQOffice.Core.AppL10n.Tr(text);
                 var sz = g.MeasureString(text, font);
                 g.DrawString(text, font, tb, x + (w - sz.Width) / 2f, y + (h - sz.Height) / 2f);
             }
@@ -1326,7 +1327,7 @@ namespace ZenQOffice.UI
             {
                 g.FillRoundedRectangle(b, r, 4f);
                 g.DrawRoundedRectangle(p, r, 4f);
-                g.DrawString(symbol, font, tb, r, sf);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr(symbol), font, tb, r, sf);
             }
         }
 
@@ -1374,6 +1375,7 @@ namespace ZenQOffice.UI
             {
                 if (!string.IsNullOrEmpty(label))
                 {
+                    label = ZenQOffice.Core.AppL10n.Tr(label);
                     g.DrawString(label, lblFont, lblB, x, y + 4);
                     x += (int)g.MeasureString(label, lblFont).Width + 4;
                 }
@@ -1422,7 +1424,7 @@ namespace ZenQOffice.UI
         {
             using (Form f = new Form()
             {
-                Text = title,
+                Text = ZenQOffice.Core.AppL10n.Tr(title),
                 Size = new Size(280, 140),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
@@ -1440,7 +1442,7 @@ namespace ZenQOffice.UI
                 };
                 Button btnOk = new Button()
                 {
-                    Text = "Xác nhận",
+                    Text = ZenQOffice.Core.AppL10n.Tr("Xác nhận"),
                     Location = new Point(120, 56),
                     Size = new Size(120, 32),
                     BackColor = Color.FromArgb(37, 99, 235),
@@ -1983,8 +1985,8 @@ namespace ZenQOffice.UI
                     Color curStroke = (l != null) ? l.StrokeColor : ShapeStrokeColor;
 
                     // 1. Nhãn chính chuẩn Inkscape: "Thay đổi:"
-                    g.DrawString("Thay đổi:", valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString("Thay đổi:", valFont).Width + 8;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Thay đổi:"), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Thay đổi:"), valFont).Width + 8;
 
                     // 2. Chiều rộng R: [154.800] - +
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "R:", curW.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
@@ -2119,8 +2121,8 @@ namespace ZenQOffice.UI
                     }, 82);
 
                     // 9. Màu Tô
-                    g.DrawString("Tô:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Tô:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Tô:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Tô:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, curFill, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(curFill))
                         {
@@ -2130,8 +2132,8 @@ namespace ZenQOffice.UI
                     curX += 34;
 
                     // 10. Màu Nét
-                    g.DrawString("Nét:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Nét:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Nét:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Nét:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, curStroke, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(curStroke))
                         {
@@ -2151,8 +2153,8 @@ namespace ZenQOffice.UI
                     Color curFill = (l != null && l.Type == LayerType.VectorShape) ? l.FillColor : ShapeFillColor;
                     Color curStroke = (l != null && l.Type == LayerType.VectorShape) ? l.StrokeColor : ShapeStrokeColor;
 
-                    g.DrawString("Đối tượng:", valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString("Đối tượng:", valFont).Width + 8;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Đối tượng:"), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Đối tượng:"), valFont).Width + 8;
 
                     if (l != null)
                     {
@@ -2227,8 +2229,8 @@ namespace ZenQOffice.UI
 
                         if (l.Type == LayerType.VectorShape)
                         {
-                            g.DrawString("Tô:", lblFont, lblB, curX, RibbonHeight + 13);
-                            curX += (int)g.MeasureString("Tô:", lblFont).Width + 5;
+                            g.DrawString(ZenQOffice.Core.AppL10n.Tr("Tô:"), lblFont, lblB, curX, RibbonHeight + 13);
+                            curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Tô:"), lblFont).Width + 5;
                             DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 24, 24, curFill, () => {
                                 using (var dlg = new PhotoColorPickerDialogForm(curFill))
                                 {
@@ -2237,8 +2239,8 @@ namespace ZenQOffice.UI
                             });
                             curX += 32;
 
-                            g.DrawString("Nét:", lblFont, lblB, curX, RibbonHeight + 13);
-                            curX += (int)g.MeasureString("Nét:", lblFont).Width + 5;
+                            g.DrawString(ZenQOffice.Core.AppL10n.Tr("Nét:"), lblFont, lblB, curX, RibbonHeight + 13);
+                            curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Nét:"), lblFont).Width + 5;
                             DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 24, 24, curStroke, () => {
                                 using (var dlg = new PhotoColorPickerDialogForm(curStroke))
                                 {
@@ -2250,7 +2252,7 @@ namespace ZenQOffice.UI
                     }
                     else
                     {
-                        g.DrawString("Chưa chọn đối tượng nào", lblFont, lblB, curX, RibbonHeight + 13);
+                        g.DrawString(ZenQOffice.Core.AppL10n.Tr("Chưa chọn đối tượng nào"), lblFont, lblB, curX, RibbonHeight + 13);
                         curX += 160;
                     }
                 }
@@ -2298,8 +2300,8 @@ namespace ZenQOffice.UI
                         SetStrokeWidth(Math.Min(50f, curSw + 0.5f));
                     }, null, 58);
 
-                    g.DrawString("Tô:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Tô:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Tô:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Tô:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, curFill, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(curFill))
                         {
@@ -2308,8 +2310,8 @@ namespace ZenQOffice.UI
                     });
                     curX += 34;
 
-                    g.DrawString("Nét:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Nét:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Nét:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Nét:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, curStroke, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(curStroke))
                         {
@@ -2327,8 +2329,8 @@ namespace ZenQOffice.UI
                     Color curFill = (l != null) ? l.FillColor : ShapeFillColor;
                     Color curStroke = (l != null) ? l.StrokeColor : ShapeStrokeColor;
 
-                    g.DrawString("Hình elip:", valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString("Hình elip:", valFont).Width + 8;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Hình elip:"), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Hình elip:"), valFont).Width + 8;
 
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "R:", curW.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), () => {
                         float nw = Math.Max(5f, curW - 5f);
@@ -2355,8 +2357,8 @@ namespace ZenQOffice.UI
                         SetStrokeWidth(Math.Min(50f, curSw + 0.5f));
                     }, null, 80);
 
-                    g.DrawString("Tô:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Tô:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Tô:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Tô:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, curFill, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(curFill))
                         {
@@ -2365,8 +2367,8 @@ namespace ZenQOffice.UI
                     });
                     curX += 34;
 
-                    g.DrawString("Nét:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Nét:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Nét:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Nét:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, curStroke, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(curStroke))
                         {
@@ -2378,8 +2380,8 @@ namespace ZenQOffice.UI
                 else if (SelectedTool == PhotoTool.Brush || SelectedTool == PhotoTool.Pen)
                 {
                     string title = (SelectedTool == PhotoTool.Pen) ? "Bút vẽ Bezier" : "Bút vẽ tự do";
-                    g.DrawString(title, valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString(title, valFont).Width + 14;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr(title), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr(title), valFont).Width + 14;
 
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "Cỡ nét:", $"{(int)BrushSize} px", () => {
                         BrushSize = Math.Max(1f, BrushSize - 1f);
@@ -2409,8 +2411,8 @@ namespace ZenQOffice.UI
                     curX += 6;
 
                     // Màu nét vẽ
-                    g.DrawString("Màu nét:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Màu nét:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Màu nét:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Màu nét:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, ForegroundColor, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(ForegroundColor))
                         {
@@ -2605,7 +2607,7 @@ namespace ZenQOffice.UI
                         }
                     }, () => {
                         if (selCount > 0 && Document.ActiveLayer != null) {
-                            float? v = ShowNumberInputDialog($"Nhập tọa độ X ({unitLabel})", displayX);
+                            float? v = ShowNumberInputDialog(ZenQOffice.Core.AppL10n.T($"Nhập tọa độ X ({unitLabel})", $"Enter X ({unitLabel})"), displayX);
                             if (v.HasValue) {
                                 float targetX = _nodeUnitIsMm ? (v.Value * PxPerMm) : v.Value;
                                 float deltaX = targetX - avgX;
@@ -2627,7 +2629,7 @@ namespace ZenQOffice.UI
                         }
                     }, () => {
                         if (selCount > 0 && Document.ActiveLayer != null) {
-                            float? v = ShowNumberInputDialog($"Nhập tọa độ Y ({unitLabel})", displayY);
+                            float? v = ShowNumberInputDialog(ZenQOffice.Core.AppL10n.T($"Nhập tọa độ Y ({unitLabel})", $"Enter Y ({unitLabel})"), displayY);
                             if (v.HasValue) {
                                 float targetY = _nodeUnitIsMm ? (v.Value * PxPerMm) : v.Value;
                                 float deltaY = targetY - avgY;
@@ -2645,8 +2647,8 @@ namespace ZenQOffice.UI
                 }
                 else if (SelectedTool == PhotoTool.Text)
                 {
-                    g.DrawString("Văn bản", valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString("Văn bản", valFont).Width + 14;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Văn bản"), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Văn bản"), valFont).Width + 14;
 
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "Cỡ chữ:", $"{(int)ActiveFontSize}", () => {
                         ActiveFontSize = Math.Max(8f, ActiveFontSize - 2f);
@@ -2660,8 +2662,8 @@ namespace ZenQOffice.UI
                     DrawD2DSlider(g, _fontSizeTrackRect, 8f, 120f, ActiveFontSize);
                     curX += 100;
 
-                    g.DrawString("Màu chữ:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Màu chữ:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Màu chữ:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Màu chữ:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, ForegroundColor, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(ForegroundColor)) {
                             if (dlg.ShowDialog() == DialogResult.OK) {
@@ -2674,8 +2676,8 @@ namespace ZenQOffice.UI
                 }
                 else if (SelectedTool == PhotoTool.Eraser)
                 {
-                    g.DrawString("Tẩy xóa", valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString("Tẩy xóa", valFont).Width + 14;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Tẩy xóa"), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Tẩy xóa"), valFont).Width + 14;
 
                     curX = DrawTopBarValueBox(g, curX, RibbonHeight + 9, "Cỡ tẩy:", $"{(int)BrushSize} px", () => {
                         BrushSize = Math.Max(1f, BrushSize - 1f);
@@ -2689,11 +2691,11 @@ namespace ZenQOffice.UI
                 }
                 else if (SelectedTool == PhotoTool.Bucket)
                 {
-                    g.DrawString("Đổ màu", valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString("Đổ màu", valFont).Width + 14;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Đổ màu"), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Đổ màu"), valFont).Width + 14;
 
-                    g.DrawString("Màu đổ:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Màu đổ:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Màu đổ:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Màu đổ:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, ForegroundColor, () => {
                         using (var dlg = new PhotoColorPickerDialogForm(ForegroundColor)) {
                             if (dlg.ShowDialog() == DialogResult.OK) ForegroundColor = dlg.SelectedColor;
@@ -2703,8 +2705,8 @@ namespace ZenQOffice.UI
                 }
                 else if (SelectedTool == PhotoTool.Gradient)
                 {
-                    g.DrawString("Dải màu", valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString("Dải màu", valFont).Width + 14;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Dải màu"), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Dải màu"), valFont).Width + 14;
 
                     DrawTopBarButton(g, curX, RibbonHeight + 10, 84, 24, "Tuyến tính", () => SetFillType(VectorFillType.LinearGradient), ShapeFillType == VectorFillType.LinearGradient);
                     curX += 90;
@@ -2715,19 +2717,19 @@ namespace ZenQOffice.UI
                 }
                 else if (SelectedTool == PhotoTool.Eyedropper)
                 {
-                    g.DrawString("Hút màu", valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString("Hút màu", valFont).Width + 14;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Hút màu"), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Hút màu"), valFont).Width + 14;
 
-                    g.DrawString("Màu mẫu:", lblFont, lblB, curX, RibbonHeight + 13);
-                    curX += (int)g.MeasureString("Màu mẫu:", lblFont).Width + 5;
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Màu mẫu:"), lblFont, lblB, curX, RibbonHeight + 13);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr("Màu mẫu:"), lblFont).Width + 5;
                     DrawTopBarColorSwatch(g, curX, RibbonHeight + 10, 26, 24, ForegroundColor, null);
                     curX += 34;
                 }
                 else
                 {
-                    string generic = $"Công cụ: {SelectedTool}";
-                    g.DrawString(generic, valFont, valB, curX, RibbonHeight + 12);
-                    curX += (int)g.MeasureString(generic, valFont).Width + 14;
+                    string generic = ZenQOffice.Core.AppL10n.T($"Công cụ: {SelectedTool}", $"Tool: {SelectedTool}");
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr(generic), valFont, valB, curX, RibbonHeight + 12);
+                    curX += (int)g.MeasureString(ZenQOffice.Core.AppL10n.Tr(generic), valFont).Width + 14;
                 }
 
                 // Quick Zoom Controls (Right aligned, safely padded)
@@ -3018,7 +3020,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush tb = new SolidBrush(isActive ? Color.FromArgb(99, 102, 241) : Color.FromArgb(100, 116, 139)))
                 using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 {
-                    g.DrawString(tabs[t], tf, tb, tabRect, sf);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr(tabs[t]), tf, tb, tabRect, sf);
                 }
             }
 
@@ -3116,7 +3118,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush nameB = new SolidBrush(Color.FromArgb(30, 41, 59)))
                 using (SolidBrush typeB = new SolidBrush(Color.FromArgb(148, 163, 184)))
                 {
-                    g.DrawString(layer.Name, nameFont, nameB, cardRect.X + 66, cardRect.Y + 7);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr(layer.Name), nameFont, nameB, cardRect.X + 66, cardRect.Y + 7);
                     string tStr = layer.ShapeType switch
                     {
                         VectorShapeType.Rectangle => "Hình chữ nhật",
@@ -3131,7 +3133,7 @@ namespace ZenQOffice.UI
                         VectorShapeType.Path => "Đường vẽ Bezier",
                         _ => "Lớp đồ họa"
                     };
-                    g.DrawString(tStr, typeFont, typeB, cardRect.X + 66, cardRect.Y + 23);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr(tStr), typeFont, typeB, cardRect.X + 66, cardRect.Y + 23);
                 }
 
                 cardStartY += cardH;
@@ -3150,7 +3152,7 @@ namespace ZenQOffice.UI
             using (SolidBrush tb = new SolidBrush(Color.FromArgb(30, 41, 59)))
             using (SolidBrush lb = new SolidBrush(Color.FromArgb(100, 116, 139)))
             {
-                g.DrawString("CHẾ ĐỘ TÔ MÀU", titleF, tb, x + 12, y);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("CHẾ ĐỘ TÔ MÀU"), titleF, tb, x + 12, y);
 
                 // 4 Compact Mode Icons at Corner (Chuẩn Inkscape)
                 int btnY = y + 24;
@@ -3167,12 +3169,12 @@ namespace ZenQOffice.UI
                     VectorFillType.RadialGradient => "Dải màu tỏa tròn",
                     _ => "Màu đơn sắc"
                 };
-                g.DrawString(modeLabel, lblF, tb, x + 144, btnY + 4);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr(modeLabel), lblF, tb, x + 144, btnY + 4);
 
                 int secY = btnY + 40;
                 if (curType == VectorFillType.Solid || curType == VectorFillType.None)
                 {
-                    g.DrawString("MÀU SẮC CHÍNH", titleF, tb, x + 12, secY);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("MÀU SẮC CHÍNH"), titleF, tb, x + 12, secY);
                     secY += 24;
 
                     // Large current color preview swatch
@@ -3195,13 +3197,13 @@ namespace ZenQOffice.UI
                     g.DrawString(hexStr, lblF, tb, x + 64, secY + 6);
 
                     secY += 40;
-                    g.DrawString("BẢNG MÀU CHỌN NHANH", titleF, tb, x + 12, secY);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("BẢNG MÀU CHỌN NHANH"), titleF, tb, x + 12, secY);
                     secY += 24;
                     DrawQuickPalette(g, x + 12, secY, (c) => SetFillColor(c));
                 }
                 else if (curType == VectorFillType.LinearGradient || curType == VectorFillType.RadialGradient)
                 {
-                    g.DrawString("MÀU BẮT ĐẦU VÀ KẾT THÚC", titleF, tb, x + 12, secY);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("MÀU BẮT ĐẦU VÀ KẾT THÚC"), titleF, tb, x + 12, secY);
                     secY += 24;
 
                     // Swatch 1
@@ -3218,7 +3220,7 @@ namespace ZenQOffice.UI
                         g.FillRoundedRectangle(fb, s1, 4f);
                         g.DrawRoundedRectangle(sp, s1, 4f);
                     }
-                    g.DrawString("Màu 1", lblF, tb, x + 56, secY + 6);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Màu 1"), lblF, tb, x + 56, secY + 6);
 
                     // Swatch 2
                     Rectangle s2 = new Rectangle(x + 130, secY, 40, 28);
@@ -3234,10 +3236,10 @@ namespace ZenQOffice.UI
                         g.FillRoundedRectangle(fb2, s2, 4f);
                         g.DrawRoundedRectangle(sp, s2, 4f);
                     }
-                    g.DrawString("Màu 2", lblF, tb, x + 174, secY + 6);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Màu 2"), lblF, tb, x + 174, secY + 6);
 
                     secY += 40;
-                    g.DrawString("GÓC DẢI MÀU", titleF, tb, x + 12, secY);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("GÓC DẢI MÀU"), titleF, tb, x + 12, secY);
                     secY += 24;
                     int[] angles = new int[] { 0, 45, 90, 180 };
                     for (int a = 0; a < angles.Length; a++)
@@ -3254,7 +3256,7 @@ namespace ZenQOffice.UI
                     });
 
                     secY += 38;
-                    g.DrawString("BẢNG MÀU CHỌN NHANH", titleF, tb, x + 12, secY);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("BẢNG MÀU CHỌN NHANH"), titleF, tb, x + 12, secY);
                     secY += 24;
                     DrawQuickPalette(g, x + 12, secY, (c) => SetFillColor(c));
                 }
@@ -3271,7 +3273,7 @@ namespace ZenQOffice.UI
             using (Font lblF = new Font("Segoe UI", 8.5f, FontStyle.Regular))
             using (SolidBrush tb = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("CHẾ ĐỘ NÉT VIỀN", titleF, tb, x + 12, y);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("CHẾ ĐỘ NÉT VIỀN"), titleF, tb, x + 12, y);
 
                 int btnY = y + 24;
                 DrawModeIconButton(g, x + 12, btnY, 26, 0, () => SetStrokeType(VectorStrokeType.None), curType == VectorStrokeType.None);
@@ -3285,10 +3287,10 @@ namespace ZenQOffice.UI
                     VectorStrokeType.LinearGradient => "Viền dải chuyển màu",
                     _ => "Viền nét đơn sắc"
                 };
-                g.DrawString(strokeLabel, lblF, tb, x + 114, btnY + 4);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr(strokeLabel), lblF, tb, x + 114, btnY + 4);
 
                 int secY = btnY + 44;
-                g.DrawString("MÀU SẮC VIỀN", titleF, tb, x + 12, secY);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("MÀU SẮC VIỀN"), titleF, tb, x + 12, secY);
                 secY += 24;
 
                 Rectangle curSwatch = new Rectangle(x + 12, secY, 44, 28);
@@ -3309,7 +3311,7 @@ namespace ZenQOffice.UI
                 g.DrawString(hexStr, lblF, tb, x + 64, secY + 6);
 
                 secY += 40;
-                g.DrawString("BẢNG MÀU CHỌN NHANH", titleF, tb, x + 12, secY);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("BẢNG MÀU CHỌN NHANH"), titleF, tb, x + 12, secY);
                 secY += 24;
                 DrawQuickPalette(g, x + 12, secY, (c) => SetStrokeColor(c));
             }
@@ -3327,7 +3329,7 @@ namespace ZenQOffice.UI
             using (Font lblF = new Font("Segoe UI", 8.5f, FontStyle.Regular))
             using (SolidBrush tb = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("ĐỘ DÀY NÉT VIỀN", titleF, tb, x + 12, y);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("ĐỘ DÀY NÉT VIỀN"), titleF, tb, x + 12, y);
 
                 int rowY = y + 24;
                 DrawInspButton(g, x + 12, rowY, 28, 28, "-", () => {
@@ -3353,7 +3355,7 @@ namespace ZenQOffice.UI
 
                 // Kiểu nét đứt
                 int sec2Y = rowY + 44;
-                g.DrawString("KIỂU NÉT ĐỨT (DASHES)", titleF, tb, x + 12, sec2Y);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("KIỂU NÉT ĐỨT (DASHES)"), titleF, tb, x + 12, sec2Y);
                 int dashY = sec2Y + 24;
                 DrawInspButton(g, x + 12, dashY, 62, 28, "Nét liền", () => SetDashStyle(DashStyle.Solid), ds == DashStyle.Solid);
                 DrawInspButton(g, x + 78, dashY, 62, 28, "Nét đứt", () => SetDashStyle(DashStyle.Dash), ds == DashStyle.Dash);
@@ -3362,7 +3364,7 @@ namespace ZenQOffice.UI
 
                 // Nối góc
                 int sec3Y = dashY + 44;
-                g.DrawString("NỐI GÓC VIỀN (JOIN)", titleF, tb, x + 12, sec3Y);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("NỐI GÓC VIỀN (JOIN)"), titleF, tb, x + 12, sec3Y);
                 int joinY = sec3Y + 24;
                 DrawInspButton(g, x + 12, joinY, 82, 28, "Góc nhọn", () => SetLineJoin(LineJoin.Miter), lj == LineJoin.Miter);
                 DrawInspButton(g, x + 98, joinY, 82, 28, "Bo tròn", () => SetLineJoin(LineJoin.Round), lj == LineJoin.Round);
@@ -3370,7 +3372,7 @@ namespace ZenQOffice.UI
 
                 // Đầu mút
                 int sec4Y = joinY + 44;
-                g.DrawString("ĐẦU MÚT VIỀN (CAP)", titleF, tb, x + 12, sec4Y);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("ĐẦU MÚT VIỀN (CAP)"), titleF, tb, x + 12, sec4Y);
                 int capY = sec4Y + 24;
                 DrawInspButton(g, x + 12, capY, 82, 28, "Đầu phẳng", () => SetLineCap(LineCap.Flat), lc == LineCap.Flat);
                 DrawInspButton(g, x + 98, capY, 82, 28, "Đầu tròn", () => SetLineCap(LineCap.Round), lc == LineCap.Round);
@@ -3410,6 +3412,7 @@ namespace ZenQOffice.UI
             {
                 g.FillRoundedRectangle(b, r, 4f);
                 g.DrawRoundedRectangle(p, r, 4f);
+                text = ZenQOffice.Core.AppL10n.Tr(text);
                 var sz = g.MeasureString(text, f);
                 g.DrawString(text, f, tb, r.X + (r.Width - sz.Width) / 2f, r.Y + (r.Height - sz.Height) / 2f);
             }
@@ -3425,19 +3428,19 @@ namespace ZenQOffice.UI
             {
                 if (l == null)
                 {
-                    g.DrawString("Chưa chọn đối tượng nào", lblF, grayB, x + 16, y + 20);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("Chưa chọn đối tượng nào"), lblF, grayB, x + 16, y + 20);
                     return;
                 }
 
                 // 1. Kích thước & Vị trí
-                g.DrawString("KÍCH THƯỚC & VỊ TRÍ", titleF, tb, x + 12, y);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("KÍCH THƯỚC & VỊ TRÍ"), titleF, tb, x + 12, y);
                 int rY = y + 22;
-                string geomStr = $"Rộng: {l.Bounds.Width:0} px   |   Cao: {l.Bounds.Height:0} px\nX: {l.Bounds.X:0} px   |   Y: {l.Bounds.Y:0} px";
+                string geomStr = ZenQOffice.Core.AppL10n.T($"Rộng: {l.Bounds.Width:0} px   |   Cao: {l.Bounds.Height:0} px\nX: {l.Bounds.X:0} px   |   Y: {l.Bounds.Y:0} px", $"W: {l.Bounds.Width:0} px   |   H: {l.Bounds.Height:0} px\nX: {l.Bounds.X:0} px   |   Y: {l.Bounds.Y:0} px");
                 g.DrawString(geomStr, lblF, grayB, x + 12, rY);
 
                 // 2. Góc xoay
                 int sec2Y = rY + 44;
-                g.DrawString("GÓC XOAY ĐỐI TƯỢNG", titleF, tb, x + 12, sec2Y);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("GÓC XOAY ĐỐI TƯỢNG"), titleF, tb, x + 12, sec2Y);
                 int rotY = sec2Y + 22;
                 string rotVal = $"{l.Rotation:0.0}°";
                 g.DrawString(rotVal, titleF, tb, x + 12, rotY + 5);
@@ -3469,7 +3472,7 @@ namespace ZenQOffice.UI
                 {
                     if (l.ShapeType == VectorShapeType.Rectangle || l.ShapeType == VectorShapeType.RoundedRect)
                     {
-                        g.DrawString("BO GÓC CHỮ NHẬT", titleF, tb, x + 12, nextSecY);
+                        g.DrawString(ZenQOffice.Core.AppL10n.Tr("BO GÓC CHỮ NHẬT"), titleF, tb, x + 12, nextSecY);
                         int crY = nextSecY + 22;
 
                         DrawInspButton(g, x + 12, crY, 28, 26, "-", () => {
@@ -3509,7 +3512,7 @@ namespace ZenQOffice.UI
                     else if (l.ShapeType == VectorShapeType.Star || l.ShapeType == VectorShapeType.Polygon)
                     {
                         string shapeLabel = (l.ShapeType == VectorShapeType.Star) ? "SỐ CÁNH HÌNH SAO" : "SỐ CẠNH ĐA GIÁC";
-                        g.DrawString(shapeLabel, titleF, tb, x + 12, nextSecY);
+                        g.DrawString(ZenQOffice.Core.AppL10n.Tr(shapeLabel), titleF, tb, x + 12, nextSecY);
                         int ptY = nextSecY + 22;
 
                         DrawInspButton(g, x + 12, ptY, 28, 26, "-", () => {
@@ -3542,7 +3545,7 @@ namespace ZenQOffice.UI
                     }
 
                     // Đổ bóng
-                    g.DrawString("HIỆU ỨNG ĐỔ BÓNG", titleF, tb, x + 12, nextSecY);
+                    g.DrawString(ZenQOffice.Core.AppL10n.Tr("HIỆU ỨNG ĐỔ BÓNG"), titleF, tb, x + 12, nextSecY);
                     int shdY = nextSecY + 22;
                     DrawInspButton(g, x + 12, shdY, 110, 26, l.HasShadow ? "Bật đổ bóng" : "Tắt đổ bóng", () => {
                         Document.SaveUndoSnapshot();
@@ -3553,7 +3556,7 @@ namespace ZenQOffice.UI
                 }
 
                 // 4. Căn gióng
-                g.DrawString("CĂN GIÓNG ĐỐI TƯỢNG", titleF, tb, x + 12, nextSecY);
+                g.DrawString(ZenQOffice.Core.AppL10n.Tr("CĂN GIÓNG ĐỐI TƯỢNG"), titleF, tb, x + 12, nextSecY);
                 int alY = nextSecY + 22;
                 DrawInspButton(g, x + 12, alY, 78, 26, "Trái", () => {
                     Document.SaveUndoSnapshot();
@@ -3698,6 +3701,8 @@ namespace ZenQOffice.UI
             {
                 g.FillRoundedRectangle(b, r, 5f);
                 g.DrawRoundedRectangle(p, r, 5f);
+                text = ZenQOffice.Core.AppL10n.Tr(text);
+                text = ZenQOffice.Core.AppL10n.Tr(text);
                 var sz = g.MeasureString(text, font);
                 g.DrawString(text, font, tb, x + (w - sz.Width) / 2f, y + (h - sz.Height) / 2f);
             }
@@ -3943,7 +3948,8 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                 g.FillRectangle(bg, statusRect);
                 g.DrawLine(sep, 0, statusRect.Y, width, statusRect.Y);
 
-                string statusText = $"Kích thước Canvas: {Document.Width} × {Document.Height} px  |  Độ phóng: {(int)(Zoom * 100)}%  |  Lớp hiện tại: {Document.ActiveLayer?.Name ?? "None"}  |  Hệ màu: RGB 32-bit  |  Hỗ trợ PSD";
+                string layerName = ZenQOffice.Core.AppL10n.Tr(Document.ActiveLayer?.Name ?? "None");
+                string statusText = ZenQOffice.Core.AppL10n.T($"Kích thước Canvas: {Document.Width} × {Document.Height} px  |  Độ phóng: {(int)(Zoom * 100)}%  |  Lớp hiện tại: {layerName}  |  Hệ màu: RGB 32-bit  |  Hỗ trợ PSD", $"Canvas: {Document.Width} × {Document.Height} px  |  Zoom: {(int)(Zoom * 100)}%  |  Layer: {layerName}  |  RGB 32-bit  |  PSD Supported");
                 g.DrawString(statusText, sf, sb, LeftToolbarWidth + 12, statusRect.Y + 5);
             }
         }
@@ -4281,7 +4287,7 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
                 }
                 else
                 {
-                    string newTxt = ShowTextInputDialog("Nhập văn bản tại đây");
+                    string newTxt = ShowTextInputDialog(ZenQOffice.Core.AppL10n.T("Nhập văn bản tại đây", "Enter text here"));
                     if (!string.IsNullOrWhiteSpace(newTxt))
                     {
                         Document.AddText(newTxt, canvasPt.X, canvasPt.Y, ActiveFontSize, ForegroundColor);
@@ -5679,10 +5685,10 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
         }
         private string ShowTextInputDialog(string initialText)
         {
-            using (Form f = new Form() { Text = "Chỉnh sửa Văn bản", Size = new Size(500, 300), StartPosition = FormStartPosition.CenterParent, ShowIcon = false })
+            using (Form f = new Form() { Text = ZenQOffice.Core.AppL10n.Tr("Chỉnh sửa Văn bản"), Size = new Size(500, 300), StartPosition = FormStartPosition.CenterParent, ShowIcon = false })
             {
                 TextBox tb = new TextBox() { Multiline = true, Dock = DockStyle.Fill, Text = initialText, Font = new Font("Segoe UI", 12f) };
-                Button btnOk = new Button() { Text = "Xác nhận", Dock = DockStyle.Bottom, Height = 40, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+                Button btnOk = new Button() { Text = ZenQOffice.Core.AppL10n.Tr("Xác nhận"), Dock = DockStyle.Bottom, Height = 40, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
                 btnOk.FlatAppearance.BorderSize = 0;
                 btnOk.Click += (s, e) => { f.DialogResult = DialogResult.OK; };
                 f.Controls.Add(tb);
@@ -5873,6 +5879,7 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
             {
                 g.FillRoundedRectangle(b, r, 3f);
                 g.DrawRoundedRectangle(p, r, 3f);
+                text = ZenQOffice.Core.AppL10n.Tr(text);
                 var sz = g.MeasureString(text, f);
                 g.DrawString(text, f, tb, r.X + (r.Width - sz.Width) / 2f, r.Y + (r.Height - sz.Height) / 2f);
             }
@@ -5884,8 +5891,8 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
         {
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                ofd.Title = "Chèn hình ảnh vào đồ họa - Chuẩn Inkscape";
-                ofd.Filter = "Tất cả tệp hình ảnh & Vector (*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.svg)|*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.svg|Đồ họa Vector SVG (*.svg)|*.svg|Hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|Tất cả tệp (*.*)|*.*";
+                ofd.Title = ZenQOffice.Core.AppL10n.Tr("Chèn hình ảnh vào đồ họa - Chuẩn Inkscape");
+                ofd.Filter = ZenQOffice.Core.AppL10n.Tr("Tất cả tệp hình ảnh & Vector (*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.svg)|*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.svg|Đồ họa Vector SVG (*.svg)|*.svg|Hình ảnh (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|Tất cả tệp (*.*)|*.*");
                 if (ofd.ShowDialog(owner) == DialogResult.OK)
                 {
                     InsertImageFromFile(ofd.FileName, owner);
@@ -5918,7 +5925,7 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
 
                 if (bmp == null)
                 {
-                    ZenQOffice.UI.FluentMessageBox.Show(owner, "Không thể đọc định dạng hình ảnh này.", "Lỗi tải ảnh", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ZenQOffice.UI.FluentMessageBox.Show(owner, ZenQOffice.Core.AppL10n.Tr("Không thể đọc định dạng hình ảnh này."), ZenQOffice.Core.AppL10n.Tr("Lỗi tải ảnh"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -5968,7 +5975,7 @@ private void DrawSmallButtonWithGlyph(D2DGraphics g, int x, int y, int w, int h,
             }
             catch (Exception ex)
             {
-                ZenQOffice.UI.FluentMessageBox.Show(owner, "Lỗi khi chèn ảnh: " + ex.Message, "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ZenQOffice.UI.FluentMessageBox.Show(owner, ZenQOffice.Core.AppL10n.T("Lỗi khi chèn ảnh: ", "Error inserting image: ") + ex.Message, ZenQOffice.Core.AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

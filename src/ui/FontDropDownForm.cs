@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -125,7 +126,7 @@ namespace ZenQOffice.UI
 
             try
             {
-                SendMessage(txtSearch.Handle, 0x1501, 1, "Tìm phông chữ...");
+                SendMessage(txtSearch.Handle, 0x1501, 1, AppL10n.Tr("Tìm phông chữ..."));
             }
             catch { }
 
@@ -302,7 +303,7 @@ namespace ZenQOffice.UI
                 using (Font ftFont = new Font("Segoe UI", 8.25f, FontStyle.Regular))
                 using (SolidBrush txtB = new SolidBrush(isBottomHover ? _accentColor : Color.FromArgb(71, 85, 105)))
                 {
-                    g.DrawString("🇻🇳 Trích xuất & Sửa lỗi Tiếng Việt...", ftFont, txtB, new PointF(10, 8));
+                    g.DrawString(AppL10n.Tr("🇻🇳 Trích xuất & Sửa lỗi Tiếng Việt..."), ftFont, txtB, new PointF(10, 8));
                 }
             };
             bottomPanel.MouseEnter += (s, e) => { isBottomHover = true; bottomPanel.Invalidate(); };

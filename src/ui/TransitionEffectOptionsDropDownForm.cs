@@ -81,10 +81,10 @@ namespace ZenQOffice.UI
 
             if(transType==TransitionType.GenOffice_ColorWipe)
             {
-                var automatic=new Button{Text="Tự lấy màu từ slide",Location=new Point(8,curY),Size=new Size(190,27),FlatStyle=FlatStyle.Flat};
+                var automatic=new Button{Text=AppL10n.Tr("Tự lấy màu từ slide"),Location=new Point(8,curY),Size=new Size(190,27),FlatStyle=FlatStyle.Flat};
                 automatic.Click+=(s,e)=>{OnColorsSelected?.Invoke(new List<int>());Close();};pnlContent.Controls.Add(automatic);curY+=32;
                 int[] defaults={0xCFBDA8,0xB18D6C,0xDACBB8,0xE6D9C5};var colors=Enumerable.Range(0,4).Select(i=>currentColors!=null&&i<currentColors.Count?currentColors[i]:defaults[i]).ToList();
-                pnlContent.Controls.Add(new Label{Text="Màu theo thứ tự gạt",Location=new Point(8,curY+4),AutoSize=true});curY+=27;
+                pnlContent.Controls.Add(new Label{Text=AppL10n.Tr("Màu theo thứ tự gạt"),Location=new Point(8,curY+4),AutoSize=true});curY+=27;
                 for(int i=0;i<4;i++)
                 {
                     int index=i;Color Paint(int rgb)=>Color.FromArgb(255,(rgb>>16)&255,(rgb>>8)&255,rgb&255);
@@ -172,7 +172,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush txtBrush = new SolidBrush(isSelected ? Color.FromArgb(0, 80, 160) : Color.FromArgb(38, 38, 38)))
                 {
                     StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center };
-                    g.DrawString(text, txtFont, txtBrush, new RectangleF(36, 0, w - 40, h), sf);
+                    g.DrawString(AppL10n.Tr(text), txtFont, txtBrush, new RectangleF(36, 0, w - 40, h), sf);
                 }
             };
 
@@ -239,7 +239,7 @@ namespace ZenQOffice.UI
                 using (SolidBrush txtBrush = new SolidBrush(isSelected ? Color.FromArgb(0, 80, 160) : Color.FromArgb(38, 38, 38)))
                 {
                     StringFormat sf = new StringFormat { LineAlignment = StringAlignment.Center };
-                    g.DrawString(text, txtFont, txtBrush, new RectangleF(36, 0, w - 40, h), sf);
+                    g.DrawString(AppL10n.Tr(text), txtFont, txtBrush, new RectangleF(36, 0, w - 40, h), sf);
                 }
             };
 

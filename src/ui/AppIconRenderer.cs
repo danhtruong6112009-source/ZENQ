@@ -409,9 +409,35 @@ namespace ZenQOffice.UI
         public static bool DrawAiIcon(Graphics g, RectangleF rect) => DrawAiIcon(g, rect.X, rect.Y, Math.Min(rect.Width, rect.Height));
 
         private static Image _rawBanner = null;
+        private static Bitmap _bannerGpuMaster = null;
         private static Bitmap _cachedBanner = null;
         private static int _cachedBannerW = 0;
         private static int _cachedBannerH = 0;
+
+        public static Bitmap GetBannerGpuMaster()
+        {
+            if (_bannerGpuMaster != null) return _bannerGpuMaster;
+            lock (_syncLock)
+            {
+                if (_bannerGpuMaster != null) return _bannerGpuMaster;
+                Image raw = GetRawBanner();
+                if (raw == null || raw.Width <= 0 || raw.Height <= 0) return null;
+
+                int maxW = 1400;
+                int mw = raw.Width > maxW ? maxW : raw.Width;
+                int mh = (int)Math.Max(1, Math.Round((double)mw * raw.Height / raw.Width));
+                Bitmap master = new Bitmap(mw, mh, PixelFormat.Format32bppArgb);
+                using (Graphics mg = Graphics.FromImage(master))
+                {
+                    mg.SmoothingMode = SmoothingMode.HighQuality;
+                    mg.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    mg.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    mg.DrawImage(raw, new Rectangle(0, 0, mw, mh));
+                }
+                _bannerGpuMaster = master;
+                return _bannerGpuMaster;
+            }
+        }
 
         public static Image GetRawBanner()
         {
@@ -422,6 +448,14 @@ namespace ZenQOffice.UI
 
                 string[] possiblePaths = new string[]
                 {
+                    Path.Combine(Application.StartupPath, "icon", "banner2.png"),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon", "banner2.png"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "icon", "banner2.png"),
+                    @"icon\banner2.png",
+                    Path.Combine(Application.StartupPath, "banner2.png"),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "banner2.png"),
+                    Path.Combine(Directory.GetCurrentDirectory(), "banner2.png"),
+                    "banner2.png",
                     Path.Combine(Application.StartupPath, "icon", "bannernew.png"),
                     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon", "bannernew.png"),
                     Path.Combine(Directory.GetCurrentDirectory(), "icon", "bannernew.png"),
@@ -464,7 +498,7 @@ namespace ZenQOffice.UI
                 try
                 {
                     System.Reflection.Assembly asm = System.Reflection.Assembly.GetExecutingAssembly();
-                    string[] bannerRes = new string[] { "bannernew.png", "banner.png" };
+                    string[] bannerRes = new string[] { "banner2.png", "bannernew.png", "banner.png" };
                     foreach (var bName in bannerRes)
                     {
                         using (Stream st = asm.GetManifestResourceStream(bName))
@@ -577,18 +611,46 @@ namespace ZenQOffice.UI
 
         public static bool DrawBanner(D2DGraphics g, RectangleF rect)
         {
-            if (g == null) return false;
-            int w = (int)Math.Round(rect.Width);
-            int h = (int)Math.Round(rect.Height);
-            if (w <= 0 || h <= 0) return false;
+            if (g == null || rect.Width <= 0 || rect.Height <= 0) return false;
+            Bitmap master = GetBannerGpuMaster();
+            if (master == null) return false;
 
-            Bitmap bmp = GetScaledBanner(w, h);
-            if (bmp != null)
+            var st = g.Save();
+            using (GraphicsPath bp = CreateRoundedRectanglePath(rect, 16f))
             {
-                g.DrawImage(bmp, rect.X, rect.Y, rect.Width, rect.Height);
-                return true;
+                g.SetClip(bp, CombineMode.Intersect);
+                float imgRatio = (float)master.Width / (float)master.Height;
+                float destRatio = rect.Width / rect.Height;
+                if (Math.Abs(imgRatio - destRatio) < 0.05f)
+                {
+                    g.DrawImage(master, rect.X, rect.Y, rect.Width, rect.Height);
+                }
+                else
+                {
+                    using (LinearGradientBrush lgb = new LinearGradientBrush(rect, Color.FromArgb(152, 224, 255), Color.FromArgb(254, 255, 255), 0f))
+                    {
+                        g.FillRectangle(lgb, rect);
+                    }
+                    float fitW, fitH, offX, offY;
+                    if (destRatio > imgRatio)
+                    {
+                        fitH = rect.Height;
+                        fitW = fitH * imgRatio;
+                        offX = rect.X + (rect.Width - fitW) / 2f;
+                        offY = rect.Y;
+                    }
+                    else
+                    {
+                        fitW = rect.Width;
+                        fitH = fitW / imgRatio;
+                        offX = rect.X;
+                        offY = rect.Y + (rect.Height - fitH) / 2f;
+                    }
+                    g.DrawImage(master, offX, offY, fitW, fitH);
+                }
             }
-            return false;
+            g.Restore(st);
+            return true;
         }
 
         private static GraphicsPath CreateRoundedRectanglePath(RectangleF rect, float radius)

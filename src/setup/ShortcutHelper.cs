@@ -1,4 +1,5 @@
 ﻿using System;
+using ZenQOffice.Core;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
@@ -86,10 +87,10 @@ namespace ZenQOffice.Setup
             string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
 
             // 1. Tạo các lối tắt App Nhánh độc lập trên Desktop (Mở app nhánh, không chia tab, không mở app mẹ)
-            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Writer.lnk"), "ZenQ Writer - Soạn thảo văn bản độc lập", File.Exists(writerIco) ? writerIco : icoPath, "-word");
-            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Calc.lnk"), "ZenQ Calc - Bảng tính điện tử độc lập", File.Exists(calcIco) ? calcIco : icoPath, "-calc");
-            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Slides.lnk"), "ZenQ Slides - Thiết kế trình chiếu độc lập", File.Exists(slidesIco) ? slidesIco : icoPath, "-slides");
-            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ PDF.lnk"), "ZenQ PDF - Trình đọc & biên tập PDF", File.Exists(pdfIco) ? pdfIco : icoPath, "-pdf");
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Writer.lnk"), AppL10n.T("ZenQ Writer - Soạn thảo văn bản độc lập", "ZenQ Writer - Standalone Word Processor"), File.Exists(writerIco) ? writerIco : icoPath, "-word");
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Calc.lnk"), AppL10n.T("ZenQ Calc - Bảng tính điện tử độc lập", "ZenQ Calc - Standalone Spreadsheets"), File.Exists(calcIco) ? calcIco : icoPath, "-calc");
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ Slides.lnk"), AppL10n.T("ZenQ Slides - Thiết kế trình chiếu độc lập", "ZenQ Slides - Standalone Presentations"), File.Exists(slidesIco) ? slidesIco : icoPath, "-slides");
+            CreateShortcut(exePath, Path.Combine(desktop, "ZenQ PDF.lnk"), AppL10n.T("ZenQ PDF - Trình đọc & biên tập PDF", "ZenQ PDF - PDF Reader & Editor"), File.Exists(pdfIco) ? pdfIco : icoPath, "-pdf");
             CreateShortcut(exePath, Path.Combine(desktop, "ZENQ OFFICE.lnk"), "ZENQ OFFICE", icoPath, "");
 
             // 2. Start Menu Shortcuts
@@ -161,7 +162,7 @@ namespace ZenQOffice.Setup
                     if (cap != null)
                     {
                         cap.SetValue("ApplicationName", "ZenQ Office");
-                        cap.SetValue("ApplicationDescription", "Bộ ứng dụng văn phòng thế hệ mới ZenQ Office");
+                        cap.SetValue("ApplicationDescription", AppL10n.T("Bộ ứng dụng văn phòng thế hệ mới ZenQ Office", "ZenQ Office Productivity Suite"));
                         using (RegistryKey fa = cap.CreateSubKey("FileAssociations"))
                         {
                             if (fa != null)

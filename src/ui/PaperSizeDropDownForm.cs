@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -260,7 +261,7 @@ namespace ZenQOffice.UI
             using (Font f = new Font("Segoe UI", 9.0f, FontStyle.Regular))
             using (Brush b = new SolidBrush(Color.FromArgb(30, 41, 59)))
             {
-                g.DrawString("Thêm khổ giấy khác (More Paper Sizes)...", f, b, 12, 9);
+                g.DrawString(AppL10n.Tr("Thêm khổ giấy khác (More Paper Sizes)..."), f, b, 12, 9);
             }
         }
 

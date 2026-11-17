@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -24,7 +25,7 @@ namespace ZenQOffice.UI
             this.CurrentBorderWidth = currentWidth;
             this.SelectedSetting = currentHasBorder ? 1 : 0;
 
-            this.Text = "Viền trang và Đổ bóng (Borders and Shading)";
+            this.Text = AppL10n.T("Viền trang và Đổ bóng (Borders and Shading)", "Borders and Shading");
             this.Size = new Size(540, 440);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -88,13 +89,13 @@ namespace ZenQOffice.UI
 
                 using (Font pf = new Font("Segoe UI", 8f))
                 {
-                    g.DrawString("Xem trước viền trang", pf, Brushes.DimGray, b.X + 30, b.Y + b.Height - 32);
+                    g.DrawString(AppL10n.T("Xem trước viền trang", "Page border preview"), pf, Brushes.DimGray, b.X + 30, b.Y + b.Height - 32);
                 }
             };
             this.Controls.Add(pnlPreview);
 
             // Setting Buttons (None, Box, Shadow, 3-D)
-            string[] settingNames = new string[] { "Không (None)", "Khung (Box)", "Bóng đổ (Shadow)", "3-D" };
+            string[] settingNames = new string[] { AppL10n.T("Không (None)", "None"), AppL10n.T("Khung (Box)", "Box"), AppL10n.T("Bóng đổ (Shadow)", "Shadow"), "3-D" };
             for (int i = 0; i < 4; i++)
             {
                 int idx = i;
@@ -118,7 +119,7 @@ namespace ZenQOffice.UI
             }
 
             // Style List Box
-            Label lblStyle = new Label { Text = "Kiểu viền (Style):", Location = new Point(145, 42), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
+            Label lblStyle = new Label { Text = AppL10n.T("Kiểu viền (Style):", "Style:"), Location = new Point(145, 42), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
             this.Controls.Add(lblStyle);
 
             ListBox lbStyle = new ZenQOffice.UI.FluentListBox
@@ -127,7 +128,7 @@ namespace ZenQOffice.UI
                 Size = new Size(130, 100),
                 Font = new Font("Segoe UI", 9)
             };
-            lbStyle.Items.AddRange(new object[] { "────── Nét liền", "─ ─ ─ Nét đứt", "══════ Nét đôi", "≡≡≡≡≡≡ Nét ba" });
+            lbStyle.Items.AddRange(new object[] { AppL10n.T("────── Nét liền", "────── Solid"), AppL10n.T("─ ─ ─ Nét đứt", "─ ─ ─ Dashed"), AppL10n.T("══════ Nét đôi", "══════ Double"), AppL10n.T("≡≡≡≡≡≡ Nét ba", "≡≡≡≡≡≡ Triple") });
             lbStyle.SelectedIndex = 0;
             lbStyle.SelectedIndexChanged += (s, e) =>
             {
@@ -137,12 +138,12 @@ namespace ZenQOffice.UI
             this.Controls.Add(lbStyle);
 
             // Color Picker Button
-            Label lblColor = new Label { Text = "Màu viền (Color):", Location = new Point(145, 170), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
+            Label lblColor = new Label { Text = AppL10n.T("Màu viền (Color):", "Color:"), Location = new Point(145, 170), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
             this.Controls.Add(lblColor);
 
             Button btnColor = new Button
             {
-                Text = "🎨 Chọn màu...",
+                Text = AppL10n.T("🎨 Chọn màu...", "🎨 Pick Color..."),
                 Location = new Point(145, 190),
                 Size = new Size(130, 30),
                 BackColor = Color.White,
@@ -163,7 +164,7 @@ namespace ZenQOffice.UI
             this.Controls.Add(btnColor);
 
             // Width DropDown
-            Label lblWidth = new Label { Text = "Độ dày (Width):", Location = new Point(145, 230), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
+            Label lblWidth = new Label { Text = AppL10n.T("Độ dày (Width):", "Width:"), Location = new Point(145, 230), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
             this.Controls.Add(lblWidth);
 
             ComboBox cbWidth = new ZenQOffice.UI.FluentComboBox
@@ -172,7 +173,7 @@ namespace ZenQOffice.UI
                 Size = new Size(130, 26),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cbWidth.Items.AddRange(new object[] { "1/2 pt (Mảnh)", "1 pt (Chuẩn)", "1 1/2 pt", "2 1/4 pt (Vừa)", "3 pt (Dày)", "4 1/2 pt", "6 pt (Đậm)" });
+            cbWidth.Items.AddRange(new object[] { AppL10n.T("1/2 pt (Mảnh)", "1/2 pt (Thin)"), AppL10n.T("1 pt (Chuẩn)", "1 pt (Normal)"), "1 1/2 pt", AppL10n.T("2 1/4 pt (Vừa)", "2 1/4 pt (Medium)"), AppL10n.T("3 pt (Dày)", "3 pt (Thick)"), "4 1/2 pt", AppL10n.T("6 pt (Đậm)", "6 pt (Heavy)") });
             cbWidth.SelectedIndex = 2;
             cbWidth.SelectedIndexChanged += (s, e) =>
             {
@@ -185,7 +186,7 @@ namespace ZenQOffice.UI
             // OK & Cancel Buttons
             Button btnOK = new Button
             {
-                Text = "Đồng ý (OK)",
+                Text = AppL10n.T("Đồng ý (OK)", "OK"),
                 Location = new Point(320, 345),
                 Size = new Size(95, 34),
                 BackColor = Color.FromArgb(43, 87, 154),
@@ -206,7 +207,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Location = new Point(425, 345),
                 Size = new Size(80, 34),
                 BackColor = Color.White,
@@ -223,7 +224,7 @@ namespace ZenQOffice.UI
             Graphics g = e.Graphics;
             using (Font tf = new Font("Segoe UI", 11, FontStyle.Bold))
             {
-                g.DrawString("Cài đặt Viền trang (Page Border Settings)", tf, Brushes.Navy, 20, 15);
+                g.DrawString(AppL10n.T("Cài đặt Viền trang (Page Border Settings)", "Page Border Settings"), tf, Brushes.Navy, 20, 15);
             }
         }
     }

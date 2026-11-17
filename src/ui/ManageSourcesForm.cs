@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -36,7 +37,7 @@ namespace ZenQOffice.UI
 
         public string GetFormattedCitation(string style)
         {
-            string firstAuthor = !string.IsNullOrEmpty(Author) ? Author.Split(',')[0].Trim() : "Khuyết danh";
+            string firstAuthor = !string.IsNullOrEmpty(Author) ? Author.Split(',')[0].Trim() : AppL10n.T("Khuyết danh", "Anonymous");
             int y = Year > 0 ? Year : DateTime.Now.Year;
 
             if (style == "IEEE")
@@ -59,8 +60,8 @@ namespace ZenQOffice.UI
 
         public string GetFormattedBibliography(string style, int index = 1)
         {
-            string auth = !string.IsNullOrEmpty(Author) ? Author : "Khuyết danh";
-            string tit = !string.IsNullOrEmpty(Title) ? Title : "Tài liệu không tiêu đề";
+            string auth = !string.IsNullOrEmpty(Author) ? Author : AppL10n.T("Khuyết danh", "Anonymous");
+            string tit = !string.IsNullOrEmpty(Title) ? Title : AppL10n.T("Tài liệu không tiêu đề", "Untitled Document");
             int y = Year > 0 ? Year : DateTime.Now.Year;
             string pub = !string.IsNullOrEmpty(Publisher) ? Publisher : "NXB";
 
@@ -104,13 +105,14 @@ namespace ZenQOffice.UI
         private Button btnNewSource;
         private Button btnDeleteSource;
 
-        private CitationSource _selectedSource = null;
+        private CitationSource _selectedSource = null;
+        private static readonly string[] SourceTypeKeys = new string[] { "Sách (Book)", "Bài báo tạp chí (Journal Article)", "Kỷ yếu hội thảo (Conference)", "Trang web (Website)", "Báo cáo khoa học (Report)" };
 
         public ManageSourcesForm(WriterView writerView)
         {
             _writerView = writerView;
 
-            this.Text = "Quản Lý Nguồn Trích Dẫn (Manage Sources)";
+            this.Text = AppL10n.T("Quản Lý Nguồn Trích Dẫn", "Manage Sources");
             this.Size = new Size(780, 560);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -126,14 +128,14 @@ namespace ZenQOffice.UI
         private void BuildUI()
         {
             // Left panel: List and search
-            Label lblSearch = new Label { Text = "Tìm kiếm nguồn:", Location = new Point(16, 12), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
+            Label lblSearch = new Label { Text = AppL10n.T("Tìm kiếm nguồn:", "Search sources:"), Location = new Point(16, 12), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) };
             this.Controls.Add(lblSearch);
 
             txtSearch = new TextBox { Location = new Point(16, 32), Size = new Size(260, 24) };
             txtSearch.TextChanged += (s, e) => FilterSourceList();
             this.Controls.Add(txtSearch);
 
-            Label lblList = new Label { Text = "Danh mục tài liệu nguồn:", Location = new Point(16, 64), AutoSize = true };
+            Label lblList = new Label { Text = AppL10n.T("Danh mục tài liệu nguồn:", "Source list:"), Location = new Point(16, 64), AutoSize = true };
             this.Controls.Add(lblList);
 
             lstSources = new ZenQOffice.UI.FluentListBox { Location = new Point(16, 86), Size = new Size(260, 310), BorderStyle = BorderStyle.FixedSingle };
@@ -142,7 +144,7 @@ namespace ZenQOffice.UI
 
             btnNewSource = new Button
             {
-                Text = "+ Thêm mới",
+                Text = AppL10n.T("+ Thêm mới", "+ New"),
                 Location = new Point(16, 404),
                 Size = new Size(125, 30),
                 BackColor = Color.FromArgb(16, 124, 65),
@@ -155,7 +157,7 @@ namespace ZenQOffice.UI
 
             btnDeleteSource = new Button
             {
-                Text = "Xóa nguồn",
+                Text = AppL10n.T("Xóa nguồn", "Delete"),
                 Location = new Point(151, 404),
                 Size = new Size(125, 30),
                 BackColor = Color.FromArgb(220, 53, 69),
@@ -169,7 +171,7 @@ namespace ZenQOffice.UI
             // Right panel: Editor
             GroupBox grpEdit = new GroupBox
             {
-                Text = "Thông tin chi tiết tài liệu",
+                Text = AppL10n.T("Thông tin chi tiết tài liệu", "Source Details"),
                 Location = new Point(292, 12),
                 Size = new Size(460, 384),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
@@ -177,21 +179,21 @@ namespace ZenQOffice.UI
             this.Controls.Add(grpEdit);
 
             int y = 26;
-            AddEditorRow(grpEdit, "Loại nguồn:", ref y, out cboType);
-            cboType.Items.AddRange(new object[] { "Sách (Book)", "Bài báo tạp chí (Journal Article)", "Kỷ yếu hội thảo (Conference)", "Trang web (Website)", "Báo cáo khoa học (Report)" });
+            AddEditorRow(grpEdit, AppL10n.T("Loại nguồn:", "Type of Source:"), ref y, out cboType);
+            cboType.Items.AddRange(new object[] { AppL10n.T("Sách (Book)", "Book"), AppL10n.T("Bài báo tạp chí (Journal Article)", "Journal Article"), AppL10n.T("Kỷ yếu hội thảo (Conference)", "Conference Proceedings"), AppL10n.T("Trang web (Website)", "Website"), AppL10n.T("Báo cáo khoa học (Report)", "Report") });
             cboType.SelectedIndex = 0;
 
-            AddEditorRow(grpEdit, "Tác giả:", ref y, out txtAuthor);
-            AddEditorRow(grpEdit, "Tựa đề:", ref y, out txtTitle);
-            AddEditorRow(grpEdit, "Năm xuất bản:", ref y, out txtYear);
-            AddEditorRow(grpEdit, "Nhà xuất bản / Tổ chức:", ref y, out txtPublisher);
-            AddEditorRow(grpEdit, "Thành phố:", ref y, out txtCity);
-            AddEditorRow(grpEdit, "Tên tạp chí / Hội thảo:", ref y, out txtJournal);
-            AddEditorRow(grpEdit, "Trang trích dẫn (ví dụ: 12-25):", ref y, out txtPages);
+            AddEditorRow(grpEdit, AppL10n.T("Tác giả:", "Author:"), ref y, out txtAuthor);
+            AddEditorRow(grpEdit, AppL10n.T("Tựa đề:", "Title:"), ref y, out txtTitle);
+            AddEditorRow(grpEdit, AppL10n.T("Năm xuất bản:", "Year:"), ref y, out txtYear);
+            AddEditorRow(grpEdit, AppL10n.T("Nhà xuất bản / Tổ chức:", "Publisher:"), ref y, out txtPublisher);
+            AddEditorRow(grpEdit, AppL10n.T("Thành phố:", "City:"), ref y, out txtCity);
+            AddEditorRow(grpEdit, AppL10n.T("Tên tạp chí / Hội thảo:", "Journal / Conference:"), ref y, out txtJournal);
+            AddEditorRow(grpEdit, AppL10n.T("Trang trích dẫn (ví dụ: 12-25):", "Pages (e.g. 12-25):"), ref y, out txtPages);
 
             btnSaveSource = new Button
             {
-                Text = "Lưu / Cập Nhật Nguồn",
+                Text = AppL10n.T("Lưu / Cập Nhật Nguồn", "Save / Update Source"),
                 Location = new Point(170, y + 6),
                 Size = new Size(270, 30),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -205,14 +207,14 @@ namespace ZenQOffice.UI
             // Bottom preview panel
             GroupBox grpPreview = new GroupBox
             {
-                Text = "Xem trước trích dẫn & thư mục",
+                Text = AppL10n.T("Xem trước trích dẫn & thư mục", "Citation & Bibliography Preview"),
                 Location = new Point(292, 400),
                 Size = new Size(460, 100),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold)
             };
             this.Controls.Add(grpPreview);
 
-            Label lblStyle = new Label { Text = "Kiểu:", Location = new Point(12, 22), AutoSize = true };
+            Label lblStyle = new Label { Text = AppL10n.T("Kiểu:", "Style:"), Location = new Point(12, 22), AutoSize = true };
             grpPreview.Controls.Add(lblStyle);
 
             cboPreviewStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(50, 19), Width = 110, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 8.5f) };
@@ -221,10 +223,10 @@ namespace ZenQOffice.UI
             cboPreviewStyle.SelectedIndexChanged += (s, e) => UpdatePreview();
             grpPreview.Controls.Add(cboPreviewStyle);
 
-            lblPreviewCit = new Label { Text = "Trích dẫn: (Tác giả, Năm)", Location = new Point(170, 22), Size = new Size(275, 20), Font = new Font("Segoe UI", 8.5f, FontStyle.Regular), ForeColor = Color.FromArgb(43, 87, 154) };
+            lblPreviewCit = new Label { Text = AppL10n.T("Trích dẫn: (Tác giả, Năm)", "Citation: (Author, Year)"), Location = new Point(170, 22), Size = new Size(275, 20), Font = new Font("Segoe UI", 8.5f, FontStyle.Regular), ForeColor = Color.FromArgb(43, 87, 154) };
             grpPreview.Controls.Add(lblPreviewCit);
 
-            lblPreviewBib = new Label { Text = "Thư mục: Tác giả (Năm). Tựa đề. NXB.", Location = new Point(12, 48), Size = new Size(435, 45), Font = new Font("Segoe UI", 8.5f, FontStyle.Regular), ForeColor = Color.FromArgb(51, 65, 85) };
+            lblPreviewBib = new Label { Text = AppL10n.T("Thư mục: Tác giả (Năm). Tựa đề. NXB.", "Bibliography: Author (Year). Title. Publisher."), Location = new Point(12, 48), Size = new Size(435, 45), Font = new Font("Segoe UI", 8.5f, FontStyle.Regular), ForeColor = Color.FromArgb(51, 65, 85) };
             grpPreview.Controls.Add(lblPreviewBib);
 
             // Dialog bottom
@@ -233,7 +235,7 @@ namespace ZenQOffice.UI
 
             Button btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 Location = new Point(670, 8),
                 Size = new Size(80, 28),
                 BackColor = Color.White,
@@ -271,9 +273,9 @@ namespace ZenQOffice.UI
                 foreach (var src in _writerView.CitationSources)
                 {
                     string display = string.Format("{0} ({1}) - {2}",
-                        !string.IsNullOrEmpty(src.Author) ? src.Author : "Khuyết danh",
+                        !string.IsNullOrEmpty(src.Author) ? src.Author : AppL10n.T("Khuyết danh", "Anonymous"),
                         src.Year,
-                        !string.IsNullOrEmpty(src.Title) ? src.Title : "Không tiêu đề");
+                        !string.IsNullOrEmpty(src.Title) ? src.Title : AppL10n.T("Không tiêu đề", "Untitled"));
                     lstSources.Items.Add(display);
                 }
             }
@@ -296,9 +298,9 @@ namespace ZenQOffice.UI
                 foreach (var src in _writerView.CitationSources)
                 {
                     string display = string.Format("{0} ({1}) - {2}",
-                        !string.IsNullOrEmpty(src.Author) ? src.Author : "Khuyết danh",
+                        !string.IsNullOrEmpty(src.Author) ? src.Author : AppL10n.T("Khuyết danh", "Anonymous"),
                         src.Year,
-                        !string.IsNullOrEmpty(src.Title) ? src.Title : "Không tiêu đề");
+                        !string.IsNullOrEmpty(src.Title) ? src.Title : AppL10n.T("Không tiêu đề", "Untitled"));
                     if (string.IsNullOrEmpty(kw) || display.ToLower().Contains(kw))
                     {
                         lstSources.Items.Add(display);
@@ -314,7 +316,7 @@ namespace ZenQOffice.UI
             if (idx >= 0 && idx < _writerView.CitationSources.Count)
             {
                 _selectedSource = _writerView.CitationSources[idx];
-                cboType.SelectedItem = _selectedSource.SourceType;
+                int typeIdx = Array.IndexOf(SourceTypeKeys, _selectedSource.SourceType); cboType.SelectedIndex = typeIdx >= 0 ? typeIdx : 0;
                 txtAuthor.Text = _selectedSource.Author;
                 txtTitle.Text = _selectedSource.Title;
                 txtYear.Text = _selectedSource.Year.ToString();
@@ -338,8 +340,8 @@ namespace ZenQOffice.UI
             txtCity.Text = "";
             txtJournal.Text = "";
             txtPages.Text = "";
-            lblPreviewCit.Text = "Trích dẫn: (Tác giả, Năm)";
-            lblPreviewBib.Text = "Thư mục: Tác giả (Năm). Tựa đề. NXB.";
+            lblPreviewCit.Text = AppL10n.T("Trích dẫn: (Tác giả, Năm)", "Citation: (Author, Year)");
+            lblPreviewBib.Text = AppL10n.T("Thư mục: Tác giả (Năm). Tựa đề. NXB.", "Bibliography: Author (Year). Title. Publisher.");
             txtAuthor.Focus();
         }
 
@@ -347,7 +349,7 @@ namespace ZenQOffice.UI
         {
             if (string.IsNullOrEmpty(txtAuthor.Text.Trim()) && string.IsNullOrEmpty(txtTitle.Text.Trim()))
             {
-                ZenQOffice.UI.FluentMessageBox.Show("Vui lòng nhập Tác giả hoặc Tựa đề của nguồn trích dẫn!", "Quản lý nguồn", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Vui lòng nhập Tác giả hoặc Tựa đề của nguồn trích dẫn!", "Please enter the Author or Title of the source!"), AppL10n.T("Quản lý nguồn", "Manage Sources"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -364,7 +366,7 @@ namespace ZenQOffice.UI
                 }
             }
 
-            _selectedSource.SourceType = cboType.SelectedItem != null ? cboType.SelectedItem.ToString() : "Sách (Book)";
+            _selectedSource.SourceType = (cboType.SelectedIndex >= 0 && cboType.SelectedIndex < SourceTypeKeys.Length) ? SourceTypeKeys[cboType.SelectedIndex] : SourceTypeKeys[0];
             _selectedSource.Author = txtAuthor.Text.Trim();
             _selectedSource.Title = txtTitle.Text.Trim();
             _selectedSource.Year = yr;
@@ -375,13 +377,13 @@ namespace ZenQOffice.UI
 
             LoadSourceList();
             UpdatePreview();
-            ZenQOffice.UI.FluentMessageBox.Show("Đã lưu nguồn tài liệu tham khảo thành công!", "Quản lý nguồn", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Đã lưu nguồn tài liệu tham khảo thành công!", "Reference source saved successfully!"), AppL10n.T("Quản lý nguồn", "Manage Sources"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void BtnDeleteSource_Click(object sender, EventArgs e)
         {
             if (_selectedSource == null || _writerView == null || _writerView.CitationSources == null) return;
-            if (ZenQOffice.UI.FluentMessageBox.Show("Bạn có chắc chắn muốn xóa nguồn này khỏi danh sách?", "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (ZenQOffice.UI.FluentMessageBox.Show(AppL10n.T("Bạn có chắc chắn muốn xóa nguồn này khỏi danh sách?", "Are you sure you want to delete this source?"), AppL10n.T("Xác nhận xóa", "Confirm Delete"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 _writerView.CitationSources.Remove(_selectedSource);
                 LoadSourceList();
@@ -397,10 +399,10 @@ namespace ZenQOffice.UI
                 if (!int.TryParse(txtYear.Text, out y)) y = 2024;
                 _selectedSource = new CitationSource
                 {
-                    Author = !string.IsNullOrEmpty(txtAuthor.Text) ? txtAuthor.Text : "Nguyễn Văn A",
-                    Title = !string.IsNullOrEmpty(txtTitle.Text) ? txtTitle.Text : "Giáo trình Khoa học",
+                    Author = !string.IsNullOrEmpty(txtAuthor.Text) ? txtAuthor.Text : AppL10n.T("Nguyễn Văn A", "John Doe"),
+                    Title = !string.IsNullOrEmpty(txtTitle.Text) ? txtTitle.Text : AppL10n.T("Giáo trình Khoa học", "Introduction to Science"),
                     Year = y,
-                    Publisher = !string.IsNullOrEmpty(txtPublisher.Text) ? txtPublisher.Text : "NXB Đại Học"
+                    Publisher = !string.IsNullOrEmpty(txtPublisher.Text) ? txtPublisher.Text : AppL10n.T("NXB Đại Học", "University Press")
                 };
             }
             string style = cboPreviewStyle.SelectedItem != null ? cboPreviewStyle.SelectedItem.ToString() : "APA 7th";
@@ -410,8 +412,8 @@ namespace ZenQOffice.UI
             else if (style.StartsWith("Chicago")) style = "Chicago";
             else style = "Harvard";
 
-            lblPreviewCit.Text = "Trích dẫn: " + _selectedSource.GetFormattedCitation(style);
-            lblPreviewBib.Text = "Thư mục: " + _selectedSource.GetFormattedBibliography(style, 1);
+            lblPreviewCit.Text = AppL10n.T("Trích dẫn: ", "Citation: ") + _selectedSource.GetFormattedCitation(style);
+            lblPreviewBib.Text = AppL10n.T("Thư mục: ", "Bibliography: ") + _selectedSource.GetFormattedBibliography(style, 1);
         }
     }
 }

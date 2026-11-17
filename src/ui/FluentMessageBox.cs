@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using ZenQOffice.Core;
 namespace ZenQOffice.UI
 {
     public static class FluentMessageBox
@@ -9,6 +10,8 @@ namespace ZenQOffice.UI
             =>Show(null,text,caption,buttons,icon,defaultButton);
         public static DialogResult Show(IWin32Window owner,string text,string caption="",MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1)
         {
+            text = AppL10n.Tr(text);
+            caption = AppL10n.Tr(caption);
             var control=owner as Control;
             if(control==null&&Application.OpenForms.Count>0)control=Application.OpenForms[0];
             if(control!=null&&control.InvokeRequired)
@@ -63,8 +66,14 @@ namespace ZenQOffice.UI
         }
         private static string Label(DialogResult result)=>result switch
         {
-            DialogResult.Yes=>"Có",DialogResult.No=>"Không",DialogResult.Cancel=>"Hủy",DialogResult.Retry or DialogResult.TryAgain=>"Thử lại",
-            DialogResult.Abort=>"Hủy thao tác",DialogResult.Ignore=>"Bỏ qua",DialogResult.Continue=>"Tiếp tục",_=>"OK"
+            DialogResult.Yes=>AppL10n.T("Có","Yes"),
+            DialogResult.No=>AppL10n.T("Không","No"),
+            DialogResult.Cancel=>AppL10n.T("Hủy","Cancel"),
+            DialogResult.Retry or DialogResult.TryAgain=>AppL10n.T("Thử lại","Retry"),
+            DialogResult.Abort=>AppL10n.T("Hủy thao tác","Abort"),
+            DialogResult.Ignore=>AppL10n.T("Bỏ qua","Ignore"),
+            DialogResult.Continue=>AppL10n.T("Tiếp tục","Continue"),
+            _=>"OK"
         };
         protected override void OnFormClosing(FormClosingEventArgs e)
         {

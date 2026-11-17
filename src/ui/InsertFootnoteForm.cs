@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -22,7 +23,7 @@ namespace ZenQOffice.UI
         public InsertFootnoteForm(WriterView writerView, bool defaultEndnote = false)
         {
             _writerView = writerView;
-            this.Text = "Chèn Chú Thích (Footnote & Endnote)";
+            this.Text = AppL10n.T("Chèn Chú Thích (Footnote & Endnote)", "Footnote and Endnote");
             this.Size = new Size(540, 480);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -40,7 +41,7 @@ namespace ZenQOffice.UI
             // 1. Group Vị trí
             GroupBox grpLocation = new GroupBox
             {
-                Text = "Vị trí đặt chú thích (Location):",
+                Text = AppL10n.T("Vị trí đặt chú thích (Location):", "Location:"),
                 Location = new Point(20, 15),
                 Size = new Size(485, 80),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
@@ -49,7 +50,7 @@ namespace ZenQOffice.UI
 
             rdoFootnote = new RadioButton
             {
-                Text = "Chú thích chân trang (Footnote) - Chân mỗi trang",
+                Text = AppL10n.T("Chú thích chân trang (Footnote) - Chân mỗi trang", "Footnotes - Bottom of page"),
                 Location = new Point(20, 24),
                 AutoSize = true,
                 Checked = !defaultEndnote,
@@ -60,7 +61,7 @@ namespace ZenQOffice.UI
 
             rdoEndnote = new RadioButton
             {
-                Text = "Chú thích cuối tài liệu (Endnote) - Cuối toàn bộ tài liệu",
+                Text = AppL10n.T("Chú thích cuối tài liệu (Endnote) - Cuối toàn bộ tài liệu", "Endnotes - End of document"),
                 Location = new Point(20, 48),
                 AutoSize = true,
                 Checked = defaultEndnote,
@@ -72,14 +73,14 @@ namespace ZenQOffice.UI
             // 2. Group Định dạng ký hiệu
             GroupBox grpFormat = new GroupBox
             {
-                Text = "Định dạng ký hiệu đánh số (Format):",
+                Text = AppL10n.T("Định dạng ký hiệu đánh số (Format):", "Format:"),
                 Location = new Point(20, 102),
                 Size = new Size(485, 95),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
             };
             this.Controls.Add(grpFormat);
 
-            Label lblFmt = new Label { Text = "Định dạng số:", Location = new Point(20, 26), AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
+            Label lblFmt = new Label { Text = AppL10n.T("Định dạng số:", "Number format:"), Location = new Point(20, 26), AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
             grpFormat.Controls.Add(lblFmt);
 
             cboNumberFormat = new ZenQOffice.UI.FluentComboBox
@@ -90,17 +91,17 @@ namespace ZenQOffice.UI
                 Font = new Font("Segoe UI", 9.0f)
             };
             cboNumberFormat.Items.AddRange(new object[] {
-                "1, 2, 3, ... (Số thường)",
-                "i, ii, iii, ... (La Mã thường)",
-                "I, II, III, ... (La Mã hoa)",
-                "a, b, c, ... (Chữ cái thường)",
-                "A, B, C, ... (Chữ cái hoa)",
-                "*, †, ‡, § (Ký hiệu đặc biệt)"
+                AppL10n.T("1, 2, 3, ... (Số thường)", "1, 2, 3, ..."),
+                AppL10n.T("i, ii, iii, ... (La Mã thường)", "i, ii, iii, ..."),
+                AppL10n.T("I, II, III, ... (La Mã hoa)", "I, II, III, ..."),
+                AppL10n.T("a, b, c, ... (Chữ cái thường)", "a, b, c, ..."),
+                AppL10n.T("A, B, C, ... (Chữ cái hoa)", "A, B, C, ..."),
+                AppL10n.T("*, †, ‡, § (Ký hiệu đặc biệt)", "*, †, ‡, § (Symbols)")
             });
             cboNumberFormat.SelectedIndex = defaultEndnote ? 1 : 0;
             grpFormat.Controls.Add(cboNumberFormat);
 
-            Label lblCustom = new Label { Text = "Ký hiệu tự nhập:", Location = new Point(20, 58), AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
+            Label lblCustom = new Label { Text = AppL10n.T("Ký hiệu tự nhập:", "Custom mark:"), Location = new Point(20, 58), AutoSize = true, Font = new Font("Segoe UI", 8.5f) };
             grpFormat.Controls.Add(lblCustom);
 
             txtCustomMark = new TextBox { Location = new Point(130, 56), Size = new Size(160, 24), Font = new Font("Segoe UI", 9.0f) };
@@ -109,7 +110,7 @@ namespace ZenQOffice.UI
             // 3. Group Nội dung chú thích
             GroupBox grpContent = new GroupBox
             {
-                Text = "Nội dung chú thích (Footnote Text):",
+                Text = AppL10n.T("Nội dung chú thích (Footnote Text):", "Footnote text:"),
                 Location = new Point(20, 204),
                 Size = new Size(485, 110),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
@@ -127,7 +128,7 @@ namespace ZenQOffice.UI
             grpContent.Controls.Add(txtNoteContent);
 
             // 4. Danh sách chú thích hiện tại
-            Label lblList = new Label { Text = "Danh sách các chú thích hiện có trong tài liệu:", Location = new Point(20, 320), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular), ForeColor = Color.DimGray };
+            Label lblList = new Label { Text = AppL10n.T("Danh sách các chú thích hiện có trong tài liệu:", "Existing footnotes/endnotes:"), Location = new Point(20, 320), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Regular), ForeColor = Color.DimGray };
             this.Controls.Add(lblList);
 
             lstExistingNotes = new ZenQOffice.UI.FluentListBox
@@ -145,7 +146,7 @@ namespace ZenQOffice.UI
 
             Button btnInsert = new Button
             {
-                Text = "Chèn",
+                Text = AppL10n.T("Chèn", "Insert"),
                 Location = new Point(310, 10),
                 Size = new Size(95, 28),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -164,7 +165,7 @@ namespace ZenQOffice.UI
 
             Button btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Location = new Point(415, 10),
                 Size = new Size(80, 28),
                 BackColor = Color.White,
@@ -262,13 +263,13 @@ namespace ZenQOffice.UI
                 foreach (var fn in _writerView.DetailedFootnotes)
                 {
                     string type = fn.IsEndnote ? "Endnote" : "Footnote (Trang " + fn.PageNumber + ")";
-                    string previewTxt = !string.IsNullOrEmpty(fn.Text) ? fn.Text : "(Chưa có nội dung)";
+                    string previewTxt = !string.IsNullOrEmpty(fn.Text) ? fn.Text : AppL10n.T("(Chưa có nội dung)", "(Empty)");
                     lstExistingNotes.Items.Add(string.Format("{0} {1}: {2}", type, fn.Marker, previewTxt));
                 }
             }
             else
             {
-                lstExistingNotes.Items.Add("(Chưa có chú thích nào trong tài liệu)");
+                lstExistingNotes.Items.Add(AppL10n.T("(Chưa có chú thích nào trong tài liệu)", "(No notes in document yet)"));
             }
         }
     }

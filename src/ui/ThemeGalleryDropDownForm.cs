@@ -63,7 +63,7 @@ namespace ZenQOffice.UI
         {
             Label lbl = new Label
             {
-                Text = headerText,
+                Text = AppL10n.Tr(headerText),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(10, curY),

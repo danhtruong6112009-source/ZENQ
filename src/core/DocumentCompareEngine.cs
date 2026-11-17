@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
@@ -136,8 +136,9 @@ namespace ZenQOffice.Core
         /// <summary>
         /// Performs full comparison and produces tracked revisions and metrics
         /// </summary>
-        public static DocumentCompareResult CompareDocuments(string originalText, string revisedText, string author = "So sánh tài liệu")
+        public static DocumentCompareResult CompareDocuments(string originalText, string revisedText, string author = null)
         {
+            if (string.IsNullOrEmpty(author)) author = AppL10n.T("So sánh tài liệu", "Document Compare");
             var result = new DocumentCompareResult();
             var tokens = ComputeWordDiff(originalText, revisedText);
             result.Tokens = tokens;

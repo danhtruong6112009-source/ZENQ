@@ -53,7 +53,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Xác thực dữ liệu (Data Validation)";
+            this.Text = AppL10n.T("Xác thực dữ liệu (Data Validation)", "Data Validation");
             this.Size = new Size(460, 420);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -63,44 +63,44 @@ namespace ZenQOffice.UI
             this.BackColor = Color.FromArgb(248, 250, 252);
 
             tabControl = new ZenQOffice.UI.FluentTabControl { Dock = DockStyle.Top, Height = 320 };
-            tabSettings = new TabPage("Cài đặt");
-            tabInputMessage = new TabPage("Thông báo nhập");
-            tabErrorAlert = new TabPage("Cảnh báo lỗi");
+            tabSettings = new TabPage(AppL10n.T("Cài đặt", "Settings"));
+            tabInputMessage = new TabPage(AppL10n.T("Thông báo nhập", "Input Message"));
+            tabErrorAlert = new TabPage(AppL10n.T("Cảnh báo lỗi", "Error Alert"));
             tabControl.TabPages.AddRange(new TabPage[] { tabSettings, tabInputMessage, tabErrorAlert });
 
             // ==================== TAB 1: Cài đặt ====================
-            Label lblAllow = new Label { Text = "Cho phép (Allow):", Location = new Point(16, 16), AutoSize = true };
+            Label lblAllow = new Label { Text = AppL10n.T("Cho phép (Allow):", "Allow:"), Location = new Point(16, 16), AutoSize = true };
             cboAllow = new ZenQOffice.UI.FluentComboBox { Location = new Point(16, 38), Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
             cboAllow.Items.AddRange(new object[] {
-                "Bất kỳ giá trị nào (Any)",
-                "Số nguyên (Whole number)",
-                "Số thập phân (Decimal)",
-                "Danh sách (List)",
-                "Ngày tháng (Date)",
-                "Độ dài văn bản (Text length)",
-                "Tùy chỉnh (Custom Formula)"
+                AppL10n.T("Bất kỳ giá trị nào (Any)", "Any value"),
+                AppL10n.T("Số nguyên (Whole number)", "Whole number"),
+                AppL10n.T("Số thập phân (Decimal)", "Decimal"),
+                AppL10n.T("Danh sách (List)", "List"),
+                AppL10n.T("Ngày tháng (Date)", "Date"),
+                AppL10n.T("Độ dài văn bản (Text length)", "Text length"),
+                AppL10n.T("Tùy chỉnh (Custom Formula)", "Custom")
             });
 
-            chkIgnoreBlank = new CheckBox { Text = "Bỏ qua ô trống", Location = new Point(220, 38), AutoSize = true, Checked = true };
-            chkInCellDropdown = new CheckBox { Text = "Danh sách thả xuống trong ô", Location = new Point(220, 68), AutoSize = true, Checked = true };
+            chkIgnoreBlank = new CheckBox { Text = AppL10n.T("Bỏ qua ô trống", "Ignore blank"), Location = new Point(220, 38), AutoSize = true, Checked = true };
+            chkInCellDropdown = new CheckBox { Text = AppL10n.T("Danh sách thả xuống trong ô", "In-cell dropdown"), Location = new Point(220, 68), AutoSize = true, Checked = true };
 
-            Label lblData = new Label { Text = "Dữ liệu (Data):", Location = new Point(16, 75), AutoSize = true };
+            Label lblData = new Label { Text = AppL10n.T("Dữ liệu (Data):", "Data:"), Location = new Point(16, 75), AutoSize = true };
             cboOperator = new ZenQOffice.UI.FluentComboBox { Location = new Point(16, 96), Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
             cboOperator.Items.AddRange(new object[] {
-                "Ở giữa (between)",
-                "Không ở giữa (not between)",
-                "Bằng (equal to)",
-                "Không bằng (not equal to)",
-                "Lớn hơn (greater than)",
-                "Nhỏ hơn (less than)",
-                "Lớn hơn hoặc bằng (>=)",
-                "Nhỏ hơn hoặc bằng (<=)"
+                AppL10n.T("Ở giữa (between)", "between"),
+                AppL10n.T("Không ở giữa (not between)", "not between"),
+                AppL10n.T("Bằng (equal to)", "equal to"),
+                AppL10n.T("Không bằng (not equal to)", "not equal to"),
+                AppL10n.T("Lớn hơn (greater than)", "greater than"),
+                AppL10n.T("Nhỏ hơn (less than)", "less than"),
+                AppL10n.T("Lớn hơn hoặc bằng (>=)", "greater than or equal to"),
+                AppL10n.T("Nhỏ hơn hoặc bằng (<=)", "less than or equal to")
             });
 
-            lblFormula1 = new Label { Text = "Giá trị tối thiểu / Nguồn:", Location = new Point(16, 135), AutoSize = true };
+            lblFormula1 = new Label { Text = AppL10n.T("Giá trị tối thiểu / Nguồn:", "Minimum / Source:"), Location = new Point(16, 135), AutoSize = true };
             txtFormula1 = new TextBox { Location = new Point(16, 156), Width = 380 };
 
-            lblFormula2 = new Label { Text = "Giá trị tối đa:", Location = new Point(16, 195), AutoSize = true };
+            lblFormula2 = new Label { Text = AppL10n.T("Giá trị tối đa:", "Maximum:"), Location = new Point(16, 195), AutoSize = true };
             txtFormula2 = new TextBox { Location = new Point(16, 216), Width = 380 };
 
             tabSettings.Controls.AddRange(new Control[] {
@@ -112,27 +112,27 @@ namespace ZenQOffice.UI
             cboOperator.SelectedIndexChanged += (s, e) => UpdateOperatorUI();
 
             // ==================== TAB 2: Thông báo nhập ====================
-            chkShowInputMessage = new CheckBox { Text = "Hiển thị thông báo khi chọn ô này", Location = new Point(16, 16), AutoSize = true, Checked = true };
-            Label lblInTitle = new Label { Text = "Tiêu đề:", Location = new Point(16, 50), AutoSize = true };
+            chkShowInputMessage = new CheckBox { Text = AppL10n.T("Hiển thị thông báo khi chọn ô này", "Show input message when cell is selected"), Location = new Point(16, 16), AutoSize = true, Checked = true };
+            Label lblInTitle = new Label { Text = AppL10n.T("Tiêu đề:", "Title:"), Location = new Point(16, 50), AutoSize = true };
             txtInputTitle = new TextBox { Location = new Point(16, 72), Width = 380 };
-            Label lblInMsg = new Label { Text = "Nội dung thông báo nhập:", Location = new Point(16, 110), AutoSize = true };
+            Label lblInMsg = new Label { Text = AppL10n.T("Nội dung thông báo nhập:", "Input message:"), Location = new Point(16, 110), AutoSize = true };
             txtInputMessage = new TextBox { Location = new Point(16, 132), Width = 380, Height = 100, Multiline = true };
             tabInputMessage.Controls.AddRange(new Control[] { chkShowInputMessage, lblInTitle, txtInputTitle, lblInMsg, txtInputMessage });
 
             // ==================== TAB 3: Cảnh báo lỗi ====================
-            chkShowErrorMessage = new CheckBox { Text = "Hiển thị cảnh báo lỗi khi nhập dữ liệu không hợp lệ", Location = new Point(16, 16), AutoSize = true, Checked = true };
-            Label lblStyle = new Label { Text = "Kiểu cảnh báo (Style):", Location = new Point(16, 50), AutoSize = true };
+            chkShowErrorMessage = new CheckBox { Text = AppL10n.T("Hiển thị cảnh báo lỗi khi nhập dữ liệu không hợp lệ", "Show error alert after invalid data is entered"), Location = new Point(16, 16), AutoSize = true, Checked = true };
+            Label lblStyle = new Label { Text = AppL10n.T("Kiểu cảnh báo (Style):", "Style:"), Location = new Point(16, 50), AutoSize = true };
             cboErrorStyle = new ZenQOffice.UI.FluentComboBox { Location = new Point(16, 72), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
-            cboErrorStyle.Items.AddRange(new object[] { "⛔ Dừng lại (Stop)", "⚠️ Cảnh báo (Warning)", "ℹ️ Thông tin (Information)" });
+            cboErrorStyle.Items.AddRange(new object[] { AppL10n.T("⛔ Dừng lại (Stop)", "⛔ Stop"), AppL10n.T("⚠️ Cảnh báo (Warning)", "⚠️ Warning"), AppL10n.T("ℹ️ Thông tin (Information)", "ℹ️ Information") });
 
-            Label lblErrTitle = new Label { Text = "Tiêu đề:", Location = new Point(180, 50), AutoSize = true };
+            Label lblErrTitle = new Label { Text = AppL10n.T("Tiêu đề:", "Title:"), Location = new Point(180, 50), AutoSize = true };
             txtErrorTitle = new TextBox { Location = new Point(180, 72), Width = 216 };
-            Label lblErrMsg = new Label { Text = "Thông báo lỗi:", Location = new Point(16, 110), AutoSize = true };
+            Label lblErrMsg = new Label { Text = AppL10n.T("Thông báo lỗi:", "Error message:"), Location = new Point(16, 110), AutoSize = true };
             txtErrorMessage = new TextBox { Location = new Point(16, 132), Width = 380, Height = 100, Multiline = true };
             tabErrorAlert.Controls.AddRange(new Control[] { chkShowErrorMessage, lblStyle, cboErrorStyle, lblErrTitle, txtErrorTitle, lblErrMsg, txtErrorMessage });
 
             // Bottom Buttons
-            Button btnClearAll = new Button { Text = "Xóa tất cả", Location = new Point(16, 336), Width = 90, Height = 30 };
+            Button btnClearAll = new Button { Text = AppL10n.T("Xóa tất cả", "Clear All"), Location = new Point(16, 336), Width = 90, Height = 30 };
             btnClearAll.Click += (s, e) =>
             {
                 IsCleared = true;
@@ -148,7 +148,7 @@ namespace ZenQOffice.UI
                 this.Close();
             };
 
-            Button btnCancel = new Button { Text = "Hủy bỏ", Location = new Point(340, 336), Width = 85, Height = 30 };
+            Button btnCancel = new Button { Text = AppL10n.T("Hủy bỏ", "Cancel"), Location = new Point(340, 336), Width = 85, Height = 30 };
             btnCancel.Click += (s, e) =>
             {
                 this.DialogResult = DialogResult.Cancel;
@@ -186,8 +186,8 @@ namespace ZenQOffice.UI
 
             chkShowErrorMessage.Checked = Rule.ShowErrorMessage;
             cboErrorStyle.SelectedIndex = Math.Max(0, Math.Min(2, (int)Rule.ErrorStyle));
-            txtErrorTitle.Text = Rule.ErrorTitle ?? "Giá trị không hợp lệ";
-            txtErrorMessage.Text = Rule.ErrorMessage ?? "Giá trị bạn vừa nhập không đáp ứng các ràng buộc của ô này.";
+            txtErrorTitle.Text = Rule.ErrorTitle ?? AppL10n.T("Giá trị không hợp lệ", "Invalid value");
+            txtErrorMessage.Text = Rule.ErrorMessage ?? AppL10n.T("Giá trị bạn vừa nhập không đáp ứng các ràng buộc của ô này.", "This value doesn't match the data validation restrictions defined for this cell.");
 
             UpdateSettingsUI();
         }
@@ -236,7 +236,7 @@ namespace ZenQOffice.UI
             {
                 cboOperator.Enabled = false;
                 chkInCellDropdown.Enabled = true;
-                lblFormula1.Text = "Nguồn dữ liệu (vd: A1:A10 hoặc Táo, Cam, Chuối):";
+                lblFormula1.Text = AppL10n.T("Nguồn dữ liệu (vd: A1:A10 hoặc Táo, Cam, Chuối):", "Source (e.g. A1:A10 or Yes, No):");
                 txtFormula1.Enabled = true;
                 lblFormula2.Visible = false;
                 txtFormula2.Visible = false;
@@ -245,7 +245,7 @@ namespace ZenQOffice.UI
             {
                 cboOperator.Enabled = false;
                 chkInCellDropdown.Enabled = false;
-                lblFormula1.Text = "Công thức (Formula, vd: =A1>0):";
+                lblFormula1.Text = AppL10n.T("Công thức (Formula, vd: =A1>0):", "Formula (e.g. =A1>0):");
                 txtFormula1.Enabled = true;
                 lblFormula2.Visible = false;
                 txtFormula2.Visible = false;
@@ -254,7 +254,7 @@ namespace ZenQOffice.UI
             {
                 cboOperator.Enabled = true;
                 chkInCellDropdown.Enabled = false;
-                lblFormula1.Text = (cboOperator.SelectedIndex <= 1) ? "Giá trị tối thiểu:" : "Giá trị:";
+                lblFormula1.Text = (cboOperator.SelectedIndex <= 1) ? AppL10n.T("Giá trị tối thiểu:", "Minimum:") : AppL10n.T("Giá trị:", "Value:");
                 txtFormula1.Enabled = true;
                 UpdateOperatorUI();
             }
@@ -268,7 +268,7 @@ namespace ZenQOffice.UI
             bool isBetween = (cboOperator.SelectedIndex == 0 || cboOperator.SelectedIndex == 1);
             lblFormula2.Visible = isBetween;
             txtFormula2.Visible = isBetween;
-            lblFormula1.Text = isBetween ? "Giá trị tối thiểu:" : "Giá trị:";
+            lblFormula1.Text = isBetween ? AppL10n.T("Giá trị tối thiểu:", "Minimum:") : AppL10n.T("Giá trị:", "Value:");
         }
     }
 }

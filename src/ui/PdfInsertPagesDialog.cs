@@ -2,7 +2,8 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 using ZenQOffice.Format;
 
 namespace ZenQOffice.UI
@@ -32,7 +33,7 @@ namespace ZenQOffice.UI
             this.totalPages = Math.Max(1, totalPages);
             this.currentPage = Math.Max(1, Math.Min(currentPage, this.totalPages));
 
-            this.Text = "Chèn Trang từ Tệp PDF - Insert Pages from File";
+            this.Text = AppL10n.T("Chèn Trang từ Tệp PDF - Insert Pages from File", "Insert Pages from PDF");
             this.Size = new Size(520, 460);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -64,8 +65,8 @@ namespace ZenQOffice.UI
                 using (Font titleF = new Font("Segoe UI", 12f, FontStyle.Bold))
                 using (Font subF = new Font("Segoe UI", 8.5f, FontStyle.Regular))
                 {
-                    e.Graphics.DrawString("Chèn Trang từ Tệp PDF (Insert Pages)", titleF, Brushes.White, 44, 12);
-                    e.Graphics.DrawString($"Tài liệu hiện tại có {totalPages} trang. Chọn tệp PDF và vị trí cần ghép vào.", subF, Brushes.WhiteSmoke, 44, 38);
+                    e.Graphics.DrawString(AppL10n.T("Chèn Trang từ Tệp PDF (Insert Pages)", "Insert Pages from PDF"), titleF, Brushes.White, 44, 12);
+                    e.Graphics.DrawString(string.Format(AppL10n.T("Tài liệu hiện tại có {0} trang. Chọn tệp PDF và vị trí cần ghép vào.", "This document has {0} page(s). Choose a PDF file and insertion location."), totalPages), subF, Brushes.WhiteSmoke, 44, 38);
                 }
             };
             this.Controls.Add(pnlHeader);
@@ -80,14 +81,14 @@ namespace ZenQOffice.UI
             // Group 1: Chọn tệp
             GroupBox grpFile = new GroupBox
             {
-                Text = "Tệp PDF Cần Chèn",
+                Text = AppL10n.T("Tệp PDF Cần Chèn", "Source PDF File"),
                 Location = new Point(4, 4),
                 Size = new Size(464, 105),
                 ForeColor = Color.FromArgb(30, 41, 59)
             };
             pnlBody.Controls.Add(grpFile);
 
-            Label lblPath = new Label { Text = "Đường dẫn tệp:", Location = new Point(16, 26), AutoSize = true };
+            Label lblPath = new Label { Text = AppL10n.T("Đường dẫn tệp:", "File path:"), Location = new Point(16, 26), AutoSize = true };
             grpFile.Controls.Add(lblPath);
 
             txtFile = new TextBox
@@ -101,7 +102,7 @@ namespace ZenQOffice.UI
 
             btnBrowse = new Button
             {
-                Text = "Duyệt...",
+                Text = AppL10n.T("Duyệt...", "Browse..."),
                 Location = new Point(366, 46),
                 Size = new Size(88, 28),
                 BackColor = Color.White,
@@ -118,7 +119,7 @@ namespace ZenQOffice.UI
 
             lblFileInfo = new Label
             {
-                Text = "Chưa chọn tệp PDF nào.",
+                Text = AppL10n.T("Chưa chọn tệp PDF nào.", "No PDF file selected."),
                 Location = new Point(16, 78),
                 AutoSize = true,
                 ForeColor = Color.Gray,
@@ -129,7 +130,7 @@ namespace ZenQOffice.UI
             // Group 2: Vị trí chèn
             GroupBox grpLoc = new GroupBox
             {
-                Text = "Vị trí Chèn vào Tài liệu",
+                Text = AppL10n.T("Vị trí Chèn vào Tài liệu", "Location in Document"),
                 Location = new Point(4, 115),
                 Size = new Size(464, 165),
                 ForeColor = Color.FromArgb(30, 41, 59)
@@ -138,7 +139,7 @@ namespace ZenQOffice.UI
 
             rdoBeforeFirst = new RadioButton
             {
-                Text = "Trước trang đầu tiên (Đầu tài liệu)",
+                Text = AppL10n.T("Trước trang đầu tiên (Đầu tài liệu)", "Before first page"),
                 Location = new Point(16, 26),
                 AutoSize = true
             };
@@ -146,7 +147,7 @@ namespace ZenQOffice.UI
 
             rdoAfterLast = new RadioButton
             {
-                Text = "Sau trang cuối cùng (Cuối tài liệu)",
+                Text = AppL10n.T("Sau trang cuối cùng (Cuối tài liệu)", "After last page"),
                 Location = new Point(16, 56),
                 AutoSize = true,
                 Checked = true
@@ -155,7 +156,7 @@ namespace ZenQOffice.UI
 
             rdoBeforeCurrent = new RadioButton
             {
-                Text = $"Trước trang hiện tại (Trước trang {currentPage})",
+                Text = string.Format(AppL10n.T("Trước trang hiện tại (Trước trang {0})", "Before current page (Page {0})"), currentPage),
                 Location = new Point(16, 86),
                 AutoSize = true
             };
@@ -163,7 +164,7 @@ namespace ZenQOffice.UI
 
             rdoAfterCurrent = new RadioButton
             {
-                Text = $"Sau trang hiện tại (Sau trang {currentPage})",
+                Text = string.Format(AppL10n.T("Sau trang hiện tại (Sau trang {0})", "After current page (Page {0})"), currentPage),
                 Location = new Point(16, 116),
                 AutoSize = true
             };
@@ -180,7 +181,7 @@ namespace ZenQOffice.UI
 
             btnInsert = new Button
             {
-                Text = "Chèn Trang",
+                Text = AppL10n.T("Chèn Trang", "Insert Pages"),
                 Size = new Size(130, 34),
                 Location = new Point(230, 10),
                 BackColor = Color.FromArgb(37, 99, 235),
@@ -199,7 +200,7 @@ namespace ZenQOffice.UI
 
             btnCancel = new Button
             {
-                Text = "Hủy bỏ",
+                Text = AppL10n.T("Hủy bỏ", "Cancel"),
                 Size = new Size(95, 34),
                 Location = new Point(370, 10),
                 BackColor = Color.White,
@@ -218,7 +219,7 @@ namespace ZenQOffice.UI
 
         private void BtnBrowse_Click(object sender, EventArgs e)
         {
-            using (var ofd = new OpenFileDialog { Filter = "Tệp PDF (*.pdf)|*.pdf", Title = "Chọn tệp PDF cần chèn" })
+            using (var ofd = new OpenFileDialog { Filter = AppL10n.T("Tệp PDF (*.pdf)|*.pdf", "PDF Files (*.pdf)|*.pdf"), Title = AppL10n.T("Chọn tệp PDF cần chèn", "Select PDF File to Insert") })
             {
                 if (ofd.ShowDialog(this) == DialogResult.OK)
                 {
@@ -228,12 +229,12 @@ namespace ZenQOffice.UI
                         var infoDoc = PdfHandler.LoadPdf(ofd.FileName);
                         int pCount = (infoDoc != null && infoDoc.Pages != null) ? infoDoc.Pages.Count : 1;
                         long sizeKb = new FileInfo(ofd.FileName).Length / 1024;
-                        lblFileInfo.Text = $"Tệp hợp lệ: {pCount} trang ({sizeKb:N0} KB)";
+                        lblFileInfo.Text = string.Format(AppL10n.T("Tệp hợp lệ: {0} trang ({1:N0} KB)", "Valid PDF: {0} page(s) ({1:N0} KB)"), pCount, sizeKb);
                         lblFileInfo.ForeColor = Color.FromArgb(16, 185, 129);
                     }
                     catch
                     {
-                        lblFileInfo.Text = "Tệp PDF đã chọn.";
+                        lblFileInfo.Text = AppL10n.T("Tệp PDF đã chọn.", "PDF file selected.");
                         lblFileInfo.ForeColor = Color.Gray;
                     }
                 }
@@ -244,7 +245,7 @@ namespace ZenQOffice.UI
         {
             if (string.IsNullOrWhiteSpace(txtFile.Text) || !File.Exists(txtFile.Text))
             {
-                ZenQOffice.UI.FluentMessageBox.Show(this, "Vui lòng chọn một tệp PDF hợp lệ!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ZenQOffice.UI.FluentMessageBox.Show(this, AppL10n.T("Vui lòng chọn một tệp PDF hợp lệ!", "Please select a valid PDF file!"), AppL10n.T("Thông báo", "Notice"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 btnBrowse.PerformClick();
                 return;
             }

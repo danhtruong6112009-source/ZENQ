@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
+using System.Windows.Forms;
+using ZenQOffice.Core;
 
 namespace ZenQOffice.UI
 {
@@ -23,7 +24,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent(DocumentStatistics stats)
         {
-            this.Text = "Đếm từ (Word Count)";
+            this.Text = AppL10n.T("Đếm từ (Word Count)", "Word Count");
             this.Size = new Size(360, 310);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -34,7 +35,7 @@ namespace ZenQOffice.UI
 
             Label lblHeading = new Label
             {
-                Text = "Thống kê tài liệu:",
+                Text = AppL10n.T("Thống kê tài liệu:", "Statistics:"),
                 Location = new Point(20, 16),
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
@@ -47,11 +48,11 @@ namespace ZenQOffice.UI
             string[,] rows = new string[,]
             {
                 { "Trang (Pages):", stats.Pages.ToString("N0") },
-                { "Từ (Words):", stats.Words.ToString("N0") },
-                { "Ký tự (không dấu cách):", stats.CharactersNoSpaces.ToString("N0") },
-                { "Ký tự (có dấu cách):", stats.CharactersWithSpaces.ToString("N0") },
-                { "Đoạn văn (Paragraphs):", stats.Paragraphs.ToString("N0") },
-                { "Dòng (Lines):", stats.Lines.ToString("N0") }
+                { AppL10n.T("Từ (Words):", "Words:"), stats.Words.ToString("N0") },
+                { AppL10n.T("Ký tự (không dấu cách):", "Characters (no spaces):"), stats.CharactersNoSpaces.ToString("N0") },
+                { AppL10n.T("Ký tự (có dấu cách):", "Characters (with spaces):"), stats.CharactersWithSpaces.ToString("N0") },
+                { AppL10n.T("Đoạn văn (Paragraphs):", "Paragraphs:"), stats.Paragraphs.ToString("N0") },
+                { AppL10n.T("Dòng (Lines):", "Lines:"), stats.Lines.ToString("N0") }
             };
 
             for (int i = 0; i < 6; i++)
@@ -78,7 +79,7 @@ namespace ZenQOffice.UI
 
             CheckBox chkIncludeNotes = new CheckBox
             {
-                Text = "Bao gồm cả hộp văn bản và chú thích",
+                Text = AppL10n.T("Bao gồm cả hộp văn bản và chú thích", "Include textboxes, footnotes and endnotes"),
                 Location = new Point(24, startY + 6 * stepY + 6),
                 AutoSize = true,
                 Checked = true,
@@ -87,7 +88,7 @@ namespace ZenQOffice.UI
 
             Button btnClose = new Button
             {
-                Text = "Đóng",
+                Text = AppL10n.T("Đóng", "Close"),
                 Location = new Point(235, startY + 7 * stepY + 14),
                 Width = 85,
                 Height = 28,

@@ -164,15 +164,15 @@ namespace ZenQOffice.UI
   {
    var menu=new FluentContextMenuStrip{Font=EquationMenuFont,CornerRadius=3,HoverCornerRadius=2,ItemPadding=new Padding(2,1,2,1),Padding=new Padding(2),ShowImageMargin=false,ShowCheckMargin=true};int index=SelectedEquationIndex();
    bool linear=index>=0&&WriterMath.IsLinear(PieceTable.GetText()[index]);
-   menu.Items.Add("Nhập / Sửa công thức…",null,(s,e)=>ShowEquationEditor(owner));
+   menu.Items.Add(ZenQOffice.Core.AppL10n.T("Nhập / Sửa công thức…","Insert / Edit Equation…"),null,(s,e)=>ShowEquationEditor(owner));
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add(new ToolStripMenuItem("Professional",null,(s,e)=>SetEquationLinear(false)){Checked=!linear});
    menu.Items.Add(new ToolStripMenuItem("Linear (LaTeX)",null,(s,e)=>SetEquationLinear(true)){Checked=linear});
    menu.Items.Add(new ToolStripSeparator());
-   menu.Items.Add("Tất cả: Professional",null,(s,e)=>SetEquationLinear(false,true));
-   menu.Items.Add("Tất cả: Linear",null,(s,e)=>SetEquationLinear(true,true));
+   menu.Items.Add(ZenQOffice.Core.AppL10n.T("Tất cả: Professional","All: Professional"),null,(s,e)=>SetEquationLinear(false,true));
+   menu.Items.Add(ZenQOffice.Core.AppL10n.T("Tất cả: Linear","All: Linear"),null,(s,e)=>SetEquationLinear(true,true));
    menu.Items.Add(new ToolStripSeparator());
-   menu.Items.Add("Sao chép công thức",null,(s,e)=>{if(SelectedEquationIndex()>=0)Copy();});
+   menu.Items.Add(ZenQOffice.Core.AppL10n.T("Sao chép công thức","Copy Equation"),null,(s,e)=>{if(SelectedEquationIndex()>=0)Copy();});
    menu.Opening+=(s,e)=>
    {
     int selected=SelectedEquationIndex();bool isLinear=selected>=0&&WriterMath.IsLinear(PieceTable.GetText()[selected]);
@@ -200,11 +200,11 @@ namespace ZenQOffice.UI
   public void ShowEquationEditor(Control owner=null)
   {
    string selected=GetSelectedText();
-   using var dialog=new Form{Text="Nhập / Sửa công thức",ClientSize=new Size(580,190),StartPosition=FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,BackColor=Color.White,Font=new Font("Segoe UI",9)};
-   var label=new Label{Text=@"Nhập công thức / LaTeX: \frac{a}{b}, \vec{AB}, x^2, \sqrt{x}",AutoSize=true,Location=new Point(16,16)};
+   using var dialog=new Form{Text=ZenQOffice.Core.AppL10n.T("Nhập / Sửa công thức","Insert / Edit Equation"),ClientSize=new Size(580,190),StartPosition=FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,BackColor=Color.White,Font=new Font("Segoe UI",9)};
+   var label=new Label{Text=ZenQOffice.Core.AppL10n.T(@"Nhập công thức / LaTeX: \frac{a}{b}, \vec{AB}, x^2, \sqrt{x}",@"Enter equation / LaTeX: \frac{a}{b}, \vec{AB}, x^2, \sqrt{x}"),AutoSize=true,Location=new Point(16,16)};
    var input=new TextBox{Text=WriterMath.Contains(selected)?WriterMath.ToLinear(selected):@"\frac{a}{b}",Multiline=true,ScrollBars=ScrollBars.Vertical,Location=new Point(16,44),Size=new Size(548,80)};
-   var ok=new Button{Text="Áp dụng",DialogResult=DialogResult.OK,Location=new Point(358,145),Size=new Size(100,30)};
-   var cancel=new Button{Text="Hủy",DialogResult=DialogResult.Cancel,Location=new Point(468,145),Size=new Size(96,30)};
+   var ok=new Button{Text=ZenQOffice.Core.AppL10n.T("Áp dụng","Apply"),DialogResult=DialogResult.OK,Location=new Point(358,145),Size=new Size(100,30)};
+   var cancel=new Button{Text=ZenQOffice.Core.AppL10n.T("Hủy","Cancel"),DialogResult=DialogResult.Cancel,Location=new Point(468,145),Size=new Size(96,30)};
    dialog.Controls.AddRange(new Control[]{label,input,ok,cancel});dialog.AcceptButton=ok;dialog.CancelButton=cancel;
    if(dialog.ShowDialog(owner)==DialogResult.OK&&!string.IsNullOrWhiteSpace(input.Text)&&(!WriterMath.Contains(selected)||input.Text.Trim()!=WriterMath.ToLinear(selected).Trim())){InsertEquation(input.Text.Trim());InvalidateLayoutAndTextCache();Invalidate();}
   }

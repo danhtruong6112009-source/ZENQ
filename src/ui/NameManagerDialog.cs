@@ -20,7 +20,7 @@ namespace ZenQOffice.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Trình quản lý Tên (Name Manager)";
+            this.Text = AppL10n.T("Trình quản lý Tên (Name Manager)", "Name Manager");
             this.Size = new Size(580, 420);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -29,16 +29,16 @@ namespace ZenQOffice.UI
             this.Font = new Font("Segoe UI", 9f);
             this.BackColor = Color.FromArgb(248, 250, 252);
 
-            Button btnNew = new Button { Text = "Mới...", Location = new Point(16, 16), Width = 90, Height = 28, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White };
+            Button btnNew = new Button { Text = AppL10n.T("Mới...", "New..."), Location = new Point(16, 16), Width = 90, Height = 28, BackColor = Color.FromArgb(37, 99, 235), ForeColor = Color.White };
             btnNew.Click += BtnNew_Click;
 
-            Button btnEdit = new Button { Text = "Chỉnh sửa...", Location = new Point(114, 16), Width = 95, Height = 28 };
+            Button btnEdit = new Button { Text = AppL10n.T("Chỉnh sửa...", "Edit..."), Location = new Point(114, 16), Width = 95, Height = 28 };
             btnEdit.Click += BtnEdit_Click;
 
-            Button btnDelete = new Button { Text = "Xóa", Location = new Point(216, 16), Width = 80, Height = 28 };
+            Button btnDelete = new Button { Text = AppL10n.T("Xóa", "Delete"), Location = new Point(216, 16), Width = 80, Height = 28 };
             btnDelete.Click += BtnDelete_Click;
 
-            Button btnClose = new Button { Text = "Đóng", Location = new Point(470, 16), Width = 80, Height = 28 };
+            Button btnClose = new Button { Text = AppL10n.T("Đóng", "Close"), Location = new Point(470, 16), Width = 80, Height = 28 };
             btnClose.Click += (s, e) => this.Close();
 
             lvNames = new ListView
@@ -50,10 +50,10 @@ namespace ZenQOffice.UI
                 FullRowSelect = true,
                 GridLines = true
             };
-            lvNames.Columns.Add("Tên (Name)", 130);
-            lvNames.Columns.Add("Giá trị / Tham chiếu (Refers To)", 180);
-            lvNames.Columns.Add("Phạm vi (Scope)", 110);
-            lvNames.Columns.Add("Ghi chú (Comment)", 100);
+            lvNames.Columns.Add(AppL10n.T("Tên (Name)", "Name"), 130);
+            lvNames.Columns.Add(AppL10n.T("Giá trị / Tham chiếu (Refers To)", "Refers To"), 180);
+            lvNames.Columns.Add(AppL10n.T("Phạm vi (Scope)", "Scope"), 110);
+            lvNames.Columns.Add(AppL10n.T("Ghi chú (Comment)", "Comment"), 100);
 
             this.Controls.AddRange(new Control[] { btnNew, btnEdit, btnDelete, btnClose, lvNames });
         }
@@ -79,26 +79,26 @@ namespace ZenQOffice.UI
         {
             using (Form editDlg = new Form())
             {
-                editDlg.Text = "Tên mới (New Name)";
+                editDlg.Text = AppL10n.T("Tên mới (New Name)", "New Name");
                 editDlg.Size = new Size(380, 260);
                 editDlg.StartPosition = FormStartPosition.CenterParent;
                 editDlg.FormBorderStyle = FormBorderStyle.FixedDialog;
                 editDlg.MaximizeBox = false; editDlg.MinimizeBox = false;
 
-                Label lblN = new Label { Text = "Tên vùng (Name):", Location = new Point(16, 16), AutoSize = true };
+                Label lblN = new Label { Text = AppL10n.T("Tên vùng (Name):", "Name:"), Location = new Point(16, 16), AutoSize = true };
                 TextBox txtN = new TextBox { Text = "VungDuLieu1", Location = new Point(16, 38), Width = 330 };
 
-                Label lblS = new Label { Text = "Phạm vi (Scope):", Location = new Point(16, 70), AutoSize = true };
+                Label lblS = new Label { Text = AppL10n.T("Phạm vi (Scope):", "Scope:"), Location = new Point(16, 70), AutoSize = true };
                 ComboBox cboS = new ZenQOffice.UI.FluentComboBox { Location = new Point(16, 92), Width = 330, DropDownStyle = ComboBoxStyle.DropDownList };
-                cboS.Items.Add("Toàn bảng tính (Workbook)");
+                cboS.Items.Add(AppL10n.T("Toàn bảng tính (Workbook)", "Workbook"));
                 cboS.SelectedIndex = 0;
 
-                Label lblR = new Label { Text = "Tham chiếu tới (Refers to):", Location = new Point(16, 124), AutoSize = true };
+                Label lblR = new Label { Text = AppL10n.T("Tham chiếu tới (Refers to):", "Refers to:"), Location = new Point(16, 124), AutoSize = true };
                 string curAddr = "=" + (calcView.CurrentSheet != null ? "Sheet1" : "") + "!$" + SparseMatrix.ColIndexToName(calcView.SelectedCol) + "$" + calcView.SelectedRow;
                 TextBox txtR = new TextBox { Text = curAddr, Location = new Point(16, 146), Width = 330 };
 
                 Button btnOk = new Button { Text = "OK", Location = new Point(180, 182), Width = 80, Height = 28, DialogResult = DialogResult.OK };
-                Button btnCan = new Button { Text = "Hủy", Location = new Point(266, 182), Width = 80, Height = 28, DialogResult = DialogResult.Cancel };
+                Button btnCan = new Button { Text = AppL10n.T("Hủy", "Cancel"), Location = new Point(266, 182), Width = 80, Height = 28, DialogResult = DialogResult.Cancel };
                 editDlg.Controls.AddRange(new Control[] { lblN, txtN, lblS, cboS, lblR, txtR, btnOk, btnCan });
 
                 if (editDlg.ShowDialog(this) == DialogResult.OK)
@@ -117,20 +117,20 @@ namespace ZenQOffice.UI
 
             using (Form editDlg = new Form())
             {
-                editDlg.Text = "Chỉnh sửa Tên";
+                editDlg.Text = AppL10n.T("Chỉnh sửa Tên", "Edit Name");
                 editDlg.Size = new Size(380, 240);
                 editDlg.StartPosition = FormStartPosition.CenterParent;
                 editDlg.FormBorderStyle = FormBorderStyle.FixedDialog;
                 editDlg.MaximizeBox = false; editDlg.MinimizeBox = false;
 
-                Label lblN = new Label { Text = "Tên vùng (Name):", Location = new Point(16, 16), AutoSize = true };
+                Label lblN = new Label { Text = AppL10n.T("Tên vùng (Name):", "Name:"), Location = new Point(16, 16), AutoSize = true };
                 TextBox txtN = new TextBox { Text = dn.Name, Location = new Point(16, 38), Width = 330 };
 
-                Label lblR = new Label { Text = "Tham chiếu tới (Refers to):", Location = new Point(16, 70), AutoSize = true };
+                Label lblR = new Label { Text = AppL10n.T("Tham chiếu tới (Refers to):", "Refers to:"), Location = new Point(16, 70), AutoSize = true };
                 TextBox txtR = new TextBox { Text = dn.RefersTo, Location = new Point(16, 92), Width = 330 };
 
                 Button btnOk = new Button { Text = "OK", Location = new Point(180, 150), Width = 80, Height = 28, DialogResult = DialogResult.OK };
-                Button btnCan = new Button { Text = "Hủy", Location = new Point(266, 150), Width = 80, Height = 28, DialogResult = DialogResult.Cancel };
+                Button btnCan = new Button { Text = AppL10n.T("Hủy", "Cancel"), Location = new Point(266, 150), Width = 80, Height = 28, DialogResult = DialogResult.Cancel };
                 editDlg.Controls.AddRange(new Control[] { lblN, txtN, lblR, txtR, btnOk, btnCan });
 
                 if (editDlg.ShowDialog(this) == DialogResult.OK)
@@ -146,7 +146,7 @@ namespace ZenQOffice.UI
         {
             if (lvNames.SelectedItems.Count == 0) return;
             var dn = lvNames.SelectedItems[0].Tag as DefinedNameModel;
-            if (dn != null && ZenQOffice.UI.FluentMessageBox.Show($"Bạn có chắc chắn muốn xóa tên \"{dn.Name}\"?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (dn != null && ZenQOffice.UI.FluentMessageBox.Show(string.Format(AppL10n.T("Bạn có chắc chắn muốn xóa tên \"{0}\"?", "Are you sure you want to delete name \"{0}\"?"), dn.Name), AppL10n.T("Xác nhận", "Confirm"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 calcView.DefinedNames.Remove(dn);
                 RefreshList();
